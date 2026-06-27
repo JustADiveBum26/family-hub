@@ -1,8 +1,37 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCo5EqGCkFd-U5O1JKxtoW5N5AEC2TzONQ",
+  authDomain: "family-hub-49194.firebaseapp.com",
+  projectId: "family-hub-49194",
+  storageBucket: "family-hub-49194.firebasestorage.app",
+  messagingSenderId: "1085739826349",
+  appId: "1:1085739826349:web:1da0c504712cbb6f54da24"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+const FAMILY_DOC = "family-hub-data";
 
 const store = {
-  save: (k,v) => { try { localStorage.setItem(k,JSON.stringify(v)); } catch {} },
-  load: (k,fb) => { try { const r=localStorage.getItem(k); return r?JSON.parse(r):fb; } catch { return fb; } },
+  save: async (k,v) => {
+    try {
+      const ref = doc(db, "appdata", FAMILY_DOC);
+      const snap = await getDoc(ref);
+      const existing = snap.exists() ? snap.data() : {};
+      await setDoc(ref, { ...existing, [k]: JSON.stringify(v) }, { merge: true });
+    } catch(e) { console.error("Firebase save error:", e); }
+  },
+  load: async (k,fb) => {
+    try {
+      const ref = doc(db, "appdata", FAMILY_DOC);
+      const snap = await getDoc(ref);
+      if (snap.exists() && snap.data()[k]) return JSON.parse(snap.data()[k]);
+      return fb;
+    } catch(e) { return fb; }
+  },
 };
 
 const DAYS=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
@@ -1196,8 +1225,9 @@ export default function App(){
   const timerRef=useRef(null);
 
   useEffect(()=>{
-    const [p,a,d,e,g,t,ps,bl,mp,sl,ms,sr,au,ch,mg,bh,as,md]=[
-      store.load("fp2:profile",D.profile),store.load("fp2:accounts",D.accounts),
+    (async()=>{
+      const [p,a,d,e,g,t,ps,bl,mp,sl,ms,sr,au,ch,mg,bh,as,md]=await Promise.all([
+        store.load("fp2:profile",D.profile),store.load("fp2:accounts",D.accounts),
         store.load("fp2:debts",D.debts),store.load("fp2:expenses",D.expenses),
         store.load("fp2:goals",D.goals),store.load("fp2:transactions",D.transactions),
         store.load("fp2:pslf",D.pslf),store.load("fp2:bills",D.bills),
@@ -1206,7 +1236,7 @@ export default function App(){
         store.load("fp2:auth",D.auth),store.load("fp2:chores",D.chores),
         store.load("fp2:messages",D.messages),store.load("fp2:billHistory",D.billHistory),
         store.load("fp2:appSettings",D.appSettings),store.load("fp2:mealDetails",{}),
-      ];
+      ]);
       setProfile(p);setAccounts(a);setDebts(d);setExpenses(e);setGoals(g);setTransactions(t);setPslf(ps);
       setBills(bl);setBillHistory(bh||[]);
       const safeMp=Object.fromEntries(DAYS.map(dy=>[dy,{Breakfast:mp[dy]?.Breakfast||"",Lunch:mp[dy]?.Lunch||"",Dinner:mp[dy]?.Dinner||""}]));
@@ -1215,6 +1245,7 @@ export default function App(){
       setMealDetails(md||{});
       setAppSettings({...D.appSettings,...(as||{})});
       setLoaded(true);
+    })();
   },[]);
 
   const resetActivity=useCallback(()=>{lastActivity.current=Date.now();},[]);
