@@ -1215,9 +1215,8 @@ export default function App(){
   const timerRef=useRef(null);
 
   useEffect(()=>{
-    {
-      const [p,a,d,e,g,t,ps,bl,mp,sl,ms,sr,au,ch,mg,bh,as,md]=[
-        store.load("fp2:profile",D.profile),store.load("fp2:accounts",D.accounts),
+    const [p,a,d,e,g,t,ps,bl,mp,sl,ms,sr,au,ch,mg,bh,as,md]=[
+      store.load("fp2:profile",D.profile),store.load("fp2:accounts",D.accounts),
         store.load("fp2:debts",D.debts),store.load("fp2:expenses",D.expenses),
         store.load("fp2:goals",D.goals),store.load("fp2:transactions",D.transactions),
         store.load("fp2:pslf",D.pslf),store.load("fp2:bills",D.bills),
