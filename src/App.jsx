@@ -976,25 +976,6 @@ function DashboardTab({profile,accounts,debts,goals,expenses,transactions,totalA
   </>);
 }
 
-// ── KID DASHBOARDS ────────────────────────────────────────────────────────────
-function KidChoreView({chores,userKey,userName,userColor,appSettings,S}){
-  const myChores=chores.filter(c=>c.assignee===userKey);
-  const todo=myChores.filter(c=>!c.done),done=myChores.filter(c=>c.done);
-  const showPoints=appSettings.showPoints;
-  const pts=done.reduce((s,c)=>s+(c.points||0),0);
-  if(myChores.length===0)return null;
-  return(<div style={{...S.card,borderTop:`3px solid ${userColor}`}}>
-    <div style={{...S.h2,...S.row}}>
-      <span>My Chores</span>
-      {showPoints&&<span style={{...S.tag(userColor),fontSize:11}}>{pts} pts earned</span>}
-    </div>
-    {todo.map(c=><div key={c.id} style={{display:"flex",gap:10,padding:"8px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"center"}}>
-      <div style={{width:20,height:20,borderRadius:4,border:`2px solid ${S.T.border}`,flexShrink:0}}/>
-      <div style={{flex:1}}><div style={{fontSize:13,color:S.T.text}}>{c.task}</div>{c.due&&<div style={{fontSize:11,color:S.T.sub}}>Due: {c.due}</div>}{showPoints&&<div style={{fontSize:11,color:S.T.accent}}>{c.points} pts</div>}</div>
-    </div>)}
-    {done.length>0&&<div style={{marginTop:8,opacity:0.5}}><div style={{...S.label,marginBottom:4}}>DONE</div>{done.map(c=><div key={c.id} style={{display:"flex",gap:8,padding:"5px 0",alignItems:"center"}}><div style={{width:18,height:18,borderRadius:4,background:"#4CAF50",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#0d0d08",fontSize:11,fontWeight:"bold"}}>✓</div><span style={{fontSize:12,color:S.T.sub,textDecoration:"line-through"}}>{c.task}</span></div>)}</div>}
-  </div>);
-}
 
 function BradynDashboard({mealPlan,shopList,shopRequests,setShopRequests,mealSuggestions,setMealSuggestions,chores,setChores,messages,setMessages,appSettings,onLogout}){
   const [tab,setTab]=useState("home");
