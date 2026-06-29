@@ -220,6 +220,7 @@ function AvatarPicker({userKey,avatars,setAvatars,onClose,onSkip}){
 }
 
 
+function LoginModal({user,auth,avatars,onSuccess,onClose}){
   const [pwd,setPwd]=useState(""),[confirm,setConfirm]=useState(""),[error,setError]=useState(""),[pinErr,setPinErr]=useState("");
   const u=USERS.find(x=>x.key===user);
   const isPin=u.type==="pin",isFirst=!auth[user],pinNotSet=isPin&&!auth[user];
