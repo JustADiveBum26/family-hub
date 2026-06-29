@@ -580,10 +580,16 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
   const saveProfile=()=>{setProfile(local);store.save("fp2:profile",local);setSaved(true);setTimeout(()=>setSaved(false),2000);};
   const saveSettings=u=>{setAppSettings(u);store.save("fp2:appSettings",u);};
   const toggleAdultChore=key=>{const u={...appSettings,showAdultChores:{...appSettings.showAdultChores,[key]:!appSettings.showAdultChores?.[key]}};saveSettings(u);};
+  const saveShopSettings=u=>{setShopSettings(u);store.save("fp2:shopSettings",u);};
+  const savePayAccounts=u=>{setPayAccounts(u);store.save("fp2:payAccounts",u);};
+  const [newCat,setNewCat]=useState("");
+  const [newStore,setNewStore]=useState("");
+  const [newBradAcct,setNewBradAcct]=useState("");
+  const [newMBAcct,setNewMBAcct]=useState("");
   const isParent=currentUser==="brad"||currentUser==="maryBeth";
   return(<div>
     <div style={S.card}>
-      <div style={S.h2}>Profile & Names</div>
+      <div style={S.h2}>Profile</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,marginBottom:14}}>
         <div><div style={S.label}>Your Name</div><input style={S.input} value={local.myName} onChange={e=>setLocal({...local,myName:e.target.value})}/></div>
         <div><div style={S.label}>Partner Name</div><input style={S.input} value={local.fianceName} onChange={e=>setLocal({...local,fianceName:e.target.value})}/></div>
