@@ -76,6 +76,14 @@ const D={
   auth:{brad:null,maryBeth:null,bradyn:null,parker:null,ryder:null},
   chores:[],messages:[],billHistory:[],
   appSettings:{showPoints:false,showAdultChores:{brad:false,maryBeth:false,bradyn:false},userThemes:{}},
+  shopSettings:{
+    categories:["Grocery","Dairy","Produce","Meat","Snacks","Beverages","Household","Personal Care","Other"],
+    stores:["Walmart","Kroger","Target","Costco","Aldi","Other"],
+  },
+  payAccounts:{
+    brad:["Chase Checking","Ally HYSA","Cash"],
+    maryBeth:["Checking","Savings","Cash"],
+  },
 };
 
 const fmt=n=>"$"+Math.abs(Math.round(n)).toLocaleString();
@@ -566,7 +574,7 @@ function MessageBoard({messages,setMessages,currentUser,S}){
 }
 
 // ── SETTINGS TAB ─────────────────────────────────────────────────────────────
-function SettingsTab({profile,setProfile,appSettings,setAppSettings,S,currentUser}){
+function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings,setShopSettings,payAccounts,setPayAccounts,S,currentUser}){
   const [local,setLocal]=useState({...profile});
   const [saved,setSaved]=useState(false);
   const saveProfile=()=>{setProfile(local);store.save("fp2:profile",local);setSaved(true);setTimeout(()=>setSaved(false),2000);};
@@ -585,6 +593,51 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,S,currentUse
         <div><div style={S.label}>Months to PSLF</div><input style={S.input} type="number" value={local.pslfMonths} onChange={e=>setLocal({...local,pslfMonths:+e.target.value})}/></div>
       </div>
       <button style={S.btn()} onClick={saveProfile}>{saved?"✓ Saved!":"Save Profile"}</button>
+    </div>
+    {isParent&&<div style={S.card}>
+      <div style={S.h2}>Shopping — Stores</div>
+      <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+        <input style={{...S.input,flex:1}} placeholder="Add store (e.g. Walmart)" value={newStore} onChange={e=>setNewStore(e.target.value)}/>
+        <button style={S.btn()} onClick={()=>{if(!newStore.trim())return;saveShopSettings({...shopSettings,stores:[...(shopSettings.stores||[]),newStore.trim()]});setNewStore("");}}>Add</button>
+      </div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+        {(shopSettings.stores||[]).map(s=><div key={s} style={{display:"flex",gap:4,alignItems:"center",...S.tag(S.T.accent)}}><span>{s}</span><button onClick={()=>saveShopSettings({...shopSettings,stores:(shopSettings.stores||[]).filter(x=>x!==s)})} style={{background:"none",border:"none",color:"#f44336",cursor:"pointer",fontSize:12,padding:"0 2px"}}>×</button></div>)}
+      </div>
+    </div>}
+    {isParent&&<div style={S.card}>
+      <div style={S.h2}>Shopping — Categories</div>
+      <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+        <input style={{...S.input,flex:1}} placeholder="Add category (e.g. Frozen Foods)" value={newCat} onChange={e=>setNewCat(e.target.value)}/>
+        <button style={S.btn()} onClick={()=>{if(!newCat.trim())return;saveShopSettings({...shopSettings,categories:[...(shopSettings.categories||[]),newCat.trim()]});setNewCat("");}}>Add</button>
+      </div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+        {(shopSettings.categories||[]).map(c=><div key={c} style={{display:"flex",gap:4,alignItems:"center",...S.tag(S.T.accent)}}><span>{c}</span><button onClick={()=>saveShopSettings({...shopSettings,categories:(shopSettings.categories||[]).filter(x=>x!==c)})} style={{background:"none",border:"none",color:"#f44336",cursor:"pointer",fontSize:12,padding:"0 2px"}}>×</button></div>)}
+      </div>
+    </div>}
+    <div style={S.card}>
+      <div style={S.h2}>{currentUser==="brad"?profile.myName:profile.fianceName} — Payment Accounts</div>
+      <div style={{fontSize:12,color:S.T.sub,marginBottom:10}}>These are the accounts you pay expenses from.</div>
+      <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+        <input style={{...S.input,flex:1}} placeholder="e.g. Chase Checking, Ally HYSA" value={currentUser==="brad"?newBradAcct:newMBAcct} onChange={e=>currentUser==="brad"?setNewBradAcct(e.target.value):setNewMBAcct(e.target.value)}/>
+        <button style={S.btn()} onClick={()=>{
+          const val=currentUser==="brad"?newBradAcct.trim():newMBAcct.trim();
+          if(!val)return;
+          const key=currentUser==="brad"?"brad":"maryBeth";
+          savePayAccounts({...payAccounts,[key]:[...(payAccounts[key]||[]),val]});
+          currentUser==="brad"?setNewBradAcct(""):setNewMBAcct("");
+        }}>Add</button>
+      </div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+        {(payAccounts[currentUser==="brad"?"brad":"maryBeth"]||[]).map(a=><div key={a} style={{display:"flex",gap:4,alignItems:"center",...S.tag("#2196F3")}}><span>{a}</span><button onClick={()=>{const key=currentUser==="brad"?"brad":"maryBeth";savePayAccounts({...payAccounts,[key]:(payAccounts[key]||[]).filter(x=>x!==a)});}} style={{background:"none",border:"none",color:"#f44336",cursor:"pointer",fontSize:12,padding:"0 2px"}}>×</button></div>)}
+      </div>
+      {currentUser==="brad"&&payAccounts.maryBeth?.length>0&&<div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${S.T.border}`}}>
+        <div style={{fontSize:11,color:S.T.sub,marginBottom:6}}>{profile.fianceName} accounts (view only)</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{(payAccounts.maryBeth||[]).map(a=><span key={a} style={{...S.tag("#E91E63"),opacity:0.7}}>{a}</span>)}</div>
+      </div>}
+      {currentUser==="maryBeth"&&payAccounts.brad?.length>0&&<div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${S.T.border}`}}>
+        <div style={{fontSize:11,color:S.T.sub,marginBottom:6}}>{profile.myName} accounts (view only)</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{(payAccounts.brad||[]).map(a=><span key={a} style={{...S.tag("#2196F3"),opacity:0.7}}>{a}</span>)}</div>
+      </div>}
     </div>
     {isParent&&<div style={S.card}>
       <div style={S.h2}>Feature Toggles</div>
@@ -635,7 +688,7 @@ function AdminPanel({auth,setAuth,S}){
 }
 
 // ── BILL CARD (top-level — must not be inside BillsTab) ──────────────────────
-function BillCard({bill,today,togglePaid,del,profile,S}){
+function BillCard({bill,today,togglePaid,setPaidFrom,del,profile,payAccounts,S}){
   const due=new Date(bill.dueDate+"T12:00:00"),dl=Math.ceil((due-today)/(864e5));
   const isOver=dl<0,isSoon=dl>=0&&dl<=3;
   const isShared=!bill.owner||bill.owner==="shared";
@@ -665,9 +718,27 @@ function BillCard({bill,today,togglePaid,del,profile,S}){
       </div>
       <div style={{textAlign:"right"}}><div style={{fontSize:20,color:GOLD,fontFamily:"monospace",fontWeight:"bold"}}>{fmt(bill.amount)}</div>{isShared&&<div style={{fontSize:11,color:S.T.sub}}>{fmt(share)} each</div>}</div>
     </div>
-    <div style={{display:"flex",gap:8,marginTop:10,paddingTop:10,borderTop:`1px solid ${S.T.border}`,flexWrap:"wrap"}}>
-      {(isShared||isBradOnly)&&<button onClick={()=>togglePaid(bill.id,"brad")} style={{flex:1,minWidth:140,padding:"8px 12px",borderRadius:7,border:`2px solid ${bill.bradPaid?"#4CAF50":"#2196F3"}`,background:bill.bradPaid?"#4CAF5018":"transparent",color:bill.bradPaid?"#4CAF50":"#2196F3",fontSize:12,cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold",textAlign:"left"}}>{bill.bradPaid?profile.myName+" Paid - "+bill.bradPaidDate:"Mark "+profile.myName+" Paid - "+fmt(share)}</button>}
-      {(isShared||isMBOnly)&&<button onClick={()=>togglePaid(bill.id,"maryBeth")} style={{flex:1,minWidth:140,padding:"8px 12px",borderRadius:7,border:`2px solid ${bill.maryBethPaid?"#4CAF50":"#E91E63"}`,background:bill.maryBethPaid?"#4CAF5018":"transparent",color:bill.maryBethPaid?"#4CAF50":"#E91E63",fontSize:12,cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold",textAlign:"left"}}>{bill.maryBethPaid?profile.fianceName+" Paid - "+bill.maryBethPaidDate:"Mark "+profile.fianceName+" Paid - "+fmt(share)}</button>}
+    <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${S.T.border}`}}>
+      {(isShared||isBradOnly)&&<div style={{marginBottom:8}}>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          <button onClick={()=>togglePaid(bill.id,"brad")} style={{flex:1,minWidth:140,padding:"8px 12px",borderRadius:7,border:`2px solid ${bill.bradPaid?"#4CAF50":"#2196F3"}`,background:bill.bradPaid?"#4CAF5018":"transparent",color:bill.bradPaid?"#4CAF50":"#2196F3",fontSize:12,cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold",textAlign:"left"}}>{bill.bradPaid?profile.myName+" Paid - "+bill.bradPaidDate:"Mark "+profile.myName+" Paid - "+fmt(share)}</button>
+          <select style={{...S.select,maxWidth:160,fontSize:11}} value={bill.paidFromBrad||""} onChange={e=>setPaidFrom(bill.id,"brad",e.target.value)}>
+            <option value="">From account...</option>
+            {(payAccounts?.brad||[]).map(a=><option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+        {bill.paidFromBrad&&<div style={{fontSize:10,color:"#2196F3",marginTop:3}}>Paid from: {bill.paidFromBrad}</div>}
+      </div>}
+      {(isShared||isMBOnly)&&<div style={{marginBottom:8}}>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          <button onClick={()=>togglePaid(bill.id,"maryBeth")} style={{flex:1,minWidth:140,padding:"8px 12px",borderRadius:7,border:`2px solid ${bill.maryBethPaid?"#4CAF50":"#E91E63"}`,background:bill.maryBethPaid?"#4CAF5018":"transparent",color:bill.maryBethPaid?"#4CAF50":"#E91E63",fontSize:12,cursor:"pointer",fontFamily:"Georgia,serif",fontWeight:"bold",textAlign:"left"}}>{bill.maryBethPaid?profile.fianceName+" Paid - "+bill.maryBethPaidDate:"Mark "+profile.fianceName+" Paid - "+fmt(share)}</button>
+          <select style={{...S.select,maxWidth:160,fontSize:11}} value={bill.paidFromMB||""} onChange={e=>setPaidFrom(bill.id,"maryBeth",e.target.value)}>
+            <option value="">From account...</option>
+            {(payAccounts?.maryBeth||[]).map(a=><option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+        {bill.paidFromMB&&<div style={{fontSize:10,color:"#E91E63",marginTop:3}}>Paid from: {bill.paidFromMB}</div>}
+      </div>}
       <button style={S.btnDanger} onClick={()=>del(bill.id)}>X</button>
     </div>
   </div>);
@@ -678,8 +749,8 @@ function SecHead({label,total,color,S}){
 }
 
 // ── BILLS TAB ─────────────────────────────────────────────────────────────────
-function BillsTab({bills,setBills,billHistory,setBillHistory,profile,S}){
-  const blank={name:"",payee:"",category:"Utilities",amount:"",dueDate:"",notes:"",owner:"shared"};
+function BillsTab({bills,setBills,billHistory,setBillHistory,profile,payAccounts,S}){
+  const blank={name:"",payee:"",category:"Utilities",amount:"",dueDate:"",notes:"",owner:"shared",paidFromBrad:"",paidFromMB:""};
   const [form,setForm]=useState(blank),[showForm,setShowForm]=useState(false),[showHistory,setShowHistory]=useState(false);
   const save=u=>{setBills(u);store.save("fp2:bills",u);};
   const saveHistory=u=>{setBillHistory(u);store.save("fp2:billHistory",u);};
@@ -696,6 +767,7 @@ function BillsTab({bills,setBills,billHistory,setBillHistory,profile,S}){
     }
   };
   const del=id=>save(bills.filter(b=>b.id!==id));
+  const setPaidFrom=(id,person,acct)=>save(bills.map(b=>b.id===id?{...b,[person==="brad"?"paidFromBrad":"paidFromMB"]:acct}:b));
   const today=new Date();
   const shared=[...bills].filter(b=>!b.owner||b.owner==="shared").sort((a,b)=>new Date(a.dueDate)-new Date(b.dueDate));
   const bradOnly=[...bills].filter(b=>b.owner==="brad").sort((a,b)=>new Date(a.dueDate)-new Date(b.dueDate));
@@ -728,9 +800,9 @@ function BillsTab({bills,setBills,billHistory,setBillHistory,profile,S}){
       <button style={{...S.btn(),padding:"9px 22px"}} onClick={addBill}>Add Expense</button>
     </div>}
     {bills.length===0&&<div style={{...S.card,textAlign:"center",padding:40,color:S.T.sub}}>No expenses yet. Click Add Expense to start.</div>}
-    {shared.length>0&&<><SecHead label="Shared Expenses - 50/50" total={sharedTotal} color="#2196F3" S={S}/>{shared.map(b=><BillCard key={b.id} bill={b} today={today} togglePaid={togglePaid} del={del} profile={profile} S={S}/>)}</>}
-    {bradOnly.length>0&&<><SecHead label={profile.myName+"'s Bills"} total={bradTotal} color="#2196F3" S={S}/>{bradOnly.map(b=><BillCard key={b.id} bill={b} today={today} togglePaid={togglePaid} del={del} profile={profile} S={S}/>)}</>}
-    {mbOnly.length>0&&<><SecHead label={profile.fianceName+"'s Bills"} total={mbTotal} color="#E91E63" S={S}/>{mbOnly.map(b=><BillCard key={b.id} bill={b} today={today} togglePaid={togglePaid} del={del} profile={profile} S={S}/>)}</>}
+    {shared.length>0&&<><SecHead label="Shared Expenses - 50/50" total={sharedTotal} color="#2196F3" S={S}/>{shared.map(b=><BillCard key={b.id} bill={b} today={today} togglePaid={togglePaid} setPaidFrom={setPaidFrom} del={del} profile={profile} payAccounts={payAccounts} S={S}/>)}</>}
+    {bradOnly.length>0&&<><SecHead label={profile.myName+"'s Bills"} total={bradTotal} color="#2196F3" S={S}/>{bradOnly.map(b=><BillCard key={b.id} bill={b} today={today} togglePaid={togglePaid} setPaidFrom={setPaidFrom} del={del} profile={profile} payAccounts={payAccounts} S={S}/>)}</>}
+    {mbOnly.length>0&&<><SecHead label={profile.fianceName+"'s Bills"} total={mbTotal} color="#E91E63" S={S}/>{mbOnly.map(b=><BillCard key={b.id} bill={b} today={today} togglePaid={togglePaid} setPaidFrom={setPaidFrom} del={del} profile={profile} payAccounts={payAccounts} S={S}/>)}</>}
   </>);
 }
 
@@ -801,10 +873,13 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList
 }
 
 // ── MEALS TAB ─────────────────────────────────────────────────────────────────
-function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,mealDetails,setMealDetails,profile,S}){
+function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,mealDetails,setMealDetails,shopSettings,profile,S}){
   const [editCell,setEditCell]=useState(null),[cellVal,setCellVal]=useState("");
-  const [showAdd,setShowAdd]=useState(false),[newItem,setNewItem]=useState({name:"",qty:"1",category:"Grocery",notes:""});
+  const [showAdd,setShowAdd]=useState(false),[newItem,setNewItem]=useState({name:"",qty:"1",category:"Grocery",store:"",notes:""});
   const [filterCat,setFilterCat]=useState("All");
+  const [filterStore,setFilterStore]=useState("All");
+  const cats=shopSettings?.categories||["Grocery","Dairy","Produce","Meat","Snacks","Beverages","Household","Personal Care","Other"];
+  const stores=shopSettings?.stores||["Walmart","Kroger","Target","Costco","Aldi","Other"];
   const [detailSlot,setDetailSlot]=useState(null);
   const saveMeals=u=>{setMealPlan(u);store.save("fp2:mealPlan",u);};
   const saveShop=u=>{setShopList(u);store.save("fp2:shopList",u);};
@@ -812,7 +887,7 @@ function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,set
   const saveReqs=u=>{setShopRequests(u);store.save("fp2:shopRequests",u);};
   const saveDetails=u=>{setMealDetails(u);store.save("fp2:mealDetails",u);};
   const saveCell=()=>{if(!editCell)return;saveMeals({...mealPlan,[editCell.day]:{...mealPlan[editCell.day],[editCell.mt]:cellVal}});setEditCell(null);setCellVal("");};
-  const addItem=()=>{if(!newItem.name)return;saveShop([...shopList,{...newItem,id:Date.now(),addedBy:"Parents",checked:false}]);setNewItem({name:"",qty:"1",category:"Grocery",notes:""});setShowAdd(false);};
+  const addItem=()=>{if(!newItem.name)return;saveShop([...shopList,{...newItem,id:Date.now(),addedBy:"Parents",checked:false}]);setNewItem({name:"",qty:"1",category:"Grocery",store:"",notes:""});setShowAdd(false);};
   const toggleItem=id=>saveShop(shopList.map(i=>i.id===id?{...i,checked:!i.checked}:i));
   const delItem=id=>saveShop(shopList.filter(i=>i.id!==id));
   const approveSugg=id=>{const s=mealSuggestions.find(x=>x.id===id);if(s){saveMeals({...mealPlan,[s.dayPreference]:{...mealPlan[s.dayPreference],[s.mealType]:s.meal}});saveSugg(mealSuggestions.map(x=>x.id===id?{...x,status:"approved"}:x));}};
@@ -821,7 +896,11 @@ function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,set
   const declineReq=id=>saveReqs(shopRequests.map(r=>r.id===id?{...r,status:"declined"}:r));
   const pendS=mealSuggestions.filter(s=>s.status==="pending"),pendR=shopRequests.filter(r=>r.status==="pending");
   const unchecked=shopList.filter(i=>!i.checked),checked=shopList.filter(i=>i.checked);
-  const groupedUnchecked=filterCat==="All"?SHOP_CATS.reduce((acc,cat)=>{const items=unchecked.filter(i=>i.category===cat);if(items.length>0)acc[cat]=items;return acc;},{}):{[filterCat]:unchecked.filter(i=>i.category===filterCat)};
+  const filteredItems=unchecked.filter(i=>(filterStore==="All"||i.store===filterStore)&&(filterCat==="All"||i.category===filterCat));
+  const groupedByStore=filterStore==="All"
+    ?[...new Set(filteredItems.map(i=>i.store||"No Store"))].reduce((acc,s)=>{const items=filteredItems.filter(i=>(i.store||"No Store")===s);if(items.length>0)acc[s]=items;return acc;},{})
+    :{[filterStore]:filteredItems};
+  const groupedUnchecked=Object.fromEntries(Object.entries(groupedByStore).map(([s,items])=>[s,cats.reduce((acc,cat)=>{const ci=items.filter(i=>i.category===cat);if(ci.length>0)acc[cat]=ci;return acc;},{})]))
   const slotKey=(day,mt)=>day+"__"+mt;
   const hasDetail=(day,mt)=>{const d=mealDetails[slotKey(day,mt)];return d&&(d.ingredients?.length>0||d.recipe?.trim());};
   return(<>
@@ -856,15 +935,26 @@ function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,set
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,marginBottom:8}}>
             <div><div style={S.label}>Item</div><input style={S.input} placeholder="e.g. Milk" value={newItem.name} onChange={e=>setNewItem({...newItem,name:e.target.value})}/></div>
             <div><div style={S.label}>Qty</div><input style={S.input} value={newItem.qty} onChange={e=>setNewItem({...newItem,qty:e.target.value})}/></div>
-            <div><div style={S.label}>Category</div><select style={S.select} value={newItem.category} onChange={e=>setNewItem({...newItem,category:e.target.value})}>{SHOP_CATS.map(c=><option key={c}>{c}</option>)}</select></div>
+            <div><div style={S.label}>Category</div><select style={S.select} value={newItem.category} onChange={e=>setNewItem({...newItem,category:e.target.value})}>{cats.map(c=><option key={c}>{c}</option>)}</select></div>
+            <div><div style={S.label}>Store</div><select style={S.select} value={newItem.store} onChange={e=>setNewItem({...newItem,store:e.target.value})}><option value="">Any store</option>{stores.map(s=><option key={s}>{s}</option>)}</select></div>
           </div>
           <div style={{display:"flex",gap:8}}><input style={{...S.input,flex:1}} placeholder="Notes" value={newItem.notes} onChange={e=>setNewItem({...newItem,notes:e.target.value})}/><button style={S.btn()} onClick={addItem}>Add</button></div>
         </div>}
-        <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
-          {["All",...SHOP_CATS].map(c=><button key={c} onClick={()=>setFilterCat(c)} style={{padding:"2px 8px",borderRadius:8,fontSize:10,cursor:"pointer",fontFamily:"Georgia,serif",background:filterCat===c?GOLD+"33":"transparent",border:`1px solid ${filterCat===c?GOLD:S.T.border}`,color:filterCat===c?GOLD:S.T.sub}}>{c}</button>)}
+        <div style={{marginBottom:8}}>
+          <div style={{...S.label,marginBottom:4}}>Filter by Store</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
+            {["All",...stores].map(s=><button key={s} onClick={()=>setFilterStore(s)} style={{padding:"2px 8px",borderRadius:8,fontSize:10,cursor:"pointer",fontFamily:"Georgia,serif",background:filterStore===s?"#2196F333":"transparent",border:`1px solid ${filterStore===s?"#2196F3":S.T.border}`,color:filterStore===s?"#2196F3":S.T.sub}}>{s}</button>)}
+          </div>
+          <div style={{...S.label,marginBottom:4}}>Filter by Category</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            {["All",...cats].map(c=><button key={c} onClick={()=>setFilterCat(c)} style={{padding:"2px 8px",borderRadius:8,fontSize:10,cursor:"pointer",fontFamily:"Georgia,serif",background:filterCat===c?GOLD+"33":"transparent",border:`1px solid ${filterCat===c?GOLD:S.T.border}`,color:filterCat===c?GOLD:S.T.sub}}>{c}</button>)}
+          </div>
         </div>
         {unchecked.length===0&&checked.length===0&&<div style={{color:S.T.sub,fontSize:13,padding:"10px 0",textAlign:"center"}}>List is empty.</div>}
-        {Object.entries(groupedUnchecked).map(([cat,items])=>items.length>0&&<div key={cat}>{cat&&<div style={{...S.label,marginTop:8,marginBottom:4}}>{cat}</div>}{items.map(item=><div key={item.id} style={{display:"flex",gap:8,padding:"5px 0",borderBottom:`1px solid #1a1a0f`,alignItems:"center"}}><div onClick={()=>toggleItem(item.id)} style={{width:17,height:17,borderRadius:3,border:`2px solid ${S.T.border}`,cursor:"pointer",flexShrink:0}}/><div style={{flex:1}}><div style={{fontSize:13,color:S.T.text}}>{item.qty&&item.qty!=="1"?item.qty+"x ":""}{item.name}</div>{(item.addedBy&&item.addedBy!=="Parents"||item.notes)?<div style={{fontSize:10,color:S.T.sub}}>{item.addedBy&&item.addedBy!=="Parents"?item.addedBy:""}{item.notes?" — "+item.notes:""}</div>:null}</div><button style={S.btnDanger} onClick={()=>delItem(item.id)}>X</button></div>)}</div>)}
+        {Object.entries(groupedUnchecked).map(([storeName,catGroups])=><div key={storeName} style={{marginBottom:12}}>
+          <div style={{fontSize:12,color:"#2196F3",fontWeight:"bold",fontFamily:"monospace",letterSpacing:"0.1em",padding:"6px 0 4px",borderBottom:`2px solid #2196F333`,marginBottom:6}}>🛒 {storeName}</div>
+          {Object.entries(catGroups).map(([cat,items])=>items.length>0&&<div key={cat}><div style={{...S.label,marginTop:6,marginBottom:3,fontSize:10}}>{cat}</div>{items.map(item=><div key={item.id} style={{display:"flex",gap:8,padding:"5px 0",borderBottom:`1px solid #1a1a0f`,alignItems:"center"}}><div onClick={()=>toggleItem(item.id)} style={{width:17,height:17,borderRadius:3,border:`2px solid ${S.T.border}`,cursor:"pointer",flexShrink:0}}/><div style={{flex:1}}><div style={{fontSize:13,color:S.T.text}}>{item.qty&&item.qty!=="1"?item.qty+"x ":""}{item.name}</div>{(item.addedBy&&item.addedBy!=="Parents"||item.notes)?<div style={{fontSize:10,color:S.T.sub}}>{item.addedBy&&item.addedBy!=="Parents"?item.addedBy:""}{item.notes?" — "+item.notes:""}</div>:null}</div><button style={S.btnDanger} onClick={()=>delItem(item.id)}>X</button></div>)}</div>)}
+        </div>)}
         {checked.length>0&&<div style={{marginTop:8}}><div style={{...S.label,marginBottom:4}}>DONE</div>{checked.map(item=><div key={item.id} style={{display:"flex",gap:8,padding:"4px 0",alignItems:"center",opacity:0.45}}><div onClick={()=>toggleItem(item.id)} style={{width:17,height:17,borderRadius:3,border:"2px solid #4CAF50",background:"#4CAF50",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#0d0d08",fontSize:10,fontWeight:"bold"}}>✓</div><span style={{fontSize:12,color:S.T.sub,textDecoration:"line-through",flex:1}}>{item.name}</span><button style={S.btnDanger} onClick={()=>delItem(item.id)}>X</button></div>)}<button style={{...S.btnGhost,marginTop:6,fontSize:11}} onClick={()=>saveShop(shopList.filter(i=>!i.checked))}>Clear Done</button></div>}
       </div>
       <div>
@@ -1144,10 +1234,10 @@ function BradDashboard(props){
     <div style={{maxWidth:1400,margin:"0 auto",padding:"16px 16px"}}>
       {tab!=="home"&&bills&&<BillsBanner bills={bills} S={S}/> }
       {tab==="home"&&<PersonalHomeScreen currentUser="brad" mealPlan={mealPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} S={S}/> }
-      {tab==="meals"&&<MealsTab mealPlan={mealPlan} setMealPlan={setMealPlan} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} profile={profile} S={S}/>}
+      {tab==="meals"&&<MealsTab mealPlan={mealPlan} setMealPlan={setMealPlan} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} shopSettings={shopSettings} profile={profile} S={S}/>}
       {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} appSettings={appSettings} S={S} currentUser="brad"/>}
       {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="brad" S={S}/>}
-      {tab==="bills"&&<BillsTab bills={bills} setBills={setBills} billHistory={billHistory} setBillHistory={setBillHistory} profile={profile} S={S}/>}
+      {tab==="bills"&&<BillsTab bills={bills} setBills={setBills} billHistory={billHistory} setBillHistory={setBillHistory} profile={profile} payAccounts={payAccounts} S={S}/>}
       {tab==="dashboard"&&<DashboardTab profile={profile} accounts={accounts} debts={debts} goals={goals} expenses={expenses} transactions={transactions} totalAssets={totalAssets} totalDebtAmt={totalDebtAmt} netWorth={netWorth} combinedLiquid={combinedLiquid} totalCC={totalCC} cushion={cushion} dti={dti} mortgageRate={mortgageRate} monthlyMortgage={monthlyMortgage} loanAmt={loanAmt} surplus={surplus} takeHome={takeHome} totalExpenses={totalExpenses} slPayment={slPayment} downNeeded={downNeeded} closing={closing} homePrice={homePrice} setTab={setTab} bills={bills} mealPlan={mealPlan} mealSuggestions={mealSuggestions} shopRequests={shopRequests} S={S}/>}
       {tab==="accounts"&&<AccountsTab accounts={accounts} setAccounts={setAccounts} profile={profile} S={S}/>}
       {tab==="debts"&&<DebtsTab debts={debts} setDebts={setDebts} profile={profile} S={S}/>}
@@ -1156,7 +1246,7 @@ function BradDashboard(props){
       {tab==="statements"&&<StatementsTab transactions={transactions} setTransactions={setTransactions} handleUpload={handleUpload} uploadLoading={uploadLoading} reviewTxns={reviewTxns} setReviewTxns={setReviewTxns} confirmTxns={confirmTxns} fileRef={fileRef} S={S}/>}
       {tab==="scenarios"&&<ScenariosTab scenario={scenario} setScenario={setScenario} debts={debts} profile={profile} combinedLiquid={combinedLiquid} totalCC={totalCC} surplus={surplus} mortgageRate={mortgageRate} loanAmt={loanAmt} homePrice={homePrice} slPayment={slPayment} S={S}/>}
       {tab==="pslf"&&<PslfTab pslf={pslf} setPslf={setPslf} debts={debts} S={S}/>}
-      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} S={S} currentUser="brad"/>}
+      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} shopSettings={shopSettings} setShopSettings={setShopSettings} payAccounts={payAccounts} setPayAccounts={setPayAccounts} S={S} currentUser="brad"/>}
       {tab==="admin"&&<AdminPanel auth={auth} setAuth={setAuth} S={S}/>}
     </div>
   </div>);
@@ -1185,11 +1275,11 @@ function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,s
     <div style={{maxWidth:1300,margin:"0 auto",padding:"16px 16px"}}>
       {tab!=="home"&&bills&&<BillsBanner bills={bills} S={S}/> }
       {tab==="home"&&<PersonalHomeScreen currentUser="maryBeth" mealPlan={mealPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} S={S}/> }
-      {tab==="meals"&&<MealsTab mealPlan={mealPlan} setMealPlan={setMealPlan} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} profile={profile} S={S}/>}
+      {tab==="meals"&&<MealsTab mealPlan={mealPlan} setMealPlan={setMealPlan} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} shopSettings={shopSettings} profile={profile} S={S}/>}
       {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} appSettings={appSettings} S={S} currentUser="maryBeth"/>}
       {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="maryBeth" S={S}/>}
-      {tab==="bills"&&<BillsTab bills={bills} setBills={setBills} billHistory={billHistory} setBillHistory={setBillHistory} profile={profile} S={S}/>}
-      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} S={S} currentUser="maryBeth"/>}
+      {tab==="bills"&&<BillsTab bills={bills} setBills={setBills} billHistory={billHistory} setBillHistory={setBillHistory} profile={profile} payAccounts={payAccounts} S={S}/>}
+      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} shopSettings={shopSettings} setShopSettings={setShopSettings} payAccounts={payAccounts} setPayAccounts={setPayAccounts} S={S} currentUser="maryBeth"/>}
     </div>
   </div>);
 }
@@ -1214,6 +1304,8 @@ export default function App(){
   const [messages,setMessages]=useState(D.messages);
   const [mealDetails,setMealDetails]=useState({});
   const [appSettings,setAppSettings]=useState(D.appSettings);
+  const [shopSettings,setShopSettings]=useState(D.shopSettings);
+  const [payAccounts,setPayAccounts]=useState(D.payAccounts);
   const [currentUser,setCurrentUser]=useState(null);
   const [loginTarget,setLoginTarget]=useState(null);
   const [loaded,setLoaded]=useState(false);
@@ -1226,7 +1318,7 @@ export default function App(){
 
   useEffect(()=>{
     (async()=>{
-      const [p,a,d,e,g,t,ps,bl,mp,sl,ms,sr,au,ch,mg,bh,as,md]=await Promise.all([
+      const [p,a,d,e,g,t,ps,bl,mp,sl,ms,sr,au,ch,mg,bh,as,md,ss,pa]=await Promise.all([
         store.load("fp2:profile",D.profile),store.load("fp2:accounts",D.accounts),
         store.load("fp2:debts",D.debts),store.load("fp2:expenses",D.expenses),
         store.load("fp2:goals",D.goals),store.load("fp2:transactions",D.transactions),
@@ -1236,6 +1328,7 @@ export default function App(){
         store.load("fp2:auth",D.auth),store.load("fp2:chores",D.chores),
         store.load("fp2:messages",D.messages),store.load("fp2:billHistory",D.billHistory),
         store.load("fp2:appSettings",D.appSettings),store.load("fp2:mealDetails",{}),
+        store.load("fp2:shopSettings",D.shopSettings),store.load("fp2:payAccounts",D.payAccounts),
       ]);
       setProfile(p);setAccounts(a);setDebts(d);setExpenses(e);setGoals(g);setTransactions(t);setPslf(ps);
       setBills(bl);setBillHistory(bh||[]);
@@ -1244,6 +1337,8 @@ export default function App(){
       setAuth(au||D.auth);setChores(ch||[]);setMessages(mg||[]);
       setMealDetails(md||{});
       setAppSettings({...D.appSettings,...(as||{})});
+      setShopSettings({...D.shopSettings,...(ss||{})});
+      setPayAccounts({...D.payAccounts,...(pa||{})});
       setLoaded(true);
     })();
   },[]);
@@ -1301,7 +1396,7 @@ export default function App(){
 
   if(!loaded)return <div style={{...S.page,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:GOLD}}>Loading Family Hub...</div>;
 
-  const sharedProps={mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,profile,setProfile,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails};
+  const sharedProps={mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,profile,setProfile,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts};
 
   return(<div style={S.page}>
     {loginTarget&&<LoginModal user={loginTarget} auth={auth} onSuccess={pwd=>handleLoginSuccess(loginTarget,pwd)} onClose={()=>setLoginTarget(null)}/>}
