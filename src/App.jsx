@@ -693,7 +693,7 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
         <div><div style={S.label}>Months to PSLF</div><input style={S.input} type="number" value={local.pslfMonths} onChange={e=>setLocal({...local,pslfMonths:+e.target.value})}/></div>
       </div>
       <button style={S.btn()} onClick={saveProfile}>{saved?"✓ Saved!":"Save Profile"}</button>
-    </div>
+    </div>}
     {isParent&&<div style={S.card}>
       <div style={S.h2}>Shopping — Stores</div>
       <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
