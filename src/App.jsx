@@ -900,7 +900,7 @@ function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,set
   const groupedByStore=filterStore==="All"
     ?[...new Set(filteredItems.map(i=>i.store||"No Store"))].reduce((acc,s)=>{const items=filteredItems.filter(i=>(i.store||"No Store")===s);if(items.length>0)acc[s]=items;return acc;},{})
     :{[filterStore]:filteredItems};
-  const groupedUnchecked=Object.fromEntries(Object.entries(groupedByStore).map(([s,items])=>[s,cats.reduce((acc,cat)=>{const ci=items.filter(i=>i.category===cat);if(ci.length>0)acc[cat]=ci;return acc;},{})]))
+  const groupedUnchecked=Object.fromEntries(Object.entries(groupedByStore).map(([s,items])=>[s,cats.reduce((acc,cat)=>{const ci=items.filter(i=>i.category===cat);if(ci.length>0)acc[cat]=ci;return acc;},{}))));
   const slotKey=(day,mt)=>day+"__"+mt;
   const hasDetail=(day,mt)=>{const d=mealDetails[slotKey(day,mt)];return d&&(d.ingredients?.length>0||d.recipe?.trim());};
   return(<>
