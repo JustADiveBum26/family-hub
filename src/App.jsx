@@ -75,6 +75,7 @@ const D={
   bills:[],mealPlan:blankMealPlan(),shopList:[],mealSuggestions:[],shopRequests:[],
   auth:{brad:null,maryBeth:null,bradyn:null,parker:null,ryder:null},
   chores:[],messages:[],billHistory:[],
+  avatars:{},
   appSettings:{showPoints:false,showAdultChores:{brad:false,maryBeth:false,bradyn:false},userThemes:{}},
   shopSettings:{
     categories:["Grocery","Dairy","Produce","Meat","Snacks","Beverages","Household","Personal Care","Other"],
@@ -127,13 +128,104 @@ function PinPad({onSubmit,color="#ff6b35",error}){
   return(<div style={{textAlign:"center"}}><div style={{display:"flex",justifyContent:"center",gap:14,marginBottom:20}}>{[0,1,2,3].map(i=><div key={i} style={{width:18,height:18,borderRadius:"50%",background:pin.length>i?color:"transparent",border:`2px solid ${color}`,transition:"background 0.15s"}}/>)}</div>{error&&<div style={{color:"#f44336",fontSize:12,marginBottom:10}}>{error}</div>}<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,maxWidth:220,margin:"0 auto"}}>{[1,2,3,4,5,6,7,8,9,"",0,"X"].map((n,i)=><button key={i} onClick={()=>typeof n==="number"?add(String(n)):n==="X"?setPin(p=>p.slice(0,-1)):null} style={{padding:"15px",fontSize:22,fontFamily:"Georgia,serif",fontWeight:"bold",background:n===""?"transparent":`${color}22`,border:`2px solid ${n===""?"transparent":color}`,borderRadius:12,color:n===""?"transparent":"#fff",cursor:n===""?"default":"pointer"}}>{n}</button>)}</div></div>);
 }
 
-function LoginModal({user,auth,onSuccess,onClose}){
+function LoginModal({user,auth,avatars,onSuccess,onClose}){
   const [pwd,setPwd]=useState(""),[confirm,setConfirm]=useState(""),[error,setError]=useState(""),[pinErr,setPinErr]=useState("");
   const u=USERS.find(x=>x.key===user);
   const isPin=u.type==="pin",isFirst=!auth[user],pinNotSet=isPin&&!auth[user];
   const submitPwd=()=>{if(isFirst){if(pwd.length<4){setError("At least 4 characters.");return;}if(pwd!==confirm){setError("Passwords don't match.");return;}onSuccess(pwd);}else{if(pwd!==auth[user]){setError("Wrong password. Try again.");setPwd("");return;}onSuccess(null);}};
   const submitPin=pin=>{if(pin!==auth[user]){setPinErr("Wrong code! Try again.");return;}onSuccess(null);};
-  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}><div style={{background:"#141410",border:`2px solid ${u.color}44`,borderRadius:16,padding:32,maxWidth:380,width:"100%"}} onClick={e=>e.stopPropagation()}><div style={{textAlign:"center",marginBottom:24}}><div style={{fontSize:44,marginBottom:6}}>{u.emoji}</div><div style={{fontSize:22,color:"#e8e0c8",marginBottom:4}}>{isFirst&&!isPin?`Welcome, ${u.label}!`:`Hey ${u.label}!`}</div><div style={{fontSize:13,color:"#666"}}>{isFirst&&!isPin?"Create your password to get started":isPin?pinNotSet?"Your PIN has not been set — ask Brad!":"Enter your 4-digit code":"Enter your password"}</div></div>{isPin&&!pinNotSet&&<PinPad onSubmit={submitPin} color={u.color} error={pinErr}/>}{isPin&&pinNotSet&&<div style={{textAlign:"center",padding:"20px 0",color:"#666",fontSize:14}}>Ask Brad to set your code!</div>}{!isPin&&<div><div style={{marginBottom:12}}><div style={S.label}>{isFirst?"Create Password":"Password"}</div><input autoFocus style={S.input} type="password" value={pwd} onChange={e=>{setPwd(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&submitPwd()}/></div>{isFirst&&<div style={{marginBottom:12}}><div style={S.label}>Confirm Password</div><input style={S.input} type="password" value={confirm} onChange={e=>{setConfirm(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&submitPwd()}/></div>}{error&&<div style={{color:"#f44336",fontSize:12,marginBottom:10}}>{error}</div>}<button style={{...S.btn(u.color),width:"100%",padding:"11px",fontSize:15,marginTop:4}} onClick={submitPwd}>{isFirst?"Create Password and Sign In":"Sign In"}</button></div>}<button onClick={onClose} style={{...S.btnGhost,width:"100%",marginTop:12,textAlign:"center"}}>Cancel</button></div></div>);
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}><div style={{background:"#141410",border:`2px solid ${u.color}44`,borderRadius:16,padding:32,maxWidth:380,width:"100%"}} onClick={e=>e.stopPropagation()}><div style={{textAlign:"center",marginBottom:24}}><div style={{display:"flex",justifyContent:"center",marginBottom:10}}><UserAvatar userKey={user} avatars={avatars||{}} size={72}/></div><div style={{fontSize:22,color:"#e8e0c8",marginBottom:4}}>{isFirst&&!isPin?`Welcome, ${u.label}!`:`Hey ${u.label}!`}</div><div style={{fontSize:13,color:"#666"}}>{isFirst&&!isPin?"Create your password to get started":isPin?pinNotSet?"Your PIN has not been set — ask Brad!":"Enter your 4-digit code":"Enter your password"}</div></div>{isPin&&!pinNotSet&&<PinPad onSubmit={submitPin} color={u.color} error={pinErr}/>}{isPin&&pinNotSet&&<div style={{textAlign:"center",padding:"20px 0",color:"#666",fontSize:14}}>Ask Brad to set your code!</div>}{!isPin&&<div><div style={{marginBottom:12}}><div style={S.label}>{isFirst?"Create Password":"Password"}</div><input autoFocus style={S.input} type="password" value={pwd} onChange={e=>{setPwd(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&submitPwd()}/></div>{isFirst&&<div style={{marginBottom:12}}><div style={S.label}>Confirm Password</div><input style={S.input} type="password" value={confirm} onChange={e=>{setConfirm(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&submitPwd()}/></div>}{error&&<div style={{color:"#f44336",fontSize:12,marginBottom:10}}>{error}</div>}<button style={{...S.btn(u.color),width:"100%",padding:"11px",fontSize:15,marginTop:4}} onClick={submitPwd}>{isFirst?"Create Password and Sign In":"Sign In"}</button></div>}<button onClick={onClose} style={{...S.btnGhost,width:"100%",marginTop:12,textAlign:"center"}}>Cancel</button></div></div>);
+}
+
+
+function UserAvatar({userKey,avatars,size=44,showName=false}){
+  const u=USERS.find(x=>x.key===userKey);
+  if(!u)return null;
+  const av=avatars?.[userKey];
+  return(<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+    <div style={{width:size,height:size,borderRadius:"50%",border:`3px solid ${u.color}`,overflow:"hidden",background:"#1a1a1a",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      {av?.url
+        ?<img src={av.url} alt={av.name||u.label} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+        :<span style={{fontSize:size*0.45}}>{u.emoji}</span>
+      }
+    </div>
+    {showName&&<div style={{fontSize:10,color:u.color,fontFamily:"monospace",fontWeight:"bold",textAlign:"center",maxWidth:size+16}}>{u.label}</div>}
+  </div>);
+}
+
+// ── AVATAR PICKER ─────────────────────────────────────────────────────────────
+function AvatarPicker({userKey,avatars,setAvatars,onClose,onSkip}){
+  const u=USERS.find(x=>x.key===userKey);
+  const [query,setQuery]=useState("");
+  const [results,setResults]=useState([]);
+  const [loading,setLoading]=useState(false);
+  const [selected,setSelected]=useState(avatars?.[userKey]||null);
+  const [error,setError]=useState("");
+  const saveAvatars=av=>{setAvatars(av);store.save("fp2:avatars",av);};
+  const search=async()=>{
+    if(!query.trim())return;
+    setLoading(true);setError("");setResults([]);
+    try{
+      const url=`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query+" Disney Pixar character")}&srlimit=8&prop=pageimages&format=json&origin=*`;
+      const r=await fetch(url);
+      const d=await r.json();
+      const pages=d.query?.search||[];
+      const imageResults=await Promise.all(pages.map(async p=>{
+        try{
+          const ir=await fetch(`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(p.title)}&prop=pageimages&pithumbsize=200&format=json&origin=*`);
+          const id=await ir.json();
+          const page=Object.values(id.query.pages)[0];
+          return{title:p.title,url:page?.thumbnail?.source||null};
+        }catch{return{title:p.title,url:null};}
+      }));
+      const withImages=imageResults.filter(r=>r.url);
+      setResults(withImages);
+      if(withImages.length===0)setError("No images found. Try a different character name.");
+    }catch(e){setError("Search failed. Check your connection.");}
+    setLoading(false);
+  };
+  const confirm=()=>{
+    if(!selected)return;
+    saveAvatars({...avatars,[userKey]:selected});
+    onClose();
+  };
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:2500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+    <div style={{background:"#141410",border:`2px solid ${u.color}44`,borderRadius:16,padding:24,maxWidth:480,width:"100%",maxHeight:"90vh",overflowY:"auto"}}>
+      <div style={{textAlign:"center",marginBottom:20}}>
+        <div style={{fontSize:11,color:"#555",fontFamily:"monospace",letterSpacing:"0.2em",marginBottom:6}}>CHOOSE YOUR CHARACTER</div>
+        <div style={{fontSize:20,color:"#e8e0c8"}}>{u.label}</div>
+      </div>
+      {selected&&<div style={{textAlign:"center",marginBottom:16}}>
+        <img src={selected.url} alt={selected.title} style={{width:80,height:80,borderRadius:"50%",objectFit:"cover",border:`3px solid ${u.color}`}}/>
+        <div style={{fontSize:11,color:u.color,marginTop:4,fontFamily:"monospace"}}>{selected.title}</div>
+      </div>}
+      <div style={{display:"flex",gap:8,marginBottom:12}}>
+        <input style={{flex:1,background:"#0d0d08",border:`1px solid ${u.color}44`,borderRadius:8,padding:"9px 12px",color:"#e8e0c8",fontFamily:"Georgia,serif",fontSize:13,outline:"none"}} placeholder="Search e.g. Simba, Elsa, Woody..." value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&search()}/>
+        <button onClick={search} disabled={loading} style={{background:u.color,border:"none",borderRadius:8,padding:"9px 16px",color:"#fff",fontFamily:"Georgia,serif",fontSize:13,cursor:"pointer",fontWeight:"bold"}}>{loading?"...":"Search"}</button>
+      </div>
+      {error&&<div style={{color:"#f44336",fontSize:12,marginBottom:10,textAlign:"center"}}>{error}</div>}
+      {results.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:16}}>
+        {results.map((r,i)=><div key={i} onClick={()=>setSelected(r)} style={{cursor:"pointer",borderRadius:10,overflow:"hidden",border:`2px solid ${selected?.url===r.url?u.color:"transparent"}`,transition:"border 0.15s"}}>
+          <img src={r.url} alt={r.title} style={{width:"100%",aspectRatio:"1",objectFit:"cover",display:"block"}}/>
+          <div style={{fontSize:9,color:"#888",padding:"3px 4px",textAlign:"center",background:"#0d0d08",lineHeight:1.2}}>{r.title.slice(0,20)}</div>
+        </div>)}
+      </div>}
+      <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
+        {selected&&<button onClick={confirm} style={{background:u.color,border:"none",borderRadius:8,padding:"10px 22px",color:"#fff",fontFamily:"Georgia,serif",fontSize:13,cursor:"pointer",fontWeight:"bold"}}>Use This Character</button>}
+        {onSkip&&<button onClick={onSkip} style={{background:"transparent",border:"1px solid #333",borderRadius:8,padding:"10px 16px",color:"#555",fontFamily:"Georgia,serif",fontSize:13,cursor:"pointer"}}>Skip for Now</button>}
+        <button onClick={onClose} style={{background:"transparent",border:"1px solid #333",borderRadius:8,padding:"10px 16px",color:"#555",fontFamily:"Georgia,serif",fontSize:13,cursor:"pointer"}}>Cancel</button>
+      </div>
+    </div>
+  </div>);
+}
+
+
+  const [pwd,setPwd]=useState(""),[confirm,setConfirm]=useState(""),[error,setError]=useState(""),[pinErr,setPinErr]=useState("");
+  const u=USERS.find(x=>x.key===user);
+  const isPin=u.type==="pin",isFirst=!auth[user],pinNotSet=isPin&&!auth[user];
+  const submitPwd=()=>{if(isFirst){if(pwd.length<4){setError("At least 4 characters.");return;}if(pwd!==confirm){setError("Passwords don't match.");return;}onSuccess(pwd);}else{if(pwd!==auth[user]){setError("Wrong password. Try again.");setPwd("");return;}onSuccess(null);}};
+  const submitPin=pin=>{if(pin!==auth[user]){setPinErr("Wrong code! Try again.");return;}onSuccess(null);};
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}><div style={{background:"#141410",border:`2px solid ${u.color}44`,borderRadius:16,padding:32,maxWidth:380,width:"100%"}} onClick={e=>e.stopPropagation()}><div style={{textAlign:"center",marginBottom:24}}><div style={{display:"flex",justifyContent:"center",marginBottom:8}}><UserAvatar userKey={user} avatars={avatars} size={72}/></div><div style={{fontSize:22,color:"#e8e0c8",marginBottom:4}}>{isFirst&&!isPin?`Welcome, ${u.label}!`:`Hey ${u.label}!`}</div><div style={{fontSize:13,color:"#666"}}>{isFirst&&!isPin?"Create your password to get started":isPin?pinNotSet?"Your PIN has not been set — ask Brad!":"Enter your 4-digit code":"Enter your password"}</div></div>{isPin&&!pinNotSet&&<PinPad onSubmit={submitPin} color={u.color} error={pinErr}/>}{isPin&&pinNotSet&&<div style={{textAlign:"center",padding:"20px 0",color:"#666",fontSize:14}}>Ask Brad to set your code!</div>}{!isPin&&<div><div style={{marginBottom:12}}><div style={S.label}>{isFirst?"Create Password":"Password"}</div><input autoFocus style={S.input} type="password" value={pwd} onChange={e=>{setPwd(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&submitPwd()}/></div>{isFirst&&<div style={{marginBottom:12}}><div style={S.label}>Confirm Password</div><input style={S.input} type="password" value={confirm} onChange={e=>{setConfirm(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&submitPwd()}/></div>}{error&&<div style={{color:"#f44336",fontSize:12,marginBottom:10}}>{error}</div>}<button style={{...S.btn(u.color),width:"100%",padding:"11px",fontSize:15,marginTop:4}} onClick={submitPwd}>{isFirst?"Create Password and Sign In":"Sign In"}</button></div>}<button onClick={onClose} style={{...S.btnGhost,width:"100%",marginTop:12,textAlign:"center"}}>Cancel</button></div></div>);
 }
 
 function WeatherWidget(){
@@ -181,7 +273,7 @@ function PinnedAnnouncements({messages,S}){
 }
 
 // ── WEEKLY CHORE BOARD — visible on all home screens ─────────────────────────
-function WeeklyChoreBoard({chores,setChores,appSettings,S}){
+function WeeklyChoreBoard({chores,setChores,appSettings,avatars,S}){
   const tn=todayName();
   const todayIdx=DAYS.indexOf(tn);
   const saveChores=u=>{setChores(u);store.save("fp2:chores",u);};
@@ -213,7 +305,7 @@ function WeeklyChoreBoard({chores,setChores,appSettings,S}){
           return(<tr key={c.id}>
             <td style={{padding:"6px 8px",borderBottom:`1px solid ${S.T.border}`}}>
               <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                <span style={{fontSize:13}}>{u?.emoji}</span>
+                <UserAvatar userKey={c.assignee} avatars={avatars||{}} size={28}/>
                 <div><div style={{fontSize:12,color:S.T.text}}>{c.task}</div><div style={{fontSize:10,color:S.T.sub}}>{u?.label}</div></div>
               </div>
             </td>
@@ -251,7 +343,7 @@ function PersonalHomeScreen({currentUser,mealPlan,bills,chores,setChores,message
   const todayMeals=mealPlan[tn]||{},tomorrowMeals=mealPlan[tomorrowName]||{};
   return(<div style={{padding:"0 0 16px"}}>
     <PinnedAnnouncements messages={messages} S={S}/>
-    <WeeklyChoreBoard chores={chores||[]} setChores={setChores} appSettings={appSettings} S={S}/>
+    <WeeklyChoreBoard chores={chores||[]} setChores={setChores} appSettings={appSettings} avatars={avatars||{}} S={S}/>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:14}}>
       <div style={S.card}>
         <div style={S.h2}>Today and Tomorrow</div>
@@ -291,12 +383,12 @@ function PersonalHomeScreen({currentUser,mealPlan,bills,chores,setChores,message
   </div>);
 }
 
-function UserHeader({user,onLogout,extra,children,S}){
+function UserHeader({user,onLogout,extra,children,S,avatars}){
   const u=USERS.find(x=>x.key===user);
   return(<div style={{background:"linear-gradient(180deg,#1a1a0f,#0d0d08)",borderBottom:`1px solid ${BORDER}`,padding:"12px 16px",position:"sticky",top:0,zIndex:100}}>
     <div style={{maxWidth:1400,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:children?8:0,flexWrap:"wrap",gap:8}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:20}}>{u.emoji}</span><div><div style={{fontSize:9,color:"#444",fontFamily:"monospace",letterSpacing:"0.2em"}}>FAMILY HUB</div><div style={{fontSize:15,color:"#e8e0c8"}}>{u.label}</div></div></div>
+        <div style={{display:"flex",alignItems:"center",gap:10}}><UserAvatar userKey={user} avatars={avatars||{}} size={38}/><div><div style={{fontSize:9,color:"#444",fontFamily:"monospace",letterSpacing:"0.2em"}}>FAMILY HUB</div><div style={{fontSize:15,color:"#e8e0c8"}}>{u.label}</div></div></div>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>{extra}<button onClick={onLogout} style={{...S.btnGhost,fontSize:12}}>Sign Out</button></div>
       </div>
       {children}
@@ -314,7 +406,7 @@ function ThemePicker({currentTheme,onSelect,S}){
 }
 
 // ── PUBLIC HOME SCREEN ────────────────────────────────────────────────────────
-function PublicHomeScreen({mealPlan,shopList,bills,expenses,onLogin,appSettings,messages}){
+function PublicHomeScreen({mealPlan,shopList,bills,expenses,onLogin,appSettings,messages,avatars}){
   const today=new Date(),tn=todayName();
   const tonightDinner=mealPlan[tn]?.Dinner||"";
   const unchecked=shopList.filter(i=>!i.checked);
@@ -342,7 +434,7 @@ function PublicHomeScreen({mealPlan,shopList,bills,expenses,onLogin,appSettings,
         {dueSoon.length>0&&<div style={S.card}><div style={S.h2}>Due This Week</div>{dueSoon.map(b=>{const dl=Math.ceil((new Date(b.dueDate+"T12:00:00")-today)/(864e5)),paid=b.bradPaid&&b.maryBethPaid;return(<div key={b.id} style={{...S.row,padding:"6px 0",borderBottom:`1px solid #1a1a0f`}}><div><div style={{fontSize:13,color:"#e8e0c8"}}>{b.name}</div><div style={{fontSize:11,color:"#555"}}>{dl===0?"Today":dl===1?"Tomorrow":`${dl} days`}</div></div><div style={{textAlign:"right"}}><div style={{fontFamily:"monospace",color:GOLD,fontSize:12,fontWeight:"bold"}}>{fmt(b.amount/2)} ea</div><div style={{fontSize:10,color:paid?"#4CAF50":"#FF9800"}}>{paid?"Paid":"Pending"}</div></div></div>);})}
         </div>}
       </div>
-      <div style={S.card}><div style={{textAlign:"center",marginBottom:14}}><div style={{fontSize:11,color:"#555",fontFamily:"monospace",letterSpacing:"0.2em"}}>SIGN IN AS</div></div><div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>{USERS.map(u=><button key={u.key} onClick={()=>onLogin(u.key)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,padding:"14px 20px",background:`${u.color}12`,border:`2px solid ${u.color}44`,borderRadius:14,cursor:"pointer",color:"#e8e0c8",fontFamily:"Georgia,serif",minWidth:90}}><span style={{fontSize:28}}>{u.emoji}</span><span style={{fontSize:13,color:u.color,fontWeight:"bold"}}>{u.label}</span></button>)}</div></div>
+      <div style={S.card}><div style={{textAlign:"center",marginBottom:14}}><div style={{fontSize:11,color:"#555",fontFamily:"monospace",letterSpacing:"0.2em"}}>SIGN IN AS</div></div><div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>{USERS.map(u=><button key={u.key} onClick={()=>onLogin(u.key)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"14px 20px",background:`${u.color}12`,border:`2px solid ${u.color}44`,borderRadius:14,cursor:"pointer",color:"#e8e0c8",fontFamily:"Georgia,serif",minWidth:90}}><UserAvatar userKey={u.key} avatars={avatars||{}} size={48}/><span style={{fontSize:13,color:u.color,fontWeight:"bold"}}>{u.label}</span></button>)}</div></div>
     </div>
   </div>);
 }
@@ -518,7 +610,7 @@ function KidChoreView({chores,setChores,userKey,userName,userColor,appSettings,S
   </div>);
 }
 // ── MESSAGE BOARD ─────────────────────────────────────────────────────────────
-function MessageBoard({messages,setMessages,currentUser,S}){
+function MessageBoard({messages,setMessages,currentUser,avatars,S}){
   const isParent=currentUser==="brad"||currentUser==="maryBeth";
   const [text,setText]=useState("");
   const save=u=>{setMessages(u);store.save("fp2:messages",u);};
@@ -559,7 +651,7 @@ function MessageBoard({messages,setMessages,currentUser,S}){
       </div>)}</div>}
       {rest.length===0&&pinned.length===0&&<div style={{textAlign:"center",padding:"24px 0",color:S.T.sub,fontSize:13}}>No announcements yet. Post something!</div>}
       {rest.map(m=><div key={m.id} style={{display:"flex",gap:10,padding:"10px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"flex-start"}}>
-        <div style={{fontSize:22,flexShrink:0}}>{m.authorEmoji}</div>
+        <div style={{flexShrink:0}}><UserAvatar userKey={m.author} avatars={avatars||{}} size={32}/></div>
         <div style={{flex:1}}>
           <div style={{...S.row,marginBottom:2,flexWrap:"wrap",gap:4}}>
             <span style={{fontSize:12,color:S.T.accent,fontWeight:"bold"}}>{m.authorLabel}</span>
@@ -574,7 +666,7 @@ function MessageBoard({messages,setMessages,currentUser,S}){
 }
 
 // ── SETTINGS TAB ─────────────────────────────────────────────────────────────
-function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings,setShopSettings,payAccounts,setPayAccounts,S,currentUser}){
+function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings,setShopSettings,payAccounts,setPayAccounts,avatars,setAvatars,setShowAvatarPicker,S,currentUser}){
   const [local,setLocal]=useState({...profile});
   const [saved,setSaved]=useState(false);
   const saveProfile=()=>{setProfile(local);store.save("fp2:profile",local);setSaved(true);setTimeout(()=>setSaved(false),2000);};
@@ -588,6 +680,7 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
   const [newMBAcct,setNewMBAcct]=useState("");
   const isParent=currentUser==="brad"||currentUser==="maryBeth";
   return(<div>
+    <div style={S.card}><div style={S.h2}>My Avatar</div><div style={{display:"flex",gap:14,alignItems:"center"}}><UserAvatar userKey={currentUser} avatars={avatars||{}} size={60}/><div><div style={{fontSize:13,color:S.T.text,marginBottom:6}}>{(avatars||{})[currentUser]?.title||"No character selected yet"}</div><button style={{...S.btn(),padding:"7px 16px",fontSize:12}} onClick={()=>setShowAvatarPicker(true)}>Change Character</button></div></div></div>
     {false&&<div style={S.card}>
       <div style={S.h2}>Profile</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,marginBottom:14}}>
@@ -1132,7 +1225,7 @@ function BradynDashboard({mealPlan,shopList,shopRequests,setShopRequests,mealSug
         </div>
       </div>}
       {tab==="chores"&&<KidChoreView chores={chores} setChores={setChores} userKey="bradyn" userName="Bradyn" userColor="#00d4ff" appSettings={appSettings} S={bS}/>}
-      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="bradyn" S={bS}/>}
+      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="bradyn" avatars={{}} S={bS}/>}
     </div>
   </div>);
 }
@@ -1170,7 +1263,7 @@ function ParkerTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMea
         </div>
       </div>}
       {tab==="chores"&&<KidChoreView chores={chores} setChores={setChores} userKey="parker" userName="Parker" userColor="#b44fef" appSettings={appSettings} S={pS}/>}
-      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="parker" S={pS}/>}
+      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="parker" avatars={{}} S={pS}/>}
     </div>
   </div>);
 }
@@ -1202,14 +1295,15 @@ function RyderTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMeal
         {screen==="shop"&&<div style={rS.card}><div style={{fontSize:18,fontWeight:"bold",color:"#fff9f0",textAlign:"center",marginBottom:10}}>What do we need?</div><input autoFocus style={{background:"rgba(255,255,255,0.1)",border:"2px solid rgba(76,223,122,0.5)",borderRadius:10,padding:"12px 14px",color:"#fff",fontSize:16,fontFamily:"Georgia,serif",width:"100%",boxSizing:"border-box",outline:"none",textAlign:"center",marginBottom:10}} placeholder="Type what you want!" value={shopIn} onChange={e=>setShopIn(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")sendShop();}}/>{bigBtn("Add it!","linear-gradient(135deg,#4cdf7a,#22aa55)","#0d1f0d",sendShop)}<button onClick={()=>setScreen("home")} style={{width:"100%",padding:"8px",background:"transparent",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,color:"#887766",fontSize:12,cursor:"pointer",fontFamily:"Georgia,serif"}}>Go back</button></div>}
       </>}
       {tab==="chores"&&<KidChoreView chores={chores} setChores={setChores} userKey="ryder" userName="Ryder" userColor="#ff6b35" appSettings={appSettings} S={rS}/>}
-      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="ryder" S={rS}/>}
+      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="ryder" avatars={{}} S={rS}/>}
     </div>
   </div>);
 }
 
 // ── BRAD DASHBOARD ────────────────────────────────────────────────────────────
 function BradDashboard(props){
-  const {onLogout,auth,setAuth,netWorth,accounts,setAccounts,debts,setDebts,expenses,setExpenses,goals,setGoals,transactions,setTransactions,pslf,setPslf,scenario,setScenario,reviewTxns,setReviewTxns,uploadLoading,handleUpload,confirmTxns,fileRef,saveAll,profile,setProfile,mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,totalAssets,totalDebtAmt,totalCC,combinedLiquid,cushion,dti,mortgageRate,monthlyMortgage,loanAmt,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts}=props;
+  const [showAvatarPicker,setShowAvatarPicker]=useState(false);
+  const {onLogout,auth,setAuth,netWorth,accounts,setAccounts,debts,setDebts,expenses,setExpenses,goals,setGoals,transactions,setTransactions,pslf,setPslf,scenario,setScenario,reviewTxns,setReviewTxns,uploadLoading,handleUpload,confirmTxns,fileRef,saveAll,profile,setProfile,mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,totalAssets,totalDebtAmt,totalCC,combinedLiquid,cushion,dti,mortgageRate,monthlyMortgage,loanAmt,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,avatars,setAvatars}=props;
   const [tab,setTab]=useState("home");
   const [userTheme,setUserTheme]=useState(appSettings?.userThemes?.brad||"dark");
   const S=makeS(userTheme);
@@ -1223,7 +1317,8 @@ function BradDashboard(props){
     {g:"Settings",tabs:[{id:"settings",label:"Settings",icon:"⚙️"},{id:"admin",label:"Admin",icon:"🔐"}]},
   ];
   return(<div style={S.page}>
-    <UserHeader user="brad" onLogout={onLogout} S={S} extra={<div style={{fontSize:13,color:S.T.accent,fontFamily:"monospace"}}>{fmt(netWorth)} net worth</div>}>
+    {showAvatarPicker&&<AvatarPicker userKey="brad" avatars={avatars} setAvatars={setAvatars} onClose={()=>setShowAvatarPicker(false)} onSkip={()=>setShowAvatarPicker(false)}/>}
+    <UserHeader user="brad" onLogout={onLogout} S={S} avatars={avatars} extra={<div style={{fontSize:13,color:S.T.accent,fontFamily:"monospace"}}>{fmt(netWorth)} net worth</div>}>
       <div style={{display:"flex",gap:0,overflowX:"auto",alignItems:"center",marginBottom:4}}>
         {GROUPS.map((group,gi)=><div key={group.g} style={{display:"flex",alignItems:"center"}}>
           {gi>0&&<div style={{width:1,height:18,background:S.T.border,margin:"0 6px",flexShrink:0}}/>}
@@ -1242,7 +1337,7 @@ function BradDashboard(props){
       {tab==="home"&&<PersonalHomeScreen currentUser="brad" mealPlan={mealPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} S={S}/> }
       {tab==="meals"&&<MealsTab mealPlan={mealPlan} setMealPlan={setMealPlan} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} shopSettings={shopSettings} profile={profile} S={S}/>}
       {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} appSettings={appSettings} S={S} currentUser="brad"/>}
-      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="brad" S={S}/>}
+      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="brad" avatars={avatars||{}} S={S}/>}
       {tab==="bills"&&<BillsTab bills={bills} setBills={setBills} billHistory={billHistory} setBillHistory={setBillHistory} profile={profile} payAccounts={payAccounts} S={S}/>}
       {tab==="dashboard"&&<DashboardTab profile={profile} accounts={accounts} debts={debts} goals={goals} expenses={expenses} transactions={transactions} totalAssets={totalAssets} totalDebtAmt={totalDebtAmt} netWorth={netWorth} combinedLiquid={combinedLiquid} totalCC={totalCC} cushion={cushion} dti={dti} mortgageRate={mortgageRate} monthlyMortgage={monthlyMortgage} loanAmt={loanAmt} surplus={surplus} takeHome={takeHome} totalExpenses={totalExpenses} slPayment={slPayment} downNeeded={downNeeded} closing={closing} homePrice={homePrice} setTab={setTab} bills={bills} mealPlan={mealPlan} mealSuggestions={mealSuggestions} shopRequests={shopRequests} S={S}/>}
       {tab==="accounts"&&<AccountsTab accounts={accounts} setAccounts={setAccounts} profile={profile} S={S}/>}
@@ -1252,14 +1347,15 @@ function BradDashboard(props){
       {tab==="statements"&&<StatementsTab transactions={transactions} setTransactions={setTransactions} handleUpload={handleUpload} uploadLoading={uploadLoading} reviewTxns={reviewTxns} setReviewTxns={setReviewTxns} confirmTxns={confirmTxns} fileRef={fileRef} S={S}/>}
       {tab==="scenarios"&&<ScenariosTab scenario={scenario} setScenario={setScenario} debts={debts} profile={profile} combinedLiquid={combinedLiquid} totalCC={totalCC} surplus={surplus} mortgageRate={mortgageRate} loanAmt={loanAmt} homePrice={homePrice} slPayment={slPayment} S={S}/>}
       {tab==="pslf"&&<PslfTab pslf={pslf} setPslf={setPslf} debts={debts} S={S}/>}
-      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} shopSettings={shopSettings} setShopSettings={setShopSettings} payAccounts={payAccounts} setPayAccounts={setPayAccounts} S={S} currentUser="brad"/>}
+      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} shopSettings={shopSettings} setShopSettings={setShopSettings} payAccounts={payAccounts} setPayAccounts={setPayAccounts} avatars={avatars} setAvatars={setAvatars} setShowAvatarPicker={setShowAvatarPicker} S={S} currentUser="brad"/>}
       {tab==="admin"&&<AdminPanel auth={auth} setAuth={setAuth} S={S}/>}
     </div>
   </div>);
 }
 
 // ── MARY BETH DASHBOARD ───────────────────────────────────────────────────────
-function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,profile,setProfile,expenses,debts,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,onLogout}){
+function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,profile,setProfile,expenses,debts,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,avatars,setAvatars,onLogout}){
+  const [showAvatarPicker,setShowAvatarPicker]=useState(false);
   const [tab,setTab]=useState("home");
   const [userTheme,setUserTheme]=useState(appSettings?.userThemes?.maryBeth||"dark");
   const S=makeS(userTheme);
@@ -1268,7 +1364,8 @@ function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,s
   const msgPending=(messages||[]).filter(m=>!m.approved).length;
   const TABS=[{id:"home",label:"Home",icon:"🏠"},{id:"meals",label:"Meals & Food",icon:"🍽"},{id:"chores",label:"Tasks",icon:"✅"},{id:"board",label:"Board",icon:"📢"},{id:"bills",label:"Expenses",icon:"🧾"},{id:"settings",label:"Settings",icon:"⚙️"}];
   return(<div style={S.page}>
-    <UserHeader user="maryBeth" onLogout={onLogout} S={S}>
+    {showAvatarPicker&&<AvatarPicker userKey="maryBeth" avatars={avatars} setAvatars={setAvatars} onClose={()=>setShowAvatarPicker(false)} onSkip={()=>setShowAvatarPicker(false)}/>}
+    <UserHeader user="maryBeth" onLogout={onLogout} S={S} avatars={avatars}>
       <div style={{display:"flex",gap:0,overflowX:"auto",marginBottom:4}}>
         {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{padding:"7px 11px",cursor:"pointer",fontSize:11,background:"none",border:"none",borderBottom:tab===t.id?`2px solid ${S.T.accent}`:"2px solid transparent",color:tab===t.id?S.T.accent:S.T.sub,fontFamily:"Georgia,serif",whiteSpace:"nowrap",position:"relative"}}>
           {t.icon} {t.label}
@@ -1283,9 +1380,9 @@ function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,s
       {tab==="home"&&<PersonalHomeScreen currentUser="maryBeth" mealPlan={mealPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} S={S}/> }
       {tab==="meals"&&<MealsTab mealPlan={mealPlan} setMealPlan={setMealPlan} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} shopSettings={shopSettings} profile={profile} S={S}/>}
       {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} appSettings={appSettings} S={S} currentUser="maryBeth"/>}
-      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="maryBeth" S={S}/>}
+      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="maryBeth" avatars={avatars||{}} S={S}/>}
       {tab==="bills"&&<BillsTab bills={bills} setBills={setBills} billHistory={billHistory} setBillHistory={setBillHistory} profile={profile} payAccounts={payAccounts} S={S}/>}
-      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} shopSettings={shopSettings} setShopSettings={setShopSettings} payAccounts={payAccounts} setPayAccounts={setPayAccounts} S={S} currentUser="maryBeth"/>}
+      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} shopSettings={shopSettings} setShopSettings={setShopSettings} payAccounts={payAccounts} setPayAccounts={setPayAccounts} avatars={avatars} setAvatars={setAvatars} setShowAvatarPicker={setShowAvatarPicker} S={S} currentUser="maryBeth"/>}
     </div>
   </div>);
 }
@@ -1312,7 +1409,9 @@ export default function App(){
   const [appSettings,setAppSettings]=useState(D.appSettings);
   const [shopSettings,setShopSettings]=useState(D.shopSettings);
   const [payAccounts,setPayAccounts]=useState(D.payAccounts);
+  const [avatars,setAvatars]=useState(D.avatars);
   const [currentUser,setCurrentUser]=useState(null);
+  const [showAvatarPicker,setShowAvatarPicker]=useState(false);
   const [loginTarget,setLoginTarget]=useState(null);
   const [loaded,setLoaded]=useState(false);
   const [scenario,setScenario]=useState({extraPayment:500,incomeBoost:0,downPct:20,extraSavings:0});
@@ -1324,7 +1423,7 @@ export default function App(){
 
   useEffect(()=>{
     (async()=>{
-      const [p,a,d,e,g,t,ps,bl,mp,sl,ms,sr,au,ch,mg,bh,as,md,ss,pa]=await Promise.all([
+      const [p,a,d,e,g,t,ps,bl,mp,sl,ms,sr,au,ch,mg,bh,as,md,ss,pa,av]=await Promise.all([
         store.load("fp2:profile",D.profile),store.load("fp2:accounts",D.accounts),
         store.load("fp2:debts",D.debts),store.load("fp2:expenses",D.expenses),
         store.load("fp2:goals",D.goals),store.load("fp2:transactions",D.transactions),
@@ -1335,6 +1434,7 @@ export default function App(){
         store.load("fp2:messages",D.messages),store.load("fp2:billHistory",D.billHistory),
         store.load("fp2:appSettings",D.appSettings),store.load("fp2:mealDetails",{}),
         store.load("fp2:shopSettings",D.shopSettings),store.load("fp2:payAccounts",D.payAccounts),
+        store.load("fp2:avatars",D.avatars),
       ]);
       setProfile(p);setAccounts(a);setDebts(d);setExpenses(e);setGoals(g);setTransactions(t);setPslf(ps);
       setBills(bl);setBillHistory(bh||[]);
@@ -1345,6 +1445,7 @@ export default function App(){
       setAppSettings({...D.appSettings,...(as||{})});
       setShopSettings({...D.shopSettings,...(ss||{})});
       setPayAccounts({...D.payAccounts,...(pa||{})});
+      setAvatars(av||{});
       setLoaded(true);
     })();
   },[]);
@@ -1397,15 +1498,16 @@ export default function App(){
   const confirmTxns=sel=>{const upd=[...transactions,...sel.map(t=>({...t,confirmed:true}))].slice(-500);setTransactions(upd);store.save("fp2:transactions",upd);setReviewTxns(null);};
 
   const handleLogin=userKey=>setLoginTarget(userKey);
-  const handleLoginSuccess=(userKey,newPwd)=>{if(newPwd){const upd={...auth,[userKey]:newPwd};setAuth(upd);store.save("fp2:auth",upd);}setCurrentUser(userKey);setLoginTarget(null);lastActivity.current=Date.now();};
+  const handleLoginSuccess=(userKey,newPwd)=>{if(newPwd){const upd={...auth,[userKey]:newPwd};setAuth(upd);store.save("fp2:auth",upd);}setCurrentUser(userKey);setLoginTarget(null);lastActivity.current=Date.now();if(!avatars[userKey])setShowAvatarPicker(true);};
   const handleLogout=()=>setCurrentUser(null);
 
   if(!loaded)return <div style={{...S.page,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:GOLD}}>Loading Family Hub...</div>;
 
-  const sharedProps={mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,profile,setProfile,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts};
+  const sharedProps={mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,profile,setProfile,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,avatars,setAvatars};
 
   return(<div style={S.page}>
-    {loginTarget&&<LoginModal user={loginTarget} auth={auth} onSuccess={pwd=>handleLoginSuccess(loginTarget,pwd)} onClose={()=>setLoginTarget(null)}/>}
+    {showAvatarPicker&&currentUser&&<AvatarPicker userKey={currentUser} avatars={avatars} setAvatars={setAvatars} onClose={()=>setShowAvatarPicker(false)} onSkip={()=>setShowAvatarPicker(false)}/>}
+    {loginTarget&&<LoginModal user={loginTarget} auth={auth} avatars={avatars} onSuccess={pwd=>handleLoginSuccess(loginTarget,pwd)} onClose={()=>setLoginTarget(null)}/>}
     {!currentUser&&<PublicHomeScreen mealPlan={mealPlan} shopList={shopList} bills={bills} expenses={expenses} onLogin={handleLogin} appSettings={appSettings} messages={messages}/>}
     {currentUser==="brad"&&<BradDashboard {...sharedProps} accounts={accounts} setAccounts={setAccounts} debts={debts} setDebts={setDebts} expenses={expenses} setExpenses={setExpenses} goals={goals} setGoals={setGoals} transactions={transactions} setTransactions={setTransactions} pslf={pslf} setPslf={setPslf} scenario={scenario} setScenario={setScenario} reviewTxns={reviewTxns} setReviewTxns={setReviewTxns} uploadLoading={uploadLoading} handleUpload={handleUpload} confirmTxns={confirmTxns} fileRef={fileRef} saveAll={saveAll} auth={auth} setAuth={setAuth} totalAssets={totalAssets} totalDebtAmt={totalDebtAmt} netWorth={netWorth} totalCC={totalCC} combinedLiquid={combinedLiquid} cushion={cushion} dti={dti} mortgageRate={mortgageRate} monthlyMortgage={monthlyMortgage} loanAmt={loanAmt} surplus={surplus} takeHome={takeHome} totalExpenses={totalExpenses} slPayment={slPayment} downNeeded={downNeeded} closing={closing} homePrice={homePrice} onLogout={handleLogout}/>}
     {currentUser==="maryBeth"&&<MaryBethDashboard {...sharedProps} expenses={expenses} debts={debts} onLogout={handleLogout} setChores={setChores}/>}
