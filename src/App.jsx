@@ -144,8 +144,8 @@ function UserAvatar({userKey,avatars,size=44,showName=false}){
   const av=avatars?.[userKey];
   return(<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
     <div style={{width:size,height:size,borderRadius:"50%",border:`3px solid ${u.color}`,overflow:"hidden",background:"#1a1a1a",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-      {av?.url
-        ?<img src={av.url} alt={av.name||u.label} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+      {av?.svg
+        ?<div style={{width:"100%",height:"100%"}} dangerouslySetInnerHTML={{__html:av.svg}}/>
         :<span style={{fontSize:size*0.45}}>{u.emoji}</span>
       }
     </div>
@@ -153,77 +153,61 @@ function UserAvatar({userKey,avatars,size=44,showName=false}){
   </div>);
 }
 
+// ── AVATAR DEFINITIONS ───────────────────────────────────────────────────────
+const AVATARS=[
+  {id:"lion",name:"Leo the Lion",color:"#F5A623",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#F5A623"/><circle cx="50" cy="48" r="26" fill="#FDEBD0"/><ellipse cx="50" cy="62" rx="14" ry="10" fill="#E59866"/><circle cx="42" cy="44" r="4" fill="#2C3E50"/><circle cx="58" cy="44" r="4" fill="#2C3E50"/><circle cx="43" cy="43" r="1.5" fill="white"/><circle cx="59" cy="43" r="1.5" fill="white"/><ellipse cx="50" cy="55" rx="6" ry="4" fill="#E59866"/><path d="M44 58 Q50 63 56 58" stroke="#2C3E50" stroke-width="1.5" fill="none"/><path d="M2 50 Q15 30 30 45 Q20 50 30 55 Q15 70 2 50Z" fill="#E67E22"/><path d="M98 50 Q85 30 70 45 Q80 50 70 55 Q85 70 98 50Z" fill="#E67E22"/></svg>'},
+  {id:"fox",name:"Finn the Fox",color:"#E67E22",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#E67E22"/><circle cx="50" cy="50" r="26" fill="#FDEBD0"/><polygon points="30,20 20,2 45,30" fill="#E67E22"/><polygon points="70,20 80,2 55,30" fill="#E67E22"/><polygon points="33,22 26,8 46,30" fill="white"/><polygon points="67,22 74,8 54,30" fill="white"/><circle cx="42" cy="46" r="4" fill="#2C3E50"/><circle cx="58" cy="46" r="4" fill="#2C3E50"/><circle cx="43" cy="45" r="1.5" fill="white"/><circle cx="59" cy="45" r="1.5" fill="white"/><ellipse cx="50" cy="55" rx="5" ry="3.5" fill="#E67E22"/><path d="M45 58 Q50 62 55 58" stroke="#2C3E50" stroke-width="1.5" fill="none"/></svg>'},
+  {id:"bear",name:"Bruno the Bear",color:"#8B6914",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#8B6914"/><circle cx="32" cy="26" r="14" fill="#8B6914"/><circle cx="68" cy="26" r="14" fill="#8B6914"/><circle cx="32" cy="26" r="9" fill="#A0784A"/><circle cx="68" cy="26" r="9" fill="#A0784A"/><circle cx="50" cy="52" r="27" fill="#A0784A"/><ellipse cx="50" cy="62" rx="12" ry="9" fill="#8B6914"/><circle cx="42" cy="46" r="4.5" fill="#2C3E50"/><circle cx="58" cy="46" r="4.5" fill="#2C3E50"/><circle cx="43" cy="45" r="1.5" fill="white"/><circle cx="59" cy="45" r="1.5" fill="white"/><ellipse cx="50" cy="60" rx="8" ry="6" fill="#5D4037"/><path d="M44 64 Q50 68 56 64" stroke="#2C3E50" stroke-width="1.5" fill="none"/></svg>'},
+  {id:"owl",name:"Ollie the Owl",color:"#6D4C41",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#795548"/><ellipse cx="50" cy="55" rx="28" ry="30" fill="#A1887F"/><polygon points="38,18 50,30 28,30" fill="#795548"/><polygon points="62,18 72,30 50,30" fill="#795548"/><circle cx="38" cy="44" r="11" fill="white"/><circle cx="62" cy="44" r="11" fill="white"/><circle cx="38" cy="44" r="7" fill="#FFA000"/><circle cx="62" cy="44" r="7" fill="#FFA000"/><circle cx="38" cy="44" r="4" fill="#1A237E"/><circle cx="62" cy="44" r="4" fill="#1A237E"/><circle cx="39" cy="43" r="1.5" fill="white"/><circle cx="63" cy="43" r="1.5" fill="white"/><polygon points="46,52 50,58 54,52" fill="#FF8F00"/></svg>'},
+  {id:"dragon",name:"Drake the Dragon",color:"#2E7D32",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#2E7D32"/><ellipse cx="50" cy="55" rx="26" ry="24" fill="#43A047"/><polygon points="25,20 38,40 20,38" fill="#1B5E20"/><polygon points="75,20 62,40 80,38" fill="#1B5E20"/><polygon points="28,22 38,40 22,36" fill="#66BB6A"/><polygon points="72,22 62,40 78,36" fill="#66BB6A"/><circle cx="42" cy="46" r="5" fill="#FFF176"/><circle cx="58" cy="46" r="5" fill="#FFF176"/><circle cx="42" cy="46" r="3" fill="#1B5E20"/><circle cx="58" cy="46" r="3" fill="#1B5E20"/><ellipse cx="50" cy="58" rx="10" ry="7" fill="#1B5E20"/><polygon points="40,65 50,80 60,65" fill="#F44336"/></svg>'},
+  {id:"unicorn",name:"Star the Unicorn",color:"#CE93D8",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#F3E5F5"/><circle cx="50" cy="52" r="26" fill="white"/><polygon points="50,8 46,30 54,30" fill="#FFD54F"/><polygon points="50,8 44,28 50,26" fill="#FF8A65"/><polygon points="50,8 56,28 50,26" fill="#CE93D8"/><circle cx="41" cy="47" r="4" fill="#6A1B9A"/><circle cx="59" cy="47" r="4" fill="#6A1B9A"/><circle cx="42" cy="46" r="1.5" fill="white"/><circle cx="60" cy="46" r="1.5" fill="white"/><ellipse cx="50" cy="58" rx="6" ry="4" fill="#F8BBD0"/><path d="M44 61 Q50 66 56 61" stroke="#CE93D8" stroke-width="1.5" fill="none"/></svg>'},
+  {id:"wolf",name:"Luna the Wolf",color:"#546E7A",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#607D8B"/><polygon points="30,22 20,2 44,32" fill="#607D8B"/><polygon points="70,22 80,2 56,32" fill="#607D8B"/><polygon points="33,24 25,8 44,32" fill="#ECEFF1"/><polygon points="67,24 75,8 56,32" fill="#ECEFF1"/><circle cx="50" cy="50" r="26" fill="#78909C"/><circle cx="50" cy="50" r="18" fill="#ECEFF1"/><circle cx="42" cy="46" r="4.5" fill="#263238"/><circle cx="58" cy="46" r="4.5" fill="#263238"/><circle cx="43" cy="45" r="1.5" fill="white"/><circle cx="59" cy="45" r="1.5" fill="white"/><ellipse cx="50" cy="57" rx="7" ry="5" fill="#78909C"/><path d="M44 60 Q50 65 56 60" stroke="#263238" stroke-width="1.5" fill="none"/></svg>'},
+  {id:"bunny",name:"Biscuit the Bunny",color:"#F8BBD0",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="55" r="46" fill="#F8BBD9"/><ellipse cx="34" cy="20" rx="9" ry="22" fill="#F8BBD9"/><ellipse cx="66" cy="20" rx="9" ry="22" fill="#F8BBD9"/><ellipse cx="34" cy="20" rx="5" ry="18" fill="#FCE4EC"/><ellipse cx="66" cy="20" rx="5" ry="18" fill="#FCE4EC"/><circle cx="50" cy="55" r="26" fill="#FCE4EC"/><circle cx="41" cy="50" r="4.5" fill="#880E4F"/><circle cx="59" cy="50" r="4.5" fill="#880E4F"/><circle cx="42" cy="49" r="1.5" fill="white"/><circle cx="60" cy="49" r="1.5" fill="white"/><ellipse cx="50" cy="60" rx="5" ry="4" fill="#F48FB1"/><path d="M45 63 Q50 67 55 63" stroke="#880E4F" stroke-width="1.5" fill="none"/></svg>'},
+  {id:"turtle",name:"Shelly the Turtle",color:"#388E3C",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#4CAF50"/><ellipse cx="50" cy="52" rx="30" ry="26" fill="#2E7D32"/><ellipse cx="50" cy="52" rx="22" ry="18" fill="#66BB6A"/><line x1="50" y1="34" x2="50" y2="70" stroke="#2E7D32" stroke-width="2"/><line x1="28" y1="52" x2="72" y2="52" stroke="#2E7D32" stroke-width="2"/><line x1="34" y1="38" x2="66" y2="66" stroke="#2E7D32" stroke-width="1.5"/><line x1="66" y1="38" x2="34" y2="66" stroke="#2E7D32" stroke-width="1.5"/><circle cx="50" cy="28" r="10" fill="#81C784"/><circle cx="44" cy="26" r="3" fill="#1B5E20"/><circle cx="56" cy="26" r="3" fill="#1B5E20"/><path d="M46 30 Q50 33 54 30" stroke="#1B5E20" stroke-width="1.5" fill="none"/></svg>'},
+  {id:"penguin",name:"Pip the Penguin",color:"#1A237E",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#1A237E"/><ellipse cx="50" cy="55" rx="24" ry="28" fill="#212121"/><ellipse cx="50" cy="58" rx="16" ry="20" fill="white"/><circle cx="42" cy="46" r="5" fill="#FFF9C4"/><circle cx="58" cy="46" r="5" fill="#FFF9C4"/><circle cx="42" cy="46" r="3" fill="#1A237E"/><circle cx="58" cy="46" r="3" fill="#1A237E"/><circle cx="43" cy="45" r="1" fill="white"/><circle cx="59" cy="45" r="1" fill="white"/><polygon points="46,55 50,60 54,55" fill="#FF8F00"/><ellipse cx="32" cy="58" rx="10" ry="6" transform="rotate(-20 32 58)" fill="#212121"/><ellipse cx="68" cy="58" rx="10" ry="6" transform="rotate(20 68 58)" fill="#212121"/></svg>'},
+  {id:"elephant",name:"Ellie the Elephant",color:"#9E9E9E",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#BDBDBD"/><circle cx="50" cy="48" r="26" fill="#9E9E9E"/><ellipse cx="34" cy="30" rx="14" ry="12" fill="#9E9E9E"/><ellipse cx="66" cy="30" rx="14" ry="12" fill="#9E9E9E"/><ellipse cx="34" cy="30" rx="10" ry="8" fill="#CFD8DC"/><ellipse cx="66" cy="30" rx="10" ry="8" fill="#CFD8DC"/><circle cx="42" cy="46" r="5" fill="#37474F"/><circle cx="58" cy="46" r="5" fill="#37474F"/><circle cx="43" cy="45" r="2" fill="white"/><circle cx="59" cy="45" r="2" fill="white"/><path d="M44 60 Q50 68 56 60 Q53 74 50 76 Q47 74 44 60Z" fill="#9E9E9E"/></svg>'},
+  {id:"cat",name:"Whiskers the Cat",color:"#FF8A65",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#FFCCBC"/><polygon points="28,26 18,4 42,32" fill="#FF8A65"/><polygon points="72,26 82,4 58,32" fill="#FF8A65"/><polygon points="31,27 22,8 42,32" fill="#FFCCBC"/><polygon points="69,27 78,8 58,32" fill="#FFCCBC"/><circle cx="50" cy="50" r="26" fill="#FFCCBC"/><circle cx="41" cy="46" r="4.5" fill="#1B5E20"/><circle cx="59" cy="46" r="4.5" fill="#1B5E20"/><ellipse cx="41" cy="46" rx="2" ry="4" fill="#212121"/><ellipse cx="59" cy="46" rx="2" ry="4" fill="#212121"/><ellipse cx="50" cy="56" rx="5" ry="3.5" fill="#FF8A65"/><path d="M46 59 Q50 63 54 59" stroke="#5D4037" stroke-width="1.5" fill="none"/></svg>'},
+  {id:"panda",name:"Bao the Panda",color:"#37474F",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="white"/><circle cx="50" cy="50" r="26" fill="white"/><ellipse cx="34" cy="28" rx="13" ry="11" fill="#37474F"/><ellipse cx="66" cy="28" rx="13" ry="11" fill="#37474F"/><ellipse cx="37" cy="47" rx="9" ry="7" fill="#37474F"/><ellipse cx="63" cy="47" rx="9" ry="7" fill="#37474F"/><circle cx="40" cy="46" r="4.5" fill="#263238"/><circle cx="60" cy="46" r="4.5" fill="#263238"/><circle cx="41" cy="45" r="1.5" fill="white"/><circle cx="61" cy="45" r="1.5" fill="white"/><ellipse cx="50" cy="57" rx="6" ry="4" fill="#BDBDBD"/><path d="M45 60 Q50 64 55 60" stroke="#37474F" stroke-width="1.5" fill="none"/></svg>'},
+  {id:"tiger",name:"Raja the Tiger",color:"#E65100",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#FF8F00"/><circle cx="50" cy="50" r="26" fill="#FFB300"/><ellipse cx="50" cy="60" rx="14" ry="10" fill="#FFECB3"/><circle cx="41" cy="45" r="4.5" fill="#1A237E"/><circle cx="59" cy="45" r="4.5" fill="#1A237E"/><circle cx="42" cy="44" r="1.5" fill="white"/><circle cx="60" cy="44" r="1.5" fill="white"/><ellipse cx="50" cy="57" rx="6" ry="4" fill="#E65100"/><path d="M45 60 Q50 65 55 60" stroke="#4A148C" stroke-width="1.5" fill="none"/><line x1="38" y1="36" x2="42" y2="42" stroke="#E65100" stroke-width="2"/><line x1="50" y1="32" x2="50" y2="40" stroke="#E65100" stroke-width="2"/><line x1="62" y1="36" x2="58" y2="42" stroke="#E65100" stroke-width="2"/></svg>'},
+  {id:"koala",name:"Koko the Koala",color:"#90A4AE",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#B0BEC5"/><ellipse cx="28" cy="36" rx="16" ry="14" fill="#78909C"/><ellipse cx="72" cy="36" rx="16" ry="14" fill="#78909C"/><ellipse cx="28" cy="36" rx="11" ry="10" fill="#B0BEC5"/><ellipse cx="72" cy="36" rx="11" ry="10" fill="#B0BEC5"/><circle cx="50" cy="52" r="26" fill="#90A4AE"/><ellipse cx="50" cy="58" rx="14" ry="10" fill="#B0BEC5"/><ellipse cx="50" cy="54" rx="8" ry="6" fill="#546E7A"/><circle cx="42" cy="46" r="4.5" fill="#263238"/><circle cx="58" cy="46" r="4.5" fill="#263238"/><circle cx="43" cy="45" r="1.5" fill="white"/><circle cx="59" cy="45" r="1.5" fill="white"/><path d="M44 62 Q50 66 56 62" stroke="#37474F" stroke-width="1.5" fill="none"/></svg>'},
+  {id:"frog",name:"Leap the Frog",color:"#2E7D32",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="52" r="46" fill="#4CAF50"/><circle cx="32" cy="28" r="12" fill="#4CAF50"/><circle cx="68" cy="28" r="12" fill="#4CAF50"/><circle cx="32" cy="28" r="8" fill="#A5D6A7"/><circle cx="68" cy="28" r="8" fill="#A5D6A7"/><circle cx="32" cy="28" r="5" fill="#1B5E20"/><circle cx="68" cy="28" r="5" fill="#1B5E20"/><circle cx="33" cy="27" r="1.5" fill="white"/><circle cx="69" cy="27" r="1.5" fill="white"/><ellipse cx="50" cy="56" rx="26" ry="22" fill="#66BB6A"/><ellipse cx="50" cy="63" rx="18" ry="14" fill="#A5D6A7"/><path d="M38 62 Q50 70 62 62" stroke="#2E7D32" stroke-width="2" fill="none"/></svg>'},
+  {id:"dragon2",name:"Blaze the Dragon",color:"#B71C1C",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#EF9A9A"/><ellipse cx="50" cy="55" rx="26" ry="24" fill="#E53935"/><polygon points="25,20 38,40 20,38" fill="#B71C1C"/><polygon points="75,20 62,40 80,38" fill="#B71C1C"/><circle cx="42" cy="46" r="5" fill="#FFF176"/><circle cx="58" cy="46" r="5" fill="#FFF176"/><circle cx="42" cy="46" r="3" fill="#B71C1C"/><circle cx="58" cy="46" r="3" fill="#B71C1C"/><ellipse cx="50" cy="58" rx="10" ry="7" fill="#B71C1C"/><polygon points="40,65 50,82 60,65" fill="#FFA726"/></svg>'},
+  {id:"phoenix",name:"Ember the Phoenix",color:"#FF5722",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#FFCC02"/><ellipse cx="50" cy="58" rx="20" ry="18" fill="#FF5722"/><path d="M50 40 Q42 30 30 35 Q40 42 38 52 Q44 44 50 48Z" fill="#FF8A65"/><path d="M50 40 Q58 30 70 35 Q60 42 62 52 Q56 44 50 48Z" fill="#FF8A65"/><path d="M50 35 Q44 22 34 28 Q44 36 42 46Z" fill="#FFCC02"/><path d="M50 35 Q56 22 66 28 Q56 36 58 46Z" fill="#FFCC02"/><circle cx="44" cy="56" r="4" fill="#FFCC02"/><circle cx="56" cy="56" r="4" fill="#FFCC02"/><circle cx="44" cy="56" r="2.5" fill="#212121"/><circle cx="56" cy="56" r="2.5" fill="#212121"/><path d="M44 62 Q50 68 56 62" stroke="#212121" stroke-width="1.5" fill="none"/></svg>'},
+  {id:"unicorn2",name:"Dawn the Unicorn",color:"#F06292",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#FCE4EC"/><circle cx="50" cy="52" r="26" fill="white"/><polygon points="50,8 46,30 54,30" fill="#CE93D8"/><polygon points="50,8 44,28 50,26" fill="#F06292"/><polygon points="50,8 56,28 50,26" fill="#FFD54F"/><circle cx="41" cy="47" r="4" fill="#880E4F"/><circle cx="59" cy="47" r="4" fill="#880E4F"/><circle cx="42" cy="46" r="1.5" fill="white"/><circle cx="60" cy="46" r="1.5" fill="white"/><ellipse cx="50" cy="58" rx="6" ry="4" fill="#F8BBD0"/><path d="M44 61 Q50 66 56 61" stroke="#F06292" stroke-width="1.5" fill="none"/></svg>'},
+  {id:"wizard",name:"Merlin the Wizard",color:"#4A148C",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#7B1FA2"/><ellipse cx="50" cy="56" rx="22" ry="20" fill="#6A1B9A"/><circle cx="50" cy="44" r="16" fill="#CE93D8"/><polygon points="50,4 38,38 62,38" fill="#4A148C"/><ellipse cx="50" cy="38" rx="14" ry="4" fill="#6A1B9A"/><circle cx="42" cy="42" r="3.5" fill="#1A237E"/><circle cx="58" cy="42" r="3.5" fill="#1A237E"/><circle cx="43" cy="41" r="1.2" fill="white"/><circle cx="59" cy="41" r="1.2" fill="white"/><path d="M44 48 Q50 52 56 48" stroke="#4A148C" stroke-width="1.5" fill="none"/><circle cx="30" cy="22" r="3" fill="#FFD54F"/><circle cx="70" cy="18" r="2" fill="#FFD54F"/></svg>'},
+  {id:"knight",name:"Sir Braveheart",color:"#5C6BC0",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#7986CB"/><path d="M26 52 Q26 28 50 26 Q74 28 74 52 Q74 68 50 72 Q26 68 26 52Z" fill="#9FA8DA"/><rect x="38" y="42" width="24" height="20" rx="2" fill="#5C6BC0"/><line x1="50" y1="42" x2="50" y2="62" stroke="#7986CB" stroke-width="2"/><line x1="38" y1="52" x2="62" y2="52" stroke="#7986CB" stroke-width="2"/><circle cx="42" cy="46" r="3.5" fill="#1A237E"/><circle cx="58" cy="46" r="3.5" fill="#1A237E"/><path d="M44 56 Q50 60 56 56" stroke="#1A237E" stroke-width="1.5" fill="none"/><polygon points="46,24 50,8 54,24" fill="#FFD54F"/></svg>'},
+  {id:"mermaid",name:"Marina Mermaid",color:"#00ACC1",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#B2EBF2"/><ellipse cx="50" cy="42" rx="18" ry="20" fill="#FFCCBC"/><circle cx="43" cy="38" r="3.5" fill="#00838F"/><circle cx="57" cy="38" r="3.5" fill="#00838F"/><circle cx="44" cy="37" r="1.2" fill="white"/><circle cx="58" cy="37" r="1.2" fill="white"/><ellipse cx="50" cy="46" rx="5" ry="3" fill="#FFAB91"/><path d="M45 49 Q50 53 55 49" stroke="#795548" stroke-width="1.5" fill="none"/><path d="M32 28 Q40 15 50 22 Q42 25 40 35" fill="#26C6DA"/><path d="M68 28 Q60 15 50 22 Q58 25 60 35" fill="#00BCD4"/><ellipse cx="50" cy="68" rx="20" ry="16" fill="#00ACC1"/><path d="M30 72 Q50 85 70 72 Q65 82 50 88 Q35 82 30 72Z" fill="#00838F"/></svg>'},
+  {id:"fairy",name:"Tinsel the Fairy",color:"#F06292",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#FCE4EC"/><ellipse cx="50" cy="56" rx="18" ry="18" fill="#F8BBD0"/><circle cx="50" cy="40" r="14" fill="#FFCCBC"/><circle cx="43" cy="38" r="3.5" fill="#AD1457"/><circle cx="57" cy="38" r="3.5" fill="#AD1457"/><circle cx="44" cy="37" r="1.2" fill="white"/><circle cx="58" cy="37" r="1.2" fill="white"/><ellipse cx="50" cy="45" rx="4" ry="3" fill="#F48FB1"/><path d="M45 48 Q50 52 55 48" stroke="#880E4F" stroke-width="1.5" fill="none"/><path d="M28 42 Q20 30 32 28 Q26 38 35 44Z" fill="#E1F5FE" opacity="0.8"/><path d="M72 42 Q80 30 68 28 Q74 38 65 44Z" fill="#E1F5FE" opacity="0.8"/><circle cx="50" cy="20" r="3" fill="#FFD54F"/></svg>'},
+  {id:"shark",name:"Finn the Shark",color:"#1565C0",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#90CAF9"/><ellipse cx="50" cy="55" rx="30" ry="22" fill="#1565C0"/><ellipse cx="50" cy="60" rx="22" ry="14" fill="#BBDEFB"/><polygon points="50,30 44,50 56,50" fill="#1565C0"/><circle cx="40" cy="52" r="4" fill="#0D47A1"/><circle cx="60" cy="52" r="4" fill="#0D47A1"/><circle cx="41" cy="51" r="1.5" fill="white"/><circle cx="61" cy="51" r="1.5" fill="white"/><path d="M40 62 Q50 56 60 62" stroke="#0D47A1" stroke-width="2" fill="none"/></svg>'},
+];
+
 // ── AVATAR PICKER ─────────────────────────────────────────────────────────────
 function AvatarPicker({userKey,avatars,setAvatars,onClose,onSkip}){
   const u=USERS.find(x=>x.key===userKey);
-  const [query,setQuery]=useState("");
-  const [results,setResults]=useState([]);
-  const [loading,setLoading]=useState(false);
   const [selected,setSelected]=useState(avatars?.[userKey]||null);
-  const [error,setError]=useState("");
   const saveAvatars=av=>{setAvatars(av);store.save("fp2:avatars",av);};
-  const search=async()=>{
-    if(!query.trim())return;
-    setLoading(true);setError("");setResults([]);
-    try{
-      // Search specifically for the character page, not generic Disney searches
-      const searchUrl=`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srlimit=12&format=json&origin=*`;
-      const r=await fetch(searchUrl);
-      const d=await r.json();
-      const pages=d.query?.search||[];
-      const imageResults=await Promise.all(pages.map(async p=>{
-        try{
-          const ir=await fetch(`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(p.title)}&prop=pageimages&pithumbsize=200&piprop=thumbnail&format=json&origin=*`);
-          const id=await ir.json();
-          const page=Object.values(id.query.pages)[0];
-          const imgUrl=page?.thumbnail?.source||null;
-          // Filter out generic logos and studio images
-          if(!imgUrl)return null;
-          const lower=imgUrl.toLowerCase();
-          if(lower.includes('logo')||lower.includes('wordmark')||lower.includes('studios')||lower.includes('pixar_logo')||lower.includes('disney_logo'))return null;
-          return{title:p.title,url:imgUrl};
-        }catch{return null;}
-      }));
-      const withImages=imageResults.filter(Boolean);
-      setResults(withImages);
-      if(withImages.length===0)setError("No character images found. Try a more specific name like 'Simba Lion King' or 'Elsa Frozen'.");
-    }catch(e){setError("Search failed. Check your connection.");}
-    setLoading(false);
-  };
-  const confirm=()=>{
-    if(!selected)return;
-    saveAvatars({...avatars,[userKey]:selected});
-    onClose();
-  };
+  const confirm=()=>{if(!selected)return;saveAvatars({...avatars,[userKey]:selected});onClose();};
   return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:2500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-    <div style={{background:"#141410",border:`2px solid ${u.color}44`,borderRadius:16,padding:24,maxWidth:480,width:"100%",maxHeight:"90vh",overflowY:"auto"}}>
-      <div style={{textAlign:"center",marginBottom:20}}>
-        <div style={{fontSize:11,color:"#555",fontFamily:"monospace",letterSpacing:"0.2em",marginBottom:6}}>CHOOSE YOUR CHARACTER</div>
-        <div style={{fontSize:20,color:"#e8e0c8"}}>{u.label}</div>
+    <div style={{background:"#141410",border:`2px solid ${u.color}44`,borderRadius:16,padding:20,maxWidth:540,width:"100%",maxHeight:"92vh",overflowY:"auto"}}>
+      <div style={{textAlign:"center",marginBottom:12}}>
+        <div style={{fontSize:11,color:"#555",fontFamily:"monospace",letterSpacing:"0.2em",marginBottom:4}}>CHOOSE YOUR CHARACTER</div>
+        <div style={{fontSize:18,color:"#e8e0c8"}}>{u.label}</div>
+        {selected&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,margin:"8px 0"}}><div style={{width:64,height:64,borderRadius:"50%",border:`3px solid ${u.color}`,overflow:"hidden"}} dangerouslySetInnerHTML={{__html:selected.svg}}/><div style={{fontSize:12,color:u.color,fontFamily:"monospace"}}>{selected.name}</div></div>}
       </div>
-      {selected&&<div style={{textAlign:"center",marginBottom:16}}>
-        <img src={selected.url} alt={selected.title} style={{width:80,height:80,borderRadius:"50%",objectFit:"cover",border:`3px solid ${u.color}`}}/>
-        <div style={{fontSize:11,color:u.color,marginTop:4,fontFamily:"monospace"}}>{selected.title}</div>
-      </div>}
-      <div style={{display:"flex",gap:8,marginBottom:12}}>
-        <input style={{flex:1,background:"#0d0d08",border:`1px solid ${u.color}44`,borderRadius:8,padding:"9px 12px",color:"#e8e0c8",fontFamily:"Georgia,serif",fontSize:13,outline:"none"}} placeholder="Search e.g. Simba, Elsa, Woody..." value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&search()}/>
-        <button onClick={search} disabled={loading} style={{background:u.color,border:"none",borderRadius:8,padding:"9px 16px",color:"#fff",fontFamily:"Georgia,serif",fontSize:13,cursor:"pointer",fontWeight:"bold"}}>{loading?"...":"Search"}</button>
-      </div>
-      {error&&<div style={{color:"#f44336",fontSize:12,marginBottom:10,textAlign:"center"}}>{error}</div>}
-      {results.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:16}}>
-        {results.map((r,i)=><div key={i} onClick={()=>setSelected(r)} style={{cursor:"pointer",borderRadius:10,overflow:"hidden",border:`2px solid ${selected?.url===r.url?u.color:"transparent"}`,transition:"border 0.15s"}}>
-          <img src={r.url} alt={r.title} style={{width:"100%",aspectRatio:"1",objectFit:"cover",display:"block"}}/>
-          <div style={{fontSize:9,color:"#888",padding:"3px 4px",textAlign:"center",background:"#0d0d08",lineHeight:1.2}}>{r.title.slice(0,20)}</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:6,marginBottom:14}}>
+        {AVATARS.map(av=><div key={av.id} onClick={()=>setSelected(av)} style={{cursor:"pointer",borderRadius:8,padding:3,border:`2px solid ${selected?.id===av.id?u.color:"transparent"}`,background:selected?.id===av.id?u.color+"22":"transparent",transition:"all 0.15s",textAlign:"center"}}>
+          <div style={{width:"100%",aspectRatio:"1",borderRadius:6,overflow:"hidden"}} dangerouslySetInnerHTML={{__html:av.svg}}/>
         </div>)}
-      </div>}
+      </div>
       <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
-        {selected&&<button onClick={confirm} style={{background:u.color,border:"none",borderRadius:8,padding:"10px 22px",color:"#fff",fontFamily:"Georgia,serif",fontSize:13,cursor:"pointer",fontWeight:"bold"}}>Use This Character</button>}
-        {onSkip&&<button onClick={onSkip} style={{background:"transparent",border:"1px solid #333",borderRadius:8,padding:"10px 16px",color:"#555",fontFamily:"Georgia,serif",fontSize:13,cursor:"pointer"}}>Skip for Now</button>}
-        <button onClick={onClose} style={{background:"transparent",border:"1px solid #333",borderRadius:8,padding:"10px 16px",color:"#555",fontFamily:"Georgia,serif",fontSize:13,cursor:"pointer"}}>Cancel</button>
+        {selected&&<button onClick={confirm} style={{background:u.color,border:"none",borderRadius:8,padding:"9px 20px",color:"#fff",fontFamily:"Georgia,serif",fontSize:13,cursor:"pointer",fontWeight:"bold"}}>Use {selected.name}</button>}
+        {onSkip&&<button onClick={onSkip} style={{background:"transparent",border:"1px solid #333",borderRadius:8,padding:"9px 14px",color:"#555",fontFamily:"Georgia,serif",fontSize:12,cursor:"pointer"}}>Skip</button>}
+        <button onClick={onClose} style={{background:"transparent",border:"1px solid #333",borderRadius:8,padding:"9px 14px",color:"#555",fontFamily:"Georgia,serif",fontSize:12,cursor:"pointer"}}>Cancel</button>
       </div>
     </div>
   </div>);
 }
+
 
 function WeatherWidget(){
   const [weather,setWeather]=useState(null),[loading,setLoading]=useState(true);
@@ -677,7 +661,7 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
   const [newMBAcct,setNewMBAcct]=useState("");
   const isParent=currentUser==="brad"||currentUser==="maryBeth";
   return(<div>
-    <div style={S.card}><div style={S.h2}>My Avatar</div><div style={{display:"flex",gap:14,alignItems:"center"}}><UserAvatar userKey={currentUser} avatars={avatars||{}} size={60}/><div><div style={{fontSize:13,color:S.T.text,marginBottom:6}}>{(avatars||{})[currentUser]?.title||"No character selected yet"}</div><button style={{...S.btn(),padding:"7px 16px",fontSize:12}} onClick={()=>setShowAvatarPicker(true)}>Change Character</button></div></div></div>
+    <div style={S.card}><div style={S.h2}>My Character</div><div style={{display:"flex",gap:14,alignItems:"center"}}><UserAvatar userKey={currentUser} avatars={avatars||{}} size={60}/><div><div style={{fontSize:13,color:S.T.text,marginBottom:6}}>{(avatars||{})[currentUser]?.name||"No character selected yet"}</div><button style={{...S.btn(),padding:"7px 16px",fontSize:12}} onClick={()=>setShowAvatarPicker(true)}>Change Character</button></div></div></div>
     {false&&<div style={S.card}>
       <div style={S.h2}>Profile</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,marginBottom:14}}>
