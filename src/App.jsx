@@ -166,21 +166,27 @@ function AvatarPicker({userKey,avatars,setAvatars,onClose,onSkip}){
     if(!query.trim())return;
     setLoading(true);setError("");setResults([]);
     try{
-      const url=`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query+" Disney Pixar character")}&srlimit=8&prop=pageimages&format=json&origin=*`;
-      const r=await fetch(url);
+      // Search specifically for the character page, not generic Disney searches
+      const searchUrl=`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srlimit=12&format=json&origin=*`;
+      const r=await fetch(searchUrl);
       const d=await r.json();
       const pages=d.query?.search||[];
       const imageResults=await Promise.all(pages.map(async p=>{
         try{
-          const ir=await fetch(`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(p.title)}&prop=pageimages&pithumbsize=200&format=json&origin=*`);
+          const ir=await fetch(`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(p.title)}&prop=pageimages&pithumbsize=200&piprop=thumbnail&format=json&origin=*`);
           const id=await ir.json();
           const page=Object.values(id.query.pages)[0];
-          return{title:p.title,url:page?.thumbnail?.source||null};
-        }catch{return{title:p.title,url:null};}
+          const imgUrl=page?.thumbnail?.source||null;
+          // Filter out generic logos and studio images
+          if(!imgUrl)return null;
+          const lower=imgUrl.toLowerCase();
+          if(lower.includes('logo')||lower.includes('wordmark')||lower.includes('studios')||lower.includes('pixar_logo')||lower.includes('disney_logo'))return null;
+          return{title:p.title,url:imgUrl};
+        }catch{return null;}
       }));
-      const withImages=imageResults.filter(r=>r.url);
+      const withImages=imageResults.filter(Boolean);
       setResults(withImages);
-      if(withImages.length===0)setError("No images found. Try a different character name.");
+      if(withImages.length===0)setError("No character images found. Try a more specific name like 'Simba Lion King' or 'Elsa Frozen'.");
     }catch(e){setError("Search failed. Check your connection.");}
     setLoading(false);
   };
@@ -319,7 +325,7 @@ function WeeklyChoreBoard({chores,setChores,appSettings,avatars,S}){
 }
 
 // ── PERSONAL HOME SCREEN (Brad / Mary Beth / Bradyn) ─────────────────────────
-function PersonalHomeScreen({currentUser,mealPlan,bills,chores,setChores,messages,appSettings,S}){
+function PersonalHomeScreen({currentUser,mealPlan,bills,chores,setChores,messages,appSettings,avatars,S}){
   const today=new Date(),tn=todayName();
   const tomorrowName=DAYS[(DAYS.indexOf(tn)+1)%7];
   const u=USERS.find(x=>x.key===currentUser);
@@ -1325,7 +1331,7 @@ function BradDashboard(props){
     </UserHeader>
     <div style={{maxWidth:1400,margin:"0 auto",padding:"16px 16px"}}>
       {tab!=="home"&&bills&&<BillsBanner bills={bills} S={S}/> }
-      {tab==="home"&&<PersonalHomeScreen currentUser="brad" mealPlan={mealPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} S={S}/> }
+      {tab==="home"&&<PersonalHomeScreen currentUser="brad" mealPlan={mealPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} avatars={avatars||{}} S={S}/> }
       {tab==="meals"&&<MealsTab mealPlan={mealPlan} setMealPlan={setMealPlan} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} shopSettings={shopSettings} profile={profile} S={S}/>}
       {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} appSettings={appSettings} S={S} currentUser="brad"/>}
       {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="brad" avatars={avatars||{}} S={S}/>}
@@ -1368,7 +1374,7 @@ function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,s
     </UserHeader>
     <div style={{maxWidth:1300,margin:"0 auto",padding:"16px 16px"}}>
       {tab!=="home"&&bills&&<BillsBanner bills={bills} S={S}/> }
-      {tab==="home"&&<PersonalHomeScreen currentUser="maryBeth" mealPlan={mealPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} S={S}/> }
+      {tab==="home"&&<PersonalHomeScreen currentUser="maryBeth" mealPlan={mealPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} avatars={avatars||{}} S={S}/> }
       {tab==="meals"&&<MealsTab mealPlan={mealPlan} setMealPlan={setMealPlan} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} shopSettings={shopSettings} profile={profile} S={S}/>}
       {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} appSettings={appSettings} S={S} currentUser="maryBeth"/>}
       {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="maryBeth" avatars={avatars||{}} S={S}/>}
