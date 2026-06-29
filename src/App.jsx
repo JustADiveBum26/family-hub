@@ -219,16 +219,6 @@ function AvatarPicker({userKey,avatars,setAvatars,onClose,onSkip}){
   </div>);
 }
 
-
-function LoginModal({user,auth,avatars,onSuccess,onClose}){
-  const [pwd,setPwd]=useState(""),[confirm,setConfirm]=useState(""),[error,setError]=useState(""),[pinErr,setPinErr]=useState("");
-  const u=USERS.find(x=>x.key===user);
-  const isPin=u.type==="pin",isFirst=!auth[user],pinNotSet=isPin&&!auth[user];
-  const submitPwd=()=>{if(isFirst){if(pwd.length<4){setError("At least 4 characters.");return;}if(pwd!==confirm){setError("Passwords don't match.");return;}onSuccess(pwd);}else{if(pwd!==auth[user]){setError("Wrong password. Try again.");setPwd("");return;}onSuccess(null);}};
-  const submitPin=pin=>{if(pin!==auth[user]){setPinErr("Wrong code! Try again.");return;}onSuccess(null);};
-  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}><div style={{background:"#141410",border:`2px solid ${u.color}44`,borderRadius:16,padding:32,maxWidth:380,width:"100%"}} onClick={e=>e.stopPropagation()}><div style={{textAlign:"center",marginBottom:24}}><div style={{display:"flex",justifyContent:"center",marginBottom:8}}><UserAvatar userKey={user} avatars={avatars} size={72}/></div><div style={{fontSize:22,color:"#e8e0c8",marginBottom:4}}>{isFirst&&!isPin?`Welcome, ${u.label}!`:`Hey ${u.label}!`}</div><div style={{fontSize:13,color:"#666"}}>{isFirst&&!isPin?"Create your password to get started":isPin?pinNotSet?"Your PIN has not been set — ask Brad!":"Enter your 4-digit code":"Enter your password"}</div></div>{isPin&&!pinNotSet&&<PinPad onSubmit={submitPin} color={u.color} error={pinErr}/>}{isPin&&pinNotSet&&<div style={{textAlign:"center",padding:"20px 0",color:"#666",fontSize:14}}>Ask Brad to set your code!</div>}{!isPin&&<div><div style={{marginBottom:12}}><div style={S.label}>{isFirst?"Create Password":"Password"}</div><input autoFocus style={S.input} type="password" value={pwd} onChange={e=>{setPwd(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&submitPwd()}/></div>{isFirst&&<div style={{marginBottom:12}}><div style={S.label}>Confirm Password</div><input style={S.input} type="password" value={confirm} onChange={e=>{setConfirm(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&submitPwd()}/></div>}{error&&<div style={{color:"#f44336",fontSize:12,marginBottom:10}}>{error}</div>}<button style={{...S.btn(u.color),width:"100%",padding:"11px",fontSize:15,marginTop:4}} onClick={submitPwd}>{isFirst?"Create Password and Sign In":"Sign In"}</button></div>}<button onClick={onClose} style={{...S.btnGhost,width:"100%",marginTop:12,textAlign:"center"}}>Cancel</button></div></div>);
-}
-
 function WeatherWidget(){
   const [weather,setWeather]=useState(null),[loading,setLoading]=useState(true);
   useEffect(()=>{
