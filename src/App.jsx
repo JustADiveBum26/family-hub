@@ -825,39 +825,35 @@ function BillsTab({bills,setBills,billHistory,setBillHistory,profile,payAccounts
 // ── MEAL DETAIL MODAL (top-level component — must NOT be inside MealsTab) ─────
 function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList,saveDetails,saveShop,S}){
   const [newIng,setNewIng]=useState({name:"",qty:"1"});
-  const [recipeText,setRecipeText]=useState("");
-  // Sync recipeText when slot changes
   const slotKey=(day,mt)=>day+"__"+mt;
-  const getDetail=(day,mt)=>mealDetails[slotKey(day,mt)]||{ingredients:[],recipe:""};
-  const updateDetail=(day,mt,patch)=>{const k=slotKey(day,mt);saveDetails({...mealDetails,[k]:{...getDetail(day,mt),...patch}});};
-  const addIngredient=(day,mt,ing)=>{const d=getDetail(day,mt);updateDetail(day,mt,{ingredients:[...d.ingredients,{id:Date.now(),...ing}]});};
-  const delIngredient=(day,mt,id)=>{const d=getDetail(day,mt);updateDetail(day,mt,{ingredients:d.ingredients.filter(i=>i.id!==id)});};
+  const getDetail=(key)=>mealDetails[key]||{ingredients:[],recipe:""};
+  const updateDetail=(key,patch)=>{saveDetails({...mealDetails,[key]:{...getDetail(key),...patch}});};
+  const addIngredient=(key,ing)=>{const d=getDetail(key);updateDetail(key,{ingredients:[...d.ingredients,{id:Date.now(),...ing}]});};
+  const delIngredient=(key,id)=>{const d=getDetail(key);updateDetail(key,{ingredients:d.ingredients.filter(i=>i.id!==id)});};
   const addIngToShop=(ing)=>{
     if(!shopList.find(i=>i.name.toLowerCase()===ing.name.toLowerCase()&&!i.checked)){
       saveShop([...shopList,{id:Date.now(),name:ing.name,qty:ing.qty||"1",category:"Grocery",addedBy:"Meal Plan",checked:false,notes:""}]);
     }
   };
-  const addAllIngsToShop=(day,mt)=>{const d=getDetail(day,mt);d.ingredients.forEach(ing=>addIngToShop(ing));};
+  const addAllIngsToShop=(key)=>{const d=getDetail(key);d.ingredients.forEach(ing=>addIngToShop(ing));};
   if(!detailSlot)return null;
-  const {day,mt}=detailSlot;
-  const mealName=mealPlan[day]?.[mt]||"";
-  const detail=getDetail(day,mt);
+  // detailSlot can be either {day,mt} (grid slot) or {key,label} (a standalone item like a kid's suggestion)
+  const key=detailSlot.key||slotKey(detailSlot.day,detailSlot.mt);
+  const headerTop=detailSlot.day?detailSlot.day.toUpperCase()+" — "+detailSlot.mt.toUpperCase():(detailSlot.sublabel||"MEAL SUGGESTION");
+  const mealName=detailSlot.label||(detailSlot.day?mealPlan[detailSlot.day]?.[detailSlot.mt]:"")||"";
+  const detail=getDetail(key);
   const shopNames=new Set(shopList.filter(i=>!i.checked).map(i=>i.name.toLowerCase()));
-  const close=()=>{updateDetail(day,mt,{recipe:recipeText});setDetailSlot(null);setNewIng({name:"",qty:"1"});};
-  // Keep recipeText in sync when detailSlot changes
-  if(recipeText===""&&detail.recipe){
-    // initialise on first open (can't use useEffect here, but reading on render is fine — it's just a string)
-  }
+  const close=()=>{setDetailSlot(null);setNewIng({name:"",qty:"1"});};
   const currentRecipe=detail.recipe||"";
   return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={close}>
     <div style={{background:S.T.card,border:`1px solid ${S.T.border}`,borderRadius:14,padding:24,maxWidth:560,width:"100%",maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
       <div style={{...S.row,marginBottom:16,flexWrap:"wrap",gap:8}}>
         <div>
-          <div style={{fontSize:10,color:S.T.sub,fontFamily:"monospace",letterSpacing:"0.15em"}}>{day.toUpperCase()} — {mt.toUpperCase()}</div>
+          <div style={{fontSize:10,color:S.T.sub,fontFamily:"monospace",letterSpacing:"0.15em"}}>{headerTop}</div>
           <div style={{fontSize:18,color:S.T.text,fontWeight:"bold"}}>{mealName||"No meal set"}</div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          <button style={{...S.btn("#4CAF50"),padding:"6px 12px",fontSize:12}} onClick={()=>addAllIngsToShop(day,mt)} disabled={detail.ingredients.length===0}>Add All to List</button>
+          <button style={{...S.btn("#4CAF50"),padding:"6px 12px",fontSize:12}} onClick={()=>addAllIngsToShop(key)} disabled={detail.ingredients.length===0}>Add All to List</button>
           <button style={{...S.btnGhost,padding:"6px 12px",fontSize:12}} onClick={close}>Close</button>
         </div>
       </div>
@@ -869,18 +865,18 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList
           return(<div key={ing.id} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"center"}}>
             <div style={{flex:1,fontSize:13,color:S.T.text}}>{ing.qty&&ing.qty!=="1"?ing.qty+" ":""}{ing.name}</div>
             <button onClick={()=>addIngToShop(ing)} style={{...S.btn(onList?"#4CAF50":S.T.accent),padding:"3px 10px",fontSize:11,opacity:onList?0.6:1}}>{onList?"On List":"+ List"}</button>
-            <button onClick={()=>delIngredient(day,mt,ing.id)} style={S.btnDanger}>X</button>
+            <button onClick={()=>delIngredient(key,ing.id)} style={S.btnDanger}>X</button>
           </div>);
         })}
         <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap",alignItems:"flex-end"}}>
-          <div style={{flex:1}}><div style={S.label}>Ingredient</div><input style={S.input} placeholder="e.g. Chicken breast" value={newIng.name} onChange={e=>setNewIng({...newIng,name:e.target.value})} onKeyDown={e=>{if(e.key==="Enter"&&newIng.name.trim()){addIngredient(day,mt,{name:newIng.name.trim(),qty:newIng.qty});setNewIng({name:"",qty:"1"});}}}/></div>
+          <div style={{flex:1}}><div style={S.label}>Ingredient</div><input style={S.input} placeholder="e.g. Chicken breast" value={newIng.name} onChange={e=>setNewIng({...newIng,name:e.target.value})} onKeyDown={e=>{if(e.key==="Enter"&&newIng.name.trim()){addIngredient(key,{name:newIng.name.trim(),qty:newIng.qty});setNewIng({name:"",qty:"1"});}}}/></div>
           <div style={{width:80}}><div style={S.label}>Qty</div><input style={S.input} placeholder="1" value={newIng.qty} onChange={e=>setNewIng({...newIng,qty:e.target.value})}/></div>
-          <button style={{...S.btn(),padding:"9px 14px"}} onClick={()=>{if(!newIng.name.trim())return;addIngredient(day,mt,{name:newIng.name.trim(),qty:newIng.qty});setNewIng({name:"",qty:"1"});}}>Add</button>
+          <button style={{...S.btn(),padding:"9px 14px"}} onClick={()=>{if(!newIng.name.trim())return;addIngredient(key,{name:newIng.name.trim(),qty:newIng.qty});setNewIng({name:"",qty:"1"});}}>Add</button>
         </div>
       </div>
       <div>
         <div style={S.h2}>Recipe / Instructions</div>
-        <textarea style={{...S.input,height:160,resize:"vertical",lineHeight:1.5}} placeholder="Type or paste your recipe steps here..." defaultValue={currentRecipe} onBlur={e=>updateDetail(day,mt,{recipe:e.target.value})}/>
+        <textarea style={{...S.input,height:160,resize:"vertical",lineHeight:1.5}} placeholder="Type or paste your recipe steps here..." defaultValue={currentRecipe} onBlur={e=>updateDetail(key,{recipe:e.target.value})}/>
         <div style={{fontSize:11,color:S.T.sub,marginTop:4}}>Changes save automatically when you click away from the text box.</div>
       </div>
     </div>
@@ -915,7 +911,16 @@ function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,set
       const d=new Date(s.suggestDate+"T12:00:00");
       targetDay=DAYS[d.getDay()===0?6:d.getDay()-1];
     }
-    if(targetDay)saveMeals({...mealPlan,[targetDay]:{...mealPlan[targetDay],[s.mealType]:s.meal}});
+    if(targetDay){
+      saveMeals({...mealPlan,[targetDay]:{...mealPlan[targetDay],[s.mealType]:s.meal}});
+      // Carry over any ingredients/recipe the kid attached to their suggestion onto the real grid slot
+      const suggKey="sugg_"+s.id;
+      const suggDetail=mealDetails[suggKey];
+      if(suggDetail&&(suggDetail.ingredients?.length>0||suggDetail.recipe?.trim())){
+        const gridKey=targetDay+"__"+s.mealType;
+        saveDetails({...mealDetails,[gridKey]:suggDetail});
+      }
+    }
     saveSugg(mealSuggestions.map(x=>x.id===id?{...x,status:"approved"}:x));
   };
   const declineSugg=id=>saveSugg(mealSuggestions.map(s=>s.id===id?{...s,status:"declined"}:s));
@@ -1284,13 +1289,15 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
   </div>);
 }
 
-function BradynDashboard({mealPlan,shopList,setShopList,shopRequests,setShopRequests,mealSuggestions,setMealSuggestions,chores,setChores,messages,setMessages,appSettings,shopSettings,bradynLedger,setBradynLedger,onLogout}){
+function BradynDashboard({mealPlan,shopList,setShopList,shopRequests,setShopRequests,mealSuggestions,setMealSuggestions,mealDetails,setMealDetails,chores,setChores,messages,setMessages,appSettings,shopSettings,bradynLedger,setBradynLedger,onLogout}){
   const [tab,setTab]=useState("home");
   const [showS,setShowS]=useState(false),[showAdd,setShowAdd]=useState(false);
   const [sugg,setSugg]=useState({meal:"",suggestDate:"",mealType:"Dinner",notes:""});
   const [newItem,setNewItem]=useState({name:"",qty:"1",category:"Grocery",store:"",notes:""});
+  const [detailSlot,setDetailSlot]=useState(null);
   const saveShop=u=>{setShopList(u);store.save("fp2:shopList",u);};
   const saveSugg=u=>{setMealSuggestions(u);store.save("fp2:mealSuggestions",u);};
+  const saveDetails=u=>{setMealDetails(u);store.save("fp2:mealDetails",u);};
   const sendSugg=()=>{if(!sugg.meal)return;saveSugg([...mealSuggestions,{...sugg,id:Date.now(),kidName:"Bradyn",status:"pending",date:new Date().toLocaleDateString()}]);setSugg({meal:"",suggestDate:"",mealType:"Dinner",notes:""});setShowS(false);};
   const addShopItem=()=>{if(!newItem.name)return;saveShop([...shopList,{...newItem,id:Date.now(),addedBy:"Bradyn",checked:false}]);setNewItem({name:"",qty:"1",category:"Grocery",store:"",notes:""});setShowAdd(false);};
   const cats=shopSettings?.categories||["Grocery","Dairy","Produce","Meat","Snacks","Beverages","Household","Personal Care","Other"];
@@ -1299,6 +1306,7 @@ function BradynDashboard({mealPlan,shopList,setShopList,shopRequests,setShopRequ
     const bS={page:{background:C.bg,minHeight:"100vh",fontFamily:"Georgia,serif",color:C.text},card:{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:16,marginBottom:12},cardSm:{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:12,marginBottom:8},h2:{fontSize:14,color:C.accent,fontWeight:"normal",borderBottom:`1px solid ${C.border}`,paddingBottom:8,marginBottom:12},btn:(c=C.accent)=>({background:c,border:"none",borderRadius:6,padding:"10px 18px",color:c===C.accent?C.bg:"#fff",fontFamily:"Georgia,serif",fontSize:13,cursor:"pointer",fontWeight:"bold",whiteSpace:"nowrap"}),btnGhost:{background:"transparent",border:`1px solid ${C.border}`,borderRadius:6,padding:"8px 14px",color:C.sub,fontFamily:"Georgia,serif",fontSize:12,cursor:"pointer"},btnDanger:{background:"transparent",border:"1px solid #f4433644",borderRadius:6,padding:"5px 10px",color:"#f44336",fontFamily:"Georgia,serif",fontSize:12,cursor:"pointer"},label:{fontSize:10,color:C.sub,textTransform:"uppercase",letterSpacing:"0.15em",marginBottom:5,fontFamily:"monospace"},input:{background:C.bg,border:`1px solid ${C.border}`,borderRadius:6,padding:"8px 12px",color:C.text,fontFamily:"Georgia,serif",fontSize:13,width:"100%",boxSizing:"border-box",outline:"none"},select:{background:C.bg,border:`1px solid ${C.border}`,borderRadius:6,padding:"8px 12px",color:C.text,fontFamily:"Georgia,serif",fontSize:13,width:"100%",boxSizing:"border-box",outline:"none"},row:{display:"flex",justifyContent:"space-between",alignItems:"center"},tag:co=>({background:co+"22",color:co,border:`1px solid ${co}44`,borderRadius:4,padding:"2px 8px",fontSize:11,fontFamily:"monospace"}),alert:co=>({background:co+"18",border:`1px solid ${co}44`,borderRadius:8,padding:"12px 16px",marginBottom:12}),T:{accent:C.accent,text:C.text,sub:C.sub,border:C.border,bg:C.bg}}
   const TABS=[{id:"home",label:"Home",icon:"🏠"},{id:"chores",label:"Tasks",icon:"✅"},{id:"ledger",label:"Brad & Me",icon:"💵"},{id:"board",label:"Board",icon:"📢"}];
   return(<div style={bS.page}>
+    <MealDetailModal detailSlot={detailSlot} setDetailSlot={setDetailSlot} mealPlan={mealPlan} mealDetails={mealDetails||{}} shopList={shopList} saveDetails={saveDetails} saveShop={saveShop} S={bS}/>
     <div style={{background:"rgba(0,0,0,0.3)",borderBottom:`1px solid ${C.border}`,padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
       <div><div style={{fontSize:9,color:C.sub,fontFamily:"monospace",letterSpacing:"0.2em"}}>FAMILY HUB</div><div style={{fontSize:16,color:C.text}}>Bradyn's View</div></div>
       <div style={{display:"flex",gap:8,alignItems:"center"}}>{TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{...bS.btnGhost,borderBottom:tab===t.id?`2px solid ${C.accent}`:"2px solid transparent",borderRadius:0,color:tab===t.id?C.accent:C.sub,padding:"6px 10px",fontSize:12}}>{t.icon} {t.label}</button>)}<button onClick={onLogout} style={{...bS.btnGhost,fontSize:12}}>Sign Out ↩</button></div>
@@ -1308,10 +1316,26 @@ function BradynDashboard({mealPlan,shopList,setShopList,shopRequests,setShopRequ
         <div>
           <div style={bS.card}><div style={bS.h2}>This Week's Meals</div>{DAYS.map(d=>{const m=mealPlan[d]||{},has=m.Breakfast||m.Lunch||m.Dinner;return(<div key={d} style={{display:"flex",gap:10,padding:"7px 0",borderBottom:`1px solid ${C.bg}`,alignItems:"flex-start"}}><div style={{width:64,flexShrink:0}}><div style={{fontSize:10,color:C.accent,fontFamily:"monospace"}}>{d.slice(0,3).toUpperCase()}</div></div><div style={{flex:1}}>{MEAL_TYPES.map(mt=>m[mt]&&<div key={mt} style={{display:"flex",gap:6,marginBottom:2}}><span style={{fontSize:10,color:C.sub,minWidth:50,fontFamily:"monospace"}}>{mt}</span><span style={{fontSize:12,color:C.text}}>{m[mt]}</span></div>)}{!has&&<span style={{fontSize:11,color:C.border}}>Nothing planned</span>}</div></div>);})}</div>
           <div style={bS.card}><div style={bS.h2}>Shopping List</div>{shopList.filter(i=>!i.checked).slice(0,8).map(i=><div key={i.id} style={{display:"flex",gap:8,padding:"5px 0",borderBottom:`1px solid ${C.bg}`,alignItems:"center"}}><span style={{fontSize:13,color:C.text,flex:1}}>{i.qty&&i.qty!=="1"?`${i.qty}× `:""}{i.name}</span>{i.addedBy&&i.addedBy!=="Parents"&&<span style={{fontSize:10,color:C.sub}}>{i.addedBy}</span>}</div>)}{shopList.filter(i=>!i.checked).length===0&&<div style={{fontSize:13,color:C.sub}}>Nothing on the list.</div>}</div>
+          {mealSuggestions.filter(s=>s.kidName==="Bradyn"&&s.status==="pending").length>0&&<div style={bS.card}>
+            <div style={bS.h2}>My Suggestions</div>
+            {mealSuggestions.filter(s=>s.kidName==="Bradyn"&&s.status==="pending").map(s=>{
+              const dKey="sugg_"+s.id;
+              const hasDetail=mealDetails&&mealDetails[dKey]&&(mealDetails[dKey].ingredients?.length>0||mealDetails[dKey].recipe?.trim());
+              return(<div key={s.id} style={{padding:"8px 0",borderBottom:`1px solid ${C.bg}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}}>
+                  <div>
+                    <div style={{fontSize:13,color:C.text,fontWeight:"bold"}}>{s.meal} {hasDetail&&<span style={{fontSize:10,color:"#4CAF50"}}>📋</span>}</div>
+                    <div style={{fontSize:11,color:C.sub}}>{s.suggestDate?new Date(s.suggestDate+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"}):""} {s.mealType} — pending approval</div>
+                  </div>
+                  <button style={{...bS.btnGhost,padding:"5px 10px",fontSize:11}} onClick={()=>setDetailSlot({key:dKey,label:s.meal,sublabel:(s.suggestDate?new Date(s.suggestDate+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"}):"")+" "+s.mealType})}>{hasDetail?"Edit":"Add"} Ingredients & Recipe</button>
+                </div>
+              </div>);
+            })}
+          </div>}
         </div>
         <div>
           <div style={bS.card}><div style={bS.h2}>Quick Actions</div><button style={{...bS.btn(),width:"100%",marginBottom:10,textAlign:"left"}} onClick={()=>{setShowS(!showS);setShowAdd(false);}}>Suggest a Meal</button><button style={{...bS.btnGhost,width:"100%",textAlign:"left"}} onClick={()=>{setShowAdd(!showAdd);setShowS(false);}}>Add to Shopping List</button></div>
-          {showS&&<div style={bS.card}><div style={bS.h2}>Suggest a Meal</div><div style={{marginBottom:8}}><div style={bS.label}>Meal</div><input style={bS.input} placeholder="e.g. Lasagna, Tacos..." value={sugg.meal} onChange={e=>setSugg({...sugg,meal:e.target.value})}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}><div><div style={bS.label}>Date</div><input style={bS.input} type="date" value={sugg.suggestDate} onChange={e=>setSugg({...sugg,suggestDate:e.target.value})}/></div><div><div style={bS.label}>Meal</div><select style={bS.select} value={sugg.mealType} onChange={e=>setSugg({...sugg,mealType:e.target.value})}>{MEAL_TYPES.map(m=><option key={m}>{m}</option>)}</select></div></div><div style={{marginBottom:10}}><div style={bS.label}>Notes</div><input style={bS.input} placeholder="Why you want it..." value={sugg.notes} onChange={e=>setSugg({...sugg,notes:e.target.value})}/></div><div style={{display:"flex",gap:8}}><button style={bS.btn()} onClick={sendSugg}>Submit</button><button style={bS.btnGhost} onClick={()=>setShowS(false)}>Cancel</button></div></div>}
+          {showS&&<div style={bS.card}><div style={bS.h2}>Suggest a Meal</div><div style={{marginBottom:8}}><div style={bS.label}>Meal</div><input style={bS.input} placeholder="e.g. Lasagna, Tacos..." value={sugg.meal} onChange={e=>setSugg({...sugg,meal:e.target.value})}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}><div><div style={bS.label}>Date</div><input style={bS.input} type="date" value={sugg.suggestDate} onChange={e=>setSugg({...sugg,suggestDate:e.target.value})}/></div><div><div style={bS.label}>Meal</div><select style={bS.select} value={sugg.mealType} onChange={e=>setSugg({...sugg,mealType:e.target.value})}>{MEAL_TYPES.map(m=><option key={m}>{m}</option>)}</select></div></div><div style={{marginBottom:10}}><div style={bS.label}>Notes</div><input style={bS.input} placeholder="Why you want it..." value={sugg.notes} onChange={e=>setSugg({...sugg,notes:e.target.value})}/></div><div style={{fontSize:11,color:C.sub,marginBottom:10}}>Tip: after submitting, you can add ingredients and a recipe from "My Suggestions" below.</div><div style={{display:"flex",gap:8}}><button style={bS.btn()} onClick={sendSugg}>Submit</button><button style={bS.btnGhost} onClick={()=>setShowS(false)}>Cancel</button></div></div>}
           {showAdd&&<div style={bS.card}><div style={bS.h2}>Add to Shopping List</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,marginBottom:8}}><div><div style={bS.label}>Item</div><input style={bS.input} placeholder="e.g. Milk" value={newItem.name} onChange={e=>setNewItem({...newItem,name:e.target.value})}/></div><div><div style={bS.label}>Qty</div><input style={bS.input} value={newItem.qty} onChange={e=>setNewItem({...newItem,qty:e.target.value})}/></div><div><div style={bS.label}>Category</div><select style={bS.select} value={newItem.category} onChange={e=>setNewItem({...newItem,category:e.target.value})}>{cats.map(c=><option key={c}>{c}</option>)}</select></div><div><div style={bS.label}>Store</div><select style={bS.select} value={newItem.store} onChange={e=>setNewItem({...newItem,store:e.target.value})}><option value="">Any store</option>{stores.map(s=><option key={s}>{s}</option>)}</select></div></div><div style={{marginBottom:10}}><div style={bS.label}>Notes</div><input style={bS.input} placeholder="Optional notes..." value={newItem.notes} onChange={e=>setNewItem({...newItem,notes:e.target.value})}/></div><div style={{display:"flex",gap:8}}><button style={bS.btn()} onClick={addShopItem}>Add to List</button><button style={bS.btnGhost} onClick={()=>setShowAdd(false)}>Cancel</button></div></div>}
         </div>
       </div>}
@@ -1598,7 +1622,7 @@ export default function App(){
     {!currentUser&&<PublicHomeScreen mealPlan={mealPlan} shopList={shopList} bills={bills} expenses={expenses} onLogin={handleLogin} appSettings={appSettings} messages={messages}/>}
     {currentUser==="brad"&&<BradDashboard {...sharedProps} accounts={accounts} setAccounts={setAccounts} debts={debts} setDebts={setDebts} expenses={expenses} setExpenses={setExpenses} goals={goals} setGoals={setGoals} transactions={transactions} setTransactions={setTransactions} pslf={pslf} setPslf={setPslf} scenario={scenario} setScenario={setScenario} reviewTxns={reviewTxns} setReviewTxns={setReviewTxns} uploadLoading={uploadLoading} handleUpload={handleUpload} confirmTxns={confirmTxns} fileRef={fileRef} saveAll={saveAll} auth={auth} setAuth={setAuth} totalAssets={totalAssets} totalDebtAmt={totalDebtAmt} netWorth={netWorth} totalCC={totalCC} combinedLiquid={combinedLiquid} cushion={cushion} dti={dti} mortgageRate={mortgageRate} monthlyMortgage={monthlyMortgage} loanAmt={loanAmt} surplus={surplus} takeHome={takeHome} totalExpenses={totalExpenses} slPayment={slPayment} downNeeded={downNeeded} closing={closing} homePrice={homePrice} onLogout={handleLogout}/>}
     {currentUser==="maryBeth"&&<MaryBethDashboard {...sharedProps} expenses={expenses} debts={debts} onLogout={handleLogout} setChores={setChores}/>}
-    {currentUser==="bradyn"&&<BradynDashboard mealPlan={mealPlan} shopList={shopList} setShopList={setShopList} shopRequests={shopRequests} setShopRequests={setShopRequests} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} chores={chores} setChores={setChores} messages={messages} setMessages={setMessages} appSettings={appSettings} shopSettings={shopSettings} bradynLedger={bradynLedger} setBradynLedger={setBradynLedger} onLogout={handleLogout}/>}
+    {currentUser==="bradyn"&&<BradynDashboard mealPlan={mealPlan} shopList={shopList} setShopList={setShopList} shopRequests={shopRequests} setShopRequests={setShopRequests} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} mealDetails={mealDetails} setMealDetails={setMealDetails} chores={chores} setChores={setChores} messages={messages} setMessages={setMessages} appSettings={appSettings} shopSettings={shopSettings} bradynLedger={bradynLedger} setBradynLedger={setBradynLedger} onLogout={handleLogout}/>}
     {currentUser==="parker"&&<ParkerTab mealPlan={mealPlan} shopRequests={shopRequests} setShopRequests={setShopRequests} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} chores={chores} setChores={setChores} messages={messages} setMessages={setMessages} appSettings={appSettings} onLogout={handleLogout}/>}
     {currentUser==="ryder"&&<RyderTab mealPlan={mealPlan} shopRequests={shopRequests} setShopRequests={setShopRequests} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} chores={chores} setChores={setChores} messages={messages} setMessages={setMessages} appSettings={appSettings} onLogout={handleLogout}/>}
   </div>);
