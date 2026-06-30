@@ -1115,9 +1115,18 @@ function DashboardTab({profile,accounts,debts,goals,expenses,transactions,totalA
 function BradynLedger({ledger,setLedger,currentUser,S}){
   const isParent=currentUser==="brad";
   const [showAdd,setShowAdd]=useState(false);
-  const [form,setForm]=useState({name:"",type:"recurring",defaultAmount:"",paymentsRemaining:"",notes:""});
+  const [form,setForm]=useState({name:"",type:"recurring",defaultAmount:"",paymentsRemaining:"",dueDate:"",notes:""});
   const save=u=>{setLedger(u);store.save("fp2:bradynLedger",u);};
   const monthKey=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");};
+  const addMonth=(dateStr)=>{
+    if(!dateStr)return dateStr;
+    const d=new Date(dateStr+"T12:00:00");
+    const day=d.getDate();
+    d.setMonth(d.getMonth()+1);
+    // Handle month-end overflow (e.g. Jan 31 -> Feb 28) by clamping to last day of target month
+    if(d.getDate()!==day)d.setDate(0);
+    return d.toISOString().slice(0,10);
+  };
   const addItem=()=>{
     if(!form.name||!form.defaultAmount)return;
     const item={
@@ -1126,6 +1135,7 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
       type:form.type,
       defaultAmount:+form.defaultAmount,
       paymentsRemaining:form.type==="recurring"&&form.paymentsRemaining?+form.paymentsRemaining:null,
+      dueDate:form.dueDate||"",
       notes:form.notes,
       history:[],
       currentMonthAmount:+form.defaultAmount,
@@ -1133,28 +1143,29 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
       paid:false,
     };
     save([...ledger,item]);
-    setForm({name:"",type:"recurring",defaultAmount:"",paymentsRemaining:"",notes:""});
+    setForm({name:"",type:"recurring",defaultAmount:"",paymentsRemaining:"",dueDate:"",notes:""});
     setShowAdd(false);
   };
   const del=id=>save(ledger.filter(i=>i.id!==id));
   const updateAmount=(id,val)=>save(ledger.map(i=>i.id===id?{...i,currentMonthAmount:+val}:i));
+  const updateDueDate=(id,val)=>save(ledger.map(i=>i.id===id?{...i,dueDate:val}:i));
   const markPaid=id=>{
     save(ledger.map(i=>{
       if(i.id!==id)return i;
-      const entry={amount:i.currentMonthAmount,date:new Date().toLocaleDateString(),monthKey:i.currentMonthKey};
+      const entry={amount:i.currentMonthAmount,date:new Date().toLocaleDateString(),monthKey:i.currentMonthKey,dueDate:i.dueDate};
       const newRemaining=i.type==="recurring"&&i.paymentsRemaining!=null?Math.max(0,i.paymentsRemaining-1):i.paymentsRemaining;
       return{...i,paid:true,history:[entry,...(i.history||[])],paymentsRemaining:newRemaining};
     }));
   };
   const resetForNewMonth=id=>{
-    save(ledger.map(i=>i.id===id?{...i,paid:false,currentMonthAmount:i.defaultAmount,currentMonthKey:monthKey()}:i));
+    save(ledger.map(i=>i.id===id?{...i,paid:false,currentMonthAmount:i.defaultAmount,currentMonthKey:monthKey(),dueDate:i.type==="recurring"?addMonth(i.dueDate):i.dueDate}:i));
   };
   // Auto-detect month rollover: if currentMonthKey differs from this month and item was paid, reset it
   useEffect(()=>{
     const mk=monthKey();
     const needsReset=ledger.filter(i=>i.type==="recurring"&&i.currentMonthKey!==mk&&i.paid);
     if(needsReset.length>0){
-      save(ledger.map(i=>(i.type==="recurring"&&i.currentMonthKey!==mk&&i.paid)?{...i,paid:false,currentMonthAmount:i.defaultAmount,currentMonthKey:mk}:i));
+      save(ledger.map(i=>(i.type==="recurring"&&i.currentMonthKey!==mk&&i.paid)?{...i,paid:false,currentMonthAmount:i.defaultAmount,currentMonthKey:mk,dueDate:addMonth(i.dueDate)}:i));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
@@ -1176,6 +1187,7 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
         <div><div style={S.label}>Type</div><select style={S.select} value={form.type} onChange={e=>setForm({...form,type:e.target.value})}><option value="recurring">Recurring Monthly</option><option value="oneTime">One-Time</option></select></div>
         <div><div style={S.label}>{form.type==="recurring"?"Default Monthly Amount":"Amount"}</div><input style={S.input} type="number" placeholder="0.00" value={form.defaultAmount} onChange={e=>setForm({...form,defaultAmount:e.target.value})}/></div>
         {form.type==="recurring"&&<div><div style={S.label}>Payments Remaining (optional)</div><input style={S.input} type="number" placeholder="e.g. 36" value={form.paymentsRemaining} onChange={e=>setForm({...form,paymentsRemaining:e.target.value})}/></div>}
+        <div><div style={S.label}>Due Date</div><input style={S.input} type="date" value={form.dueDate} onChange={e=>setForm({...form,dueDate:e.target.value})}/></div>
         <div><div style={S.label}>Notes</div><input style={S.input} placeholder="Any notes..." value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/></div>
       </div>
       <button style={{...S.btn(),padding:"9px 22px"}} onClick={addItem}>Add Item</button>
@@ -1183,17 +1195,25 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
     {ledger.length===0&&<div style={{...S.card,textAlign:"center",padding:40,color:S.T.sub}}>Nothing tracked yet.{isParent?" Click Add Item to start.":""}</div>}
     {recurring.length>0&&<div style={{marginBottom:14}}>
       <div style={{fontSize:13,color:S.T.sub,fontFamily:"monospace",letterSpacing:"0.1em",marginBottom:8,borderLeft:`3px solid ${S.T.accent}`,paddingLeft:10}}>RECURRING MONTHLY</div>
-      {recurring.map(item=>(
-        <div key={item.id} style={{...S.card,borderLeft:`4px solid ${item.paid?"#4CAF50":"#FF9800"}`,marginBottom:8}}>
+      {recurring.map(item=>{
+        const today=new Date();
+        const dl=item.dueDate?Math.ceil((new Date(item.dueDate+"T12:00:00")-today)/(864e5)):null;
+        const isOver=dl!=null&&dl<0&&!item.paid;
+        const isSoon=dl!=null&&dl>=0&&dl<=3&&!item.paid;
+        return(
+        <div key={item.id} style={{...S.card,borderLeft:`4px solid ${item.paid?"#4CAF50":isOver?"#f44336":isSoon?"#FF9800":"#FF9800"}`,marginBottom:8}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
             <div style={{flex:1}}>
               <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:4,flexWrap:"wrap"}}>
                 <span style={{fontSize:15,color:S.T.text,fontWeight:"bold"}}>{item.name}</span>
                 {item.paid&&<span style={S.tag("#4CAF50")}>PAID THIS MONTH</span>}
+                {isOver&&<span style={S.tag("#f44336")}>OVERDUE</span>}
+                {isSoon&&<span style={S.tag("#FF9800")}>DUE SOON</span>}
                 {item.paymentsRemaining!=null&&<span style={S.tag("#2196F3")}>{item.paymentsRemaining} left</span>}
               </div>
               {item.notes&&<div style={{fontSize:12,color:S.T.sub}}>{item.notes}</div>}
               <div style={{fontSize:11,color:S.T.sub,marginTop:2}}>Default: {fmt(item.defaultAmount)}/mo</div>
+              {item.dueDate&&<div style={{fontSize:11,marginTop:2,color:isOver?"#f44336":isSoon?"#FF9800":S.T.sub}}>Due {new Date(item.dueDate+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})}{!item.paid&&dl!=null?` — ${isOver?Math.abs(dl)+"d overdue":dl===0?"today":dl===1?"tomorrow":dl+" days"}`:""}</div>}
             </div>
             {isParent&&<button style={S.btnDanger} onClick={()=>del(item.id)}>X</button>}
           </div>
@@ -1201,6 +1221,10 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
             <div style={{display:"flex",gap:6,alignItems:"center"}}>
               <span style={{fontSize:11,color:S.T.sub}}>This month:</span>
               <input style={{...S.input,width:90,padding:"5px 8px",fontSize:13}} type="number" value={item.currentMonthAmount} onChange={e=>updateAmount(item.id,e.target.value)} disabled={item.paid}/>
+            </div>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <span style={{fontSize:11,color:S.T.sub}}>Due:</span>
+              <input style={{...S.input,width:140,padding:"5px 8px",fontSize:13}} type="date" value={item.dueDate||""} onChange={e=>updateDueDate(item.id,e.target.value)}/>
             </div>
             {!item.paid
               ?<button style={{...S.btn("#4CAF50"),padding:"7px 16px",fontSize:12}} onClick={()=>markPaid(item.id)}>Mark Paid - {fmt(item.currentMonthAmount)}</button>
@@ -1212,20 +1236,29 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
             {item.history.slice(0,3).map((h,i)=><div key={i} style={{fontSize:11,color:S.T.sub,display:"flex",justifyContent:"space-between",padding:"2px 0"}}><span>{h.date}</span><span style={{color:"#4CAF50"}}>{fmt(h.amount)}</span></div>)}
           </div>}
         </div>
-      ))}
+        );
+      })}
     </div>}
     {oneTime.length>0&&<div>
       <div style={{fontSize:13,color:S.T.sub,fontFamily:"monospace",letterSpacing:"0.1em",marginBottom:8,borderLeft:`3px solid ${S.T.accent}`,paddingLeft:10}}>ONE-TIME ITEMS</div>
-      {oneTime.map(item=>(
-        <div key={item.id} style={{...S.card,borderLeft:`4px solid ${item.paid?"#4CAF50":"#FF9800"}`,marginBottom:8}}>
+      {oneTime.map(item=>{
+        const today=new Date();
+        const dl=item.dueDate?Math.ceil((new Date(item.dueDate+"T12:00:00")-today)/(864e5)):null;
+        const isOver=dl!=null&&dl<0&&!item.paid;
+        const isSoon=dl!=null&&dl>=0&&dl<=3&&!item.paid;
+        return(
+        <div key={item.id} style={{...S.card,borderLeft:`4px solid ${item.paid?"#4CAF50":isOver?"#f44336":"#FF9800"}`,marginBottom:8}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
             <div>
               <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:4,flexWrap:"wrap"}}>
                 <span style={{fontSize:15,color:S.T.text,fontWeight:"bold"}}>{item.name}</span>
                 {item.paid&&<span style={S.tag("#4CAF50")}>PAID</span>}
+                {isOver&&<span style={S.tag("#f44336")}>OVERDUE</span>}
+                {isSoon&&<span style={S.tag("#FF9800")}>DUE SOON</span>}
               </div>
               {item.notes&&<div style={{fontSize:12,color:S.T.sub}}>{item.notes}</div>}
               <div style={{fontSize:13,color:GOLD,fontFamily:"monospace",fontWeight:"bold",marginTop:2}}>{fmt(item.currentMonthAmount)}</div>
+              {item.dueDate&&<div style={{fontSize:11,marginTop:2,color:isOver?"#f44336":isSoon?"#FF9800":S.T.sub}}>Due {new Date(item.dueDate+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})}{!item.paid&&dl!=null?` — ${isOver?Math.abs(dl)+"d overdue":dl===0?"today":dl===1?"tomorrow":dl+" days"}`:""}</div>}
             </div>
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
               {!item.paid&&<button style={{...S.btn("#4CAF50"),padding:"7px 16px",fontSize:12}} onClick={()=>markPaid(item.id)}>Mark Paid</button>}
@@ -1233,7 +1266,8 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
             </div>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>}
   </div>);
 }
