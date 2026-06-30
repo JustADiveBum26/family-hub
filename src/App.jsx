@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCo5EqGCkFd-U5O1JKxtoW5N5AEC2TzONQ",
@@ -15,13 +15,21 @@ const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 const FAMILY_DOC = "family-hub-data";
 
+// Each key is written as its own top-level field via updateDoc, which is an
+// atomic per-field operation in Firestore. This avoids the read-modify-write
+// race that occurs when two saves happen close together and both read the
+// same snapshot before either write lands (one save would silently revert
+// the other's change). updateDoc only touches the field being set.
 const store = {
   save: async (k,v) => {
     try {
       const ref = doc(db, "appdata", FAMILY_DOC);
-      const snap = await getDoc(ref);
-      const existing = snap.exists() ? snap.data() : {};
-      await setDoc(ref, { ...existing, [k]: JSON.stringify(v) }, { merge: true });
+      try {
+        await updateDoc(ref, { [k]: JSON.stringify(v) });
+      } catch(inner) {
+        // Document doesn't exist yet on first-ever save — create it.
+        await setDoc(ref, { [k]: JSON.stringify(v) }, { merge: true });
+      }
     } catch(e) { console.error("Firebase save error:", e); }
   },
   load: async (k,fb) => {
@@ -75,7 +83,6 @@ const D={
   bills:[],mealPlan:blankMealPlan(),shopList:[],mealSuggestions:[],shopRequests:[],
   auth:{brad:null,maryBeth:null,bradyn:null,parker:null,ryder:null},
   chores:[],messages:[],billHistory:[],
-  avatars:{},
   appSettings:{showPoints:false,showAdultChores:{brad:false,maryBeth:false,bradyn:false},userThemes:{}},
   shopSettings:{
     categories:["Grocery","Dairy","Produce","Meat","Snacks","Beverages","Household","Personal Care","Other"],
@@ -128,92 +135,14 @@ function PinPad({onSubmit,color="#ff6b35",error}){
   return(<div style={{textAlign:"center"}}><div style={{display:"flex",justifyContent:"center",gap:14,marginBottom:20}}>{[0,1,2,3].map(i=><div key={i} style={{width:18,height:18,borderRadius:"50%",background:pin.length>i?color:"transparent",border:`2px solid ${color}`,transition:"background 0.15s"}}/>)}</div>{error&&<div style={{color:"#f44336",fontSize:12,marginBottom:10}}>{error}</div>}<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,maxWidth:220,margin:"0 auto"}}>{[1,2,3,4,5,6,7,8,9,"",0,"X"].map((n,i)=><button key={i} onClick={()=>typeof n==="number"?add(String(n)):n==="X"?setPin(p=>p.slice(0,-1)):null} style={{padding:"15px",fontSize:22,fontFamily:"Georgia,serif",fontWeight:"bold",background:n===""?"transparent":`${color}22`,border:`2px solid ${n===""?"transparent":color}`,borderRadius:12,color:n===""?"transparent":"#fff",cursor:n===""?"default":"pointer"}}>{n}</button>)}</div></div>);
 }
 
-function LoginModal({user,auth,avatars,onSuccess,onClose}){
+function LoginModal({user,auth,onSuccess,onClose}){
   const [pwd,setPwd]=useState(""),[confirm,setConfirm]=useState(""),[error,setError]=useState(""),[pinErr,setPinErr]=useState("");
   const u=USERS.find(x=>x.key===user);
   const isPin=u.type==="pin",isFirst=!auth[user],pinNotSet=isPin&&!auth[user];
   const submitPwd=()=>{if(isFirst){if(pwd.length<4){setError("At least 4 characters.");return;}if(pwd!==confirm){setError("Passwords don't match.");return;}onSuccess(pwd);}else{if(pwd!==auth[user]){setError("Wrong password. Try again.");setPwd("");return;}onSuccess(null);}};
   const submitPin=pin=>{if(pin!==auth[user]){setPinErr("Wrong code! Try again.");return;}onSuccess(null);};
-  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}><div style={{background:"#141410",border:`2px solid ${u.color}44`,borderRadius:16,padding:32,maxWidth:380,width:"100%"}} onClick={e=>e.stopPropagation()}><div style={{textAlign:"center",marginBottom:24}}><div style={{display:"flex",justifyContent:"center",marginBottom:10}}><UserAvatar userKey={user} avatars={avatars||{}} size={72}/></div><div style={{fontSize:22,color:"#e8e0c8",marginBottom:4}}>{isFirst&&!isPin?`Welcome, ${u.label}!`:`Hey ${u.label}!`}</div><div style={{fontSize:13,color:"#666"}}>{isFirst&&!isPin?"Create your password to get started":isPin?pinNotSet?"Your PIN has not been set — ask Brad!":"Enter your 4-digit code":"Enter your password"}</div></div>{isPin&&!pinNotSet&&<PinPad onSubmit={submitPin} color={u.color} error={pinErr}/>}{isPin&&pinNotSet&&<div style={{textAlign:"center",padding:"20px 0",color:"#666",fontSize:14}}>Ask Brad to set your code!</div>}{!isPin&&<div><div style={{marginBottom:12}}><div style={S.label}>{isFirst?"Create Password":"Password"}</div><input autoFocus style={S.input} type="password" value={pwd} onChange={e=>{setPwd(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&submitPwd()}/></div>{isFirst&&<div style={{marginBottom:12}}><div style={S.label}>Confirm Password</div><input style={S.input} type="password" value={confirm} onChange={e=>{setConfirm(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&submitPwd()}/></div>}{error&&<div style={{color:"#f44336",fontSize:12,marginBottom:10}}>{error}</div>}<button style={{...S.btn(u.color),width:"100%",padding:"11px",fontSize:15,marginTop:4}} onClick={submitPwd}>{isFirst?"Create Password and Sign In":"Sign In"}</button></div>}<button onClick={onClose} style={{...S.btnGhost,width:"100%",marginTop:12,textAlign:"center"}}>Cancel</button></div></div>);
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}><div style={{background:"#141410",border:`2px solid ${u.color}44`,borderRadius:16,padding:32,maxWidth:380,width:"100%"}} onClick={e=>e.stopPropagation()}><div style={{textAlign:"center",marginBottom:24}}><div style={{fontSize:44,marginBottom:6}}>{u.emoji}</div><div style={{fontSize:22,color:"#e8e0c8",marginBottom:4}}>{isFirst&&!isPin?`Welcome, ${u.label}!`:`Hey ${u.label}!`}</div><div style={{fontSize:13,color:"#666"}}>{isFirst&&!isPin?"Create your password to get started":isPin?pinNotSet?"Your PIN has not been set — ask Brad!":"Enter your 4-digit code":"Enter your password"}</div></div>{isPin&&!pinNotSet&&<PinPad onSubmit={submitPin} color={u.color} error={pinErr}/>}{isPin&&pinNotSet&&<div style={{textAlign:"center",padding:"20px 0",color:"#666",fontSize:14}}>Ask Brad to set your code!</div>}{!isPin&&<div><div style={{marginBottom:12}}><div style={S.label}>{isFirst?"Create Password":"Password"}</div><input autoFocus style={S.input} type="password" value={pwd} onChange={e=>{setPwd(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&submitPwd()}/></div>{isFirst&&<div style={{marginBottom:12}}><div style={S.label}>Confirm Password</div><input style={S.input} type="password" value={confirm} onChange={e=>{setConfirm(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&submitPwd()}/></div>}{error&&<div style={{color:"#f44336",fontSize:12,marginBottom:10}}>{error}</div>}<button style={{...S.btn(u.color),width:"100%",padding:"11px",fontSize:15,marginTop:4}} onClick={submitPwd}>{isFirst?"Create Password and Sign In":"Sign In"}</button></div>}<button onClick={onClose} style={{...S.btnGhost,width:"100%",marginTop:12,textAlign:"center"}}>Cancel</button></div></div>);
 }
-
-
-function UserAvatar({userKey,avatars,size=44,showName=false}){
-  const u=USERS.find(x=>x.key===userKey);
-  if(!u)return null;
-  const av=avatars?.[userKey];
-  return(<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-    <div style={{width:size,height:size,borderRadius:"50%",border:`3px solid ${u.color}`,overflow:"hidden",background:"#1a1a1a",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-      {av?.svg
-        ?<div style={{width:"100%",height:"100%"}} dangerouslySetInnerHTML={{__html:av.svg}}/>
-        :<span style={{fontSize:size*0.45}}>{u.emoji}</span>
-      }
-    </div>
-    {showName&&<div style={{fontSize:10,color:u.color,fontFamily:"monospace",fontWeight:"bold",textAlign:"center",maxWidth:size+16}}>{u.label}</div>}
-  </div>);
-}
-
-// ── AVATAR DEFINITIONS ───────────────────────────────────────────────────────
-const AVATARS=[
-  {id:"polynesian",name:"Island Warrior",color:"#E65100",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#1a6b8a"/><ellipse cx="50" cy="90" rx="36" ry="20" fill="#2d4a22"/><ellipse cx="50" cy="58" rx="22" ry="26" fill="#c4813a"/><circle cx="50" cy="38" r="18" fill="#d4956b"/><path d="M32 28 Q50 10 68 28 Q74 38 68 32 Q50 18 32 32 Z" fill="#2d1a08"/><path d="M32 30 Q28 48 34 52" stroke="#2d1a08" stroke-width="3" fill="none"/><path d="M68 30 Q72 48 66 52" stroke="#2d1a08" stroke-width="3" fill="none"/><circle cx="43" cy="38" r="3.5" fill="#1a0a00"/><circle cx="57" cy="38" r="3.5" fill="#1a0a00"/><circle cx="44" cy="37" r="1.2" fill="white"/><circle cx="58" cy="37" r="1.2" fill="white"/><path d="M45 44 Q50 48 55 44" stroke="#8b4513" stroke-width="1.5" fill="none"/><path d="M36 46 Q28 44 26 50 Q28 56 36 54" fill="#d4956b"/><path d="M64 46 Q72 44 74 50 Q72 56 64 54" fill="#d4956b"/><path d="M38 24 Q42 16 50 14 Q58 16 62 24" stroke="#3d2b1a" stroke-width="8" stroke-linecap="round" fill="none"/><circle cx="34" cy="22" r="4" fill="#e8a020"/><circle cx="66" cy="22" r="4" fill="#e8a020"/><rect x="46" y="14" width="8" height="4" rx="2" fill="#e8a020"/></svg>'},
-  {id:"spacerogue",name:"Space Rogue",color:"#37474F",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#0d1b2a"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#1c2e40"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#2c3e50"/><circle cx="50" cy="38" r="18" fill="#f0c8a0"/><path d="M32 30 Q50 14 68 30 Q72 22 50 16 Q28 22 32 30Z" fill="#1a1a1a"/><circle cx="43" cy="38" r="3.5" fill="#1a1a1a"/><circle cx="57" cy="38" r="3.5" fill="#1a1a1a"/><circle cx="44" cy="37" r="1.2" fill="#4fc3f7"/><circle cx="58" cy="37" r="1.2" fill="#4fc3f7"/><path d="M44 46 Q50 50 56 46" stroke="#c0856a" stroke-width="1.5" fill="none"/><path d="M36 22 Q50 8 64 22" stroke="#4fc3f7" stroke-width="2" fill="none" stroke-dasharray="3,2"/><rect x="30" y="56" width="8" height="20" rx="3" fill="#37474F"/><rect x="62" y="56" width="8" height="20" rx="3" fill="#37474F"/><line x1="82" y1="48" x2="90" y2="20" stroke="#4fc3f7" stroke-width="3" stroke-linecap="round"/><circle cx="82" cy="48" r="3" fill="#4fc3f7"/></svg>'},
-  {id:"piratecaptain",name:"Pirate Captain",color:"#4A148C",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#1a0d2e"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#2d1a08"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#8b1a1a"/><circle cx="50" cy="38" r="18" fill="#e8c49a"/><path d="M28 28 Q50 8 72 28 L74 32 Q50 14 26 32Z" fill="#1a0d0d"/><path d="M24 32 Q18 28 20 22 Q26 18 30 28Z" fill="#1a0d0d"/><path d="M76 32 Q82 28 80 22 Q74 18 70 28Z" fill="#1a0d0d"/><circle cx="50" cy="30" r="4" fill="#c0a000" opacity="0.9"/><circle cx="43" cy="38" r="3.5" fill="#1a0a00"/><circle cx="57" cy="38" r="3.5" fill="#1a0a00"/><circle cx="44" cy="37" r="1.2" fill="white"/><circle cx="58" cy="37" r="1.2" fill="white"/><path d="M44 46 Q50 50 56 46" stroke="#a0522d" stroke-width="1.5" fill="none"/><circle cx="66" cy="40" r="5" fill="#1a0d0d" opacity="0.9"/><line x1="62" y1="36" x2="70" y2="44" stroke="#808080" stroke-width="1.5"/><path d="M76 62 L84 55 L88 62 L84 58Z" fill="#c0a000"/></svg>'},
-  {id:"jediwarrior",name:"Jedi Warrior",color:"#1565C0",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#0d1117"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#1a2030"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#2c3040"/><circle cx="50" cy="38" r="18" fill="#e8c49a"/><path d="M32 28 Q50 12 68 28 Q70 20 50 16 Q30 20 32 28Z" fill="#3d2b0a"/><circle cx="43" cy="38" r="3.5" fill="#1a0a00"/><circle cx="57" cy="38" r="3.5" fill="#1a0a00"/><circle cx="44" cy="37" r="1.2" fill="white"/><circle cx="58" cy="37" r="1.2" fill="white"/><path d="M44 46 Q50 50 56 46" stroke="#a0522d" stroke-width="1.5" fill="none"/><rect x="47" y="55" width="6" height="4" rx="1" fill="#888"/><rect x="49" y="30" width="2" height="30" rx="1" fill="#4fc3f7" opacity="0.9"/><ellipse cx="50" cy="30" rx="2" ry="3" fill="#4fc3f7"/></svg>'},
-  {id:"vikingshield",name:"Viking Shield",color:"#5D4037",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#4a3728"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#3d2b1a"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#7a4a28"/><circle cx="50" cy="38" r="18" fill="#f0d0a8"/><path d="M30 30 Q50 6 70 30" stroke="#8b6914" stroke-width="10" stroke-linecap="round" fill="none"/><path d="M28 28 Q26 20 30 16 Q34 20 32 28Z" fill="#c0a000"/><path d="M72 28 Q74 20 70 16 Q66 20 68 28Z" fill="#c0a000"/><circle cx="43" cy="38" r="3.5" fill="#1a0a00"/><circle cx="57" cy="38" r="3.5" fill="#1a0a00"/><circle cx="44" cy="37" r="1.2" fill="white"/><circle cx="58" cy="37" r="1.2" fill="white"/><path d="M44 46 Q50 50 56 46" stroke="#a0522d" stroke-width="1.5" fill="none"/><path d="M36 48 Q28 46 24 50" stroke="#c0a000" stroke-width="2"/><path d="M64 48 Q72 46 76 50" stroke="#c0a000" stroke-width="2"/><rect x="70" y="58" width="20" height="5" rx="2" fill="#8b6914" transform="rotate(-30 70 58)"/></svg>'},
-  {id:"sorcererappr",name:"Sorcerer",color:"#6A1B9A",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#1a0a2e"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#2d0a4e"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#4a1870"/><circle cx="50" cy="40" r="18" fill="#e8c8a0"/><polygon points="50,4 36,34 64,34" fill="#2d0a4e"/><ellipse cx="50" cy="34" rx="16" ry="4" fill="#3d0a5e"/><circle cx="43" cy="40" r="3.5" fill="#1a0a00"/><circle cx="57" cy="40" r="3.5" fill="#1a0a00"/><circle cx="44" cy="39" r="1.2" fill="#ce93d8"/><circle cx="58" cy="39" r="1.2" fill="#ce93d8"/><path d="M44 47 Q50 51 56 47" stroke="#8b4513" stroke-width="1.5" fill="none"/><path d="M22 70 Q18 60 24 56" stroke="#ffd54f" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="20" cy="70" r="4" fill="#ffd54f"/><circle cx="26" cy="26" r="3" fill="#ffd54f"/><circle cx="16" cy="44" r="2" fill="#ce93d8"/><circle cx="82" cy="38" r="2.5" fill="#ce93d8"/></svg>'},
-  {id:"oceanking",name:"Ocean King",color:"#006064",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#004d5e"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#00363a"/><ellipse cx="50" cy="62" rx="22" ry="22" fill="#006064"/><ellipse cx="50" cy="72" rx="22" ry="12" fill="#00838f"/><path d="M28 72 Q50 80 72 72 Q66 90 50 94 Q34 90 28 72Z" fill="#00acc1"/><circle cx="50" cy="40" r="18" fill="#e0c89a"/><path d="M32 30 Q50 14 68 30" stroke="#c0a000" stroke-width="5" fill="none"/><polygon points="46,24 50,14 54,24" fill="#c0a000"/><circle cx="38" cy="26" r="3" fill="#c0a000"/><circle cx="62" cy="26" r="3" fill="#c0a000"/><circle cx="43" cy="40" r="3.5" fill="#003d4f"/><circle cx="57" cy="40" r="3.5" fill="#003d4f"/><circle cx="44" cy="39" r="1.2" fill="white"/><circle cx="58" cy="39" r="1.2" fill="white"/><path d="M44 47 Q50 51 56 47" stroke="#7a5030" stroke-width="1.5" fill="none"/></svg>'},
-  {id:"dragonrider",name:"Dragon Rider",color:"#B71C1C",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#1a0808"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#2d0808"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#8b1a1a"/><circle cx="50" cy="38" r="18" fill="#f0c8a0"/><path d="M30 26 Q50 10 70 26 Q72 18 50 14 Q28 18 30 26Z" fill="#2d0808"/><circle cx="43" cy="38" r="3.5" fill="#1a0a00"/><circle cx="57" cy="38" r="3.5" fill="#1a0a00"/><circle cx="44" cy="37" r="1.2" fill="#ff5722"/><circle cx="58" cy="37" r="1.2" fill="#ff5722"/><path d="M44 46 Q50 50 56 46" stroke="#a0522d" stroke-width="1.5" fill="none"/><path d="M65 22 Q80 10 88 20 Q80 22 78 30 Q72 18 65 22Z" fill="#b71c1c"/><path d="M78 30 Q82 40 76 46 Q72 38 74 30Z" fill="#b71c1c"/><circle cx="84" cy="16" r="2.5" fill="#ff8f00"/></svg>'},
-  {id:"jungleprincess",name:"Jungle Princess",color:"#2E7D32",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#1a3a1a"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#1b5e20"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#2e7d32"/><circle cx="50" cy="38" r="18" fill="#f0c8a0"/><path d="M32 28 Q50 10 68 28 Q58 16 50 14 Q42 16 32 28Z" fill="#1b2a10"/><path d="M28 26 Q22 20 26 14 Q32 14 32 26Z" fill="#4caf50"/><path d="M72 26 Q78 20 74 14 Q68 14 68 26Z" fill="#4caf50"/><circle cx="43" cy="38" r="3.5" fill="#1a0a00"/><circle cx="57" cy="38" r="3.5" fill="#1a0a00"/><circle cx="44" cy="37" r="1.2" fill="white"/><circle cx="58" cy="37" r="1.2" fill="white"/><path d="M44 46 Q50 50 56 46" stroke="#a0522d" stroke-width="1.5" fill="none"/><circle cx="34" cy="22" r="5" fill="#ff8f00" opacity="0.9"/><circle cx="66" cy="22" r="5" fill="#ff8f00" opacity="0.9"/><path d="M38 18 Q42 12 46 18" stroke="#4caf50" stroke-width="2" fill="none"/><path d="M54 18 Q58 12 62 18" stroke="#4caf50" stroke-width="2" fill="none"/></svg>'},
-  {id:"galacticpilot",name:"Galactic Pilot",color:"#1565C0",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#0a1628"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#1a2840"/><ellipse cx="50" cy="60" rx="26" ry="22" fill="#1565c0"/><path d="M24 58 Q50 52 76 58 Q76 70 50 76 Q24 70 24 58Z" fill="#1976d2"/><circle cx="50" cy="38" r="18" fill="#f0c8a0"/><path d="M30 28 Q50 14 70 28 Q62 22 50 20 Q38 22 30 28Z" fill="#0d2644"/><circle cx="50" cy="26" r="4" fill="#4fc3f7" opacity="0.8"/><circle cx="43" cy="38" r="3.5" fill="#0d1a30"/><circle cx="57" cy="38" r="3.5" fill="#0d1a30"/><circle cx="44" cy="37" r="1.2" fill="#4fc3f7"/><circle cx="58" cy="37" r="1.2" fill="#4fc3f7"/><path d="M44 46 Q50 50 56 46" stroke="#a0522d" stroke-width="1.5" fill="none"/><path d="M14 60 Q8 50 14 42 Q20 50 14 60Z" fill="#1565c0"/><path d="M86 60 Q92 50 86 42 Q80 50 86 60Z" fill="#1565c0"/></svg>'},
-  {id:"enchantress",name:"Enchantress",color:"#AD1457",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#1a0828"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#2d0840"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#6a1b9a"/><circle cx="50" cy="38" r="18" fill="#f0c8b0"/><path d="M30 24 Q50 6 70 24 Q60 10 50 8 Q40 10 30 24Z" fill="#1a0828"/><path d="M30 24 Q22 20 20 30 Q26 30 30 24Z" fill="#f48fb1"/><path d="M70 24 Q78 20 80 30 Q74 30 70 24Z" fill="#f48fb1"/><circle cx="43" cy="38" r="3.5" fill="#1a0a00"/><circle cx="57" cy="38" r="3.5" fill="#1a0a00"/><circle cx="44" cy="37" r="1.2" fill="#f48fb1"/><circle cx="58" cy="37" r="1.2" fill="#f48fb1"/><path d="M44 46 Q50 50 56 46" stroke="#8b0047" stroke-width="1.5" fill="none"/><circle cx="32" cy="20" r="3" fill="#ffd54f"/><circle cx="68" cy="20" r="3" fill="#ffd54f"/><path d="M24 36 Q18 30 22 24" stroke="#f48fb1" stroke-width="1.5" fill="none"/><path d="M76 36 Q82 30 78 24" stroke="#f48fb1" stroke-width="1.5" fill="none"/></svg>'},
-  {id:"northernranger",name:"Northern Ranger",color:"#37474F",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#1a2a1a"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#2d3a1a"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#37474f"/><circle cx="50" cy="38" r="18" fill="#f0c8a0"/><path d="M28 24 Q50 8 72 24 Q62 12 50 10 Q38 12 28 24Z" fill="#2d2010"/><path d="M28 24 Q24 30 28 36 Q32 28 28 24Z" fill="#5d4037"/><path d="M72 24 Q76 30 72 36 Q68 28 72 24Z" fill="#5d4037"/><circle cx="43" cy="38" r="3.5" fill="#1a0a00"/><circle cx="57" cy="38" r="3.5" fill="#1a0a00"/><circle cx="44" cy="37" r="1.2" fill="white"/><circle cx="58" cy="37" r="1.2" fill="white"/><path d="M44 46 Q50 50 56 46" stroke="#a0522d" stroke-width="1.5" fill="none"/><path d="M72 44 Q82 38 86 44" stroke="#8d6e63" stroke-width="2" stroke-linecap="round" fill="none"/><rect x="80" y="30" width="3" height="22" rx="1" fill="#8d6e63"/><polygon points="81,30 82,22 83,30" fill="#c0a000"/></svg>'},
-  {id:"sunpriest",name:"Sun Priest",color:"#F57F17",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#3e2000"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#2d1400"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#e65100"/><circle cx="50" cy="38" r="18" fill="#f0c8a0"/><path d="M32 28 Q50 10 68 28 Q60 16 50 14 Q40 16 32 28Z" fill="#f57f17"/><circle cx="50" cy="16" r="6" fill="#ffd54f"/><path d="M50 10 L50 4 M44 12 L40 8 M56 12 L60 8 M42 18 L36 16 M58 18 L64 16" stroke="#ffd54f" stroke-width="1.5"/><circle cx="43" cy="38" r="3.5" fill="#1a0a00"/><circle cx="57" cy="38" r="3.5" fill="#1a0a00"/><circle cx="44" cy="37" r="1.2" fill="#ffd54f"/><circle cx="58" cy="37" r="1.2" fill="#ffd54f"/><path d="M44 46 Q50 50 56 46" stroke="#a0522d" stroke-width="1.5" fill="none"/><path d="M34 52 Q24 48 22 54" stroke="#f57f17" stroke-width="2"/><path d="M66 52 Q76 48 78 54" stroke="#f57f17" stroke-width="2"/></svg>'},
-  {id:"icequeen",name:"Ice Queen",color:"#0288D1",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#0a2040"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#0d2a50"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#0288d1"/><ellipse cx="50" cy="68" rx="22" ry="14" fill="#b3e5fc" opacity="0.3"/><circle cx="50" cy="38" r="18" fill="#f0e8ff"/><path d="M30 24 Q50 4 70 24 Q60 10 50 8 Q40 10 30 24Z" fill="#b3e5fc"/><polygon points="50,4 46,16 54,16" fill="#e1f5fe"/><polygon points="42,8 38,20 46,20" fill="#b3e5fc" opacity="0.7"/><polygon points="58,8 54,20 62,20" fill="#b3e5fc" opacity="0.7"/><circle cx="43" cy="38" r="3.5" fill="#0a2040"/><circle cx="57" cy="38" r="3.5" fill="#0a2040"/><circle cx="44" cy="37" r="1.2" fill="#b3e5fc"/><circle cx="58" cy="37" r="1.2" fill="#b3e5fc"/><path d="M44 46 Q50 50 56 46" stroke="#7986cb" stroke-width="1.5" fill="none"/><path d="M24 42 Q18 38 20 32 L24 36 L26 30 L28 36 L32 34 Q30 40 24 42Z" fill="#b3e5fc" opacity="0.8"/></svg>'},
-  {id:"thundergod",name:"Thunder God",color:"#FBC02D",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#1a1400"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#2d2400"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#5d4037"/><circle cx="50" cy="38" r="18" fill="#f5deb3"/><path d="M28 22 Q50 4 72 22 Q66 12 50 10 Q34 12 28 22Z" fill="#ffd54f"/><path d="M28 22 Q22 18 24 12 Q30 12 30 22Z" fill="#ffd54f"/><path d="M72 22 Q78 18 76 12 Q70 12 70 22Z" fill="#ffd54f"/><circle cx="43" cy="38" r="3.5" fill="#1a0a00"/><circle cx="57" cy="38" r="3.5" fill="#1a0a00"/><circle cx="44" cy="37" r="1.2" fill="#ffd54f"/><circle cx="58" cy="37" r="1.2" fill="#ffd54f"/><path d="M44 46 Q50 50 56 46" stroke="#a0522d" stroke-width="1.5" fill="none"/><polygon points="78,30 72,46 78,44 74,62 84,42 78,44Z" fill="#ffd54f"/></svg>'},
-  {id:"stardancer",name:"Star Dancer",color:"#7B1FA2",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#1a0830"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#2d0a4e"/><ellipse cx="50" cy="62" rx="22" ry="22" fill="#7b1fa2"/><ellipse cx="50" cy="72" rx="22" ry="12" fill="#ce93d8" opacity="0.4"/><circle cx="50" cy="38" r="18" fill="#f0c8d8"/><path d="M30 26 Q50 8 70 26 Q60 12 50 10 Q40 12 30 26Z" fill="#1a0830"/><circle cx="43" cy="38" r="3.5" fill="#1a0830"/><circle cx="57" cy="38" r="3.5" fill="#1a0830"/><circle cx="44" cy="37" r="1.2" fill="#ce93d8"/><circle cx="58" cy="37" r="1.2" fill="#ce93d8"/><path d="M44 46 Q50 50 56 46" stroke="#880e4f" stroke-width="1.5" fill="none"/><polygon points="50,4 51.5,9 57,9 52.5,12 54,17 50,14 46,17 47.5,12 43,9 48.5,9" fill="#ffd54f"/><circle cx="20" cy="30" r="2" fill="#ce93d8"/><circle cx="80" cy="26" r="1.5" fill="#ffd54f"/><circle cx="16" cy="58" r="1.5" fill="#ce93d8"/><circle cx="84" cy="60" r="2" fill="#ffd54f"/></svg>'},
-  {id:"firefighter",name:"Fire Fighter",color:"#C62828",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#1a0808"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#b71c1c"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#c62828"/><circle cx="50" cy="38" r="18" fill="#f0c8a0"/><path d="M26 26 Q50 4 74 26 L72 32 Q50 12 28 32Z" fill="#c62828"/><path d="M26 28 Q24 32 26 36 Q30 30 26 28Z" fill="#ff8f00"/><path d="M74 28 Q76 32 74 36 Q70 30 74 28Z" fill="#ff8f00"/><circle cx="50" cy="20" r="5" fill="#ff8f00"/><circle cx="43" cy="38" r="3.5" fill="#1a0a00"/><circle cx="57" cy="38" r="3.5" fill="#1a0a00"/><circle cx="44" cy="37" r="1.2" fill="white"/><circle cx="58" cy="37" r="1.2" fill="white"/><path d="M44 46 Q50 50 56 46" stroke="#a0522d" stroke-width="1.5" fill="none"/><path d="M34 54 Q28 48 32 42 Q36 50 34 54Z" fill="#ff8f00" opacity="0.8"/></svg>'},
-  {id:"archerelf",name:"Archer Elf",color:"#33691E",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#1a2a10"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#2d4a1a"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#33691e"/><circle cx="50" cy="38" r="18" fill="#f0e0c0"/><path d="M32 26 Q50 6 68 26 Q58 12 50 10 Q42 12 32 26Z" fill="#2d3a10"/><path d="M30 24 Q24 18 28 10 Q34 16 32 26Z" fill="#558b2f" style="clip-path:none"/><path d="M70 24 Q76 18 72 10 Q66 16 68 26Z" fill="#558b2f"/><circle cx="43" cy="38" r="3.5" fill="#1a2a10"/><circle cx="57" cy="38" r="3.5" fill="#1a2a10"/><circle cx="44" cy="37" r="1.2" fill="#a5d6a7"/><circle cx="58" cy="37" r="1.2" fill="#a5d6a7"/><path d="M44 46 Q50 50 56 46" stroke="#7a5030" stroke-width="1.5" fill="none"/><path d="M72 38 Q84 34 88 38 Q84 40 88 44 Q80 40 72 44Z" fill="#8d6e63"/><line x1="72" y1="41" x2="88" y2="41" stroke="#a5d6a7" stroke-width="1"/></svg>'},
-  {id:"robotpilot",name:"Robot Pilot",color:"#00BCD4",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#102030"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#1a3040"/><ellipse cx="50" cy="60" rx="24" ry="24" fill="#263238"/><rect x="30" y="24" width="40" height="34" rx="6" fill="#37474f"/><rect x="34" y="28" width="32" height="26" rx="4" fill="#455a64"/><rect x="40" y="32" width="9" height="9" rx="2" fill="#00bcd4"/><rect x="51" y="32" width="9" height="9" rx="2" fill="#00bcd4"/><circle cx="44.5" cy="36.5" r="3" fill="#e0f7fa"/><circle cx="55.5" cy="36.5" r="3" fill="#e0f7fa"/><rect x="40" y="44" width="20" height="5" rx="2" fill="#00bcd4" opacity="0.7"/><rect x="46" y="20" width="8" height="8" rx="2" fill="#546e7a"/><circle cx="50" cy="20" r="2" fill="#00bcd4"/><rect x="26" y="56" width="6" height="16" rx="3" fill="#37474f"/><rect x="68" y="56" width="6" height="16" rx="3" fill="#37474f"/></svg>'},
-  {id:"ghostcaptain",name:"Ghost Captain",color:"#546E7A",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#0d1a2a"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#1a2a38" opacity="0.6"/><path d="M24 58 Q24 30 50 28 Q76 30 76 58 Q76 80 68 90 Q60 84 50 90 Q40 84 32 90 Q24 80 24 58Z" fill="#37474f" opacity="0.85"/><circle cx="50" cy="44" r="18" fill="#b0bec5" opacity="0.7"/><circle cx="42" cy="42" r="5" fill="#0d1a2a"/><circle cx="58" cy="42" r="5" fill="#0d1a2a"/><circle cx="43" cy="41" r="2" fill="#4fc3f7"/><circle cx="59" cy="41" r="2" fill="#4fc3f7"/><path d="M44 50 Q50 46 56 50" stroke="#546e7a" stroke-width="1.5" fill="none"/><path d="M28 26 Q50 8 72 26 L70 30 Q50 14 30 30Z" fill="#1a2a38"/><circle cx="50" cy="20" r="4" fill="#ffd54f" opacity="0.6"/><path d="M20 60 Q14 52 18 44 Q22 54 20 60Z" fill="#546e7a" opacity="0.6"/><path d="M80 60 Q86 52 82 44 Q78 54 80 60Z" fill="#546e7a" opacity="0.6"/></svg>'},
-  {id:"sandstorm",name:"Desert Storm",color:"#F9A825",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#3e2a00"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#4e3400"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#8d6e00"/><circle cx="50" cy="38" r="18" fill="#f5deb3"/><path d="M30 34 Q28 24 34 18 Q40 14 50 14 Q60 14 66 18 Q72 24 70 34 Q60 28 50 28 Q40 28 30 34Z" fill="#5d4037"/><path d="M30 34 Q26 36 24 40 Q28 38 30 34Z" fill="#8d6e00"/><path d="M70 34 Q74 36 76 40 Q72 38 70 34Z" fill="#8d6e00"/><circle cx="43" cy="40" r="3.5" fill="#3e2a00"/><circle cx="57" cy="40" r="3.5" fill="#3e2a00"/><circle cx="44" cy="39" r="1.2" fill="#f9a825"/><circle cx="58" cy="39" r="1.2" fill="#f9a825"/><path d="M44 47 Q50 51 56 47" stroke="#8d4020" stroke-width="1.5" fill="none"/><circle cx="34" cy="22" r="4" fill="#f9a825"/><circle cx="66" cy="22" r="4" fill="#f9a825"/></svg>'},
-  {id:"crystalwitch",name:"Crystal Witch",color:"#4527A0",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#1a0a30"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#2d1040"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#4527a0"/><circle cx="50" cy="38" r="18" fill="#e8d0f0"/><polygon points="50,2 40,30 60,30" fill="#2d1040"/><ellipse cx="50" cy="30" rx="14" ry="3" fill="#4527a0"/><polygon points="36,24 30,20 38,28" fill="#7c4dff" opacity="0.8"/><polygon points="64,24 70,20 62,28" fill="#7c4dff" opacity="0.8"/><circle cx="43" cy="38" r="3.5" fill="#1a0a30"/><circle cx="57" cy="38" r="3.5" fill="#1a0a30"/><circle cx="44" cy="37" r="1.2" fill="#b39ddb"/><circle cx="58" cy="37" r="1.2" fill="#b39ddb"/><path d="M44 46 Q50 50 56 46" stroke="#7c4dff" stroke-width="1.5" fill="none"/><polygon points="22,64 18,58 26,58 22,52 28,60 24,60" fill="#e040fb" opacity="0.8"/></svg>'},
-  {id:"ironsmith",name:"Iron Smith",color:"#616161",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#1a1a1a"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#2d2d2d"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#424242"/><circle cx="50" cy="38" r="18" fill="#f0c8a0"/><path d="M28 24 Q50 4 72 24 Q60 10 50 8 Q40 10 28 24Z" fill="#2d2d2d"/><path d="M28 24 Q20 20 22 12 Q30 14 28 24Z" fill="#78909c"/><path d="M72 24 Q80 20 78 12 Q70 14 72 24Z" fill="#78909c"/><circle cx="43" cy="38" r="3.5" fill="#1a1a1a"/><circle cx="57" cy="38" r="3.5" fill="#1a1a1a"/><circle cx="44" cy="37" r="1.2" fill="#ffd54f"/><circle cx="58" cy="37" r="1.2" fill="#ffd54f"/><path d="M44 46 Q50 50 56 46" stroke="#8d6e63" stroke-width="1.5" fill="none"/><rect x="72" y="44" width="18" height="5" rx="1" fill="#78909c" transform="rotate(-20 72 44)"/><ellipse cx="72" cy="46" rx="5" ry="3" fill="#9e9e9e"/><path d="M34 52 Q26 48 24 52 Q26 58 34 56" fill="#78909c"/></svg>'},
-  {id:"wavesurfer",name:"Wave Surfer",color:"#0097A7",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#006064"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#00838f"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#0097a7"/><circle cx="50" cy="38" r="18" fill="#f0c8a0"/><path d="M32 26 Q50 8 68 26 Q58 12 50 10 Q42 12 32 26Z" fill="#006064"/><path d="M26 20 Q20 16 22 10 Q28 12 30 22 Q28 22 26 20Z" fill="#ffd54f"/><circle cx="43" cy="38" r="3.5" fill="#006064"/><circle cx="57" cy="38" r="3.5" fill="#006064"/><circle cx="44" cy="37" r="1.2" fill="#e0f7fa"/><circle cx="58" cy="37" r="1.2" fill="#e0f7fa"/><path d="M44 46 Q50 50 56 46" stroke="#00838f" stroke-width="1.5" fill="none"/><path d="M16 72 Q24 64 32 72 Q40 80 48 72 Q56 64 64 72 Q72 80 80 72 Q88 64 96 72" stroke="#b2ebf2" stroke-width="3" fill="none"/></svg>'},
-  {id:"skyprince",name:"Sky Prince",color:"#1976D2",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#0d1f4e"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#1a2e6e"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#1976d2"/><circle cx="50" cy="38" r="18" fill="#f0c8a0"/><path d="M30 24 Q50 6 70 24 Q60 10 50 8 Q40 10 30 24Z" fill="#1a2e6e"/><polygon points="46,14 50,4 54,14 58,8 54,16 50,12 46,16 42,8" fill="#ffd54f"/><circle cx="43" cy="38" r="3.5" fill="#0d1f4e"/><circle cx="57" cy="38" r="3.5" fill="#0d1f4e"/><circle cx="44" cy="37" r="1.2" fill="#90caf9"/><circle cx="58" cy="37" r="1.2" fill="#90caf9"/><path d="M44 46 Q50 50 56 46" stroke="#1565c0" stroke-width="1.5" fill="none"/><path d="M14 50 Q6 40 12 30 Q20 42 14 50Z" fill="#1976d2" opacity="0.8"/><path d="M86 50 Q94 40 88 30 Q80 42 86 50Z" fill="#1976d2" opacity="0.8"/></svg>'},
-  {id:"shadowstalker",name:"Shadow Stalker",color:"#212121",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#0a0a0a"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#1a1a1a"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#212121"/><circle cx="50" cy="38" r="18" fill="#c8a888"/><path d="M28 22 Q50 2 72 22 Q60 8 50 6 Q40 8 28 22Z" fill="#0a0a0a"/><path d="M28 22 Q22 16 24 8 Q30 12 28 22Z" fill="#424242"/><path d="M72 22 Q78 16 76 8 Q70 12 72 22Z" fill="#424242"/><circle cx="43" cy="38" r="3.5" fill="#0a0a0a"/><circle cx="57" cy="38" r="3.5" fill="#0a0a0a"/><circle cx="44" cy="37" r="1.5" fill="#b0bec5"/><circle cx="58" cy="37" r="1.5" fill="#b0bec5"/><path d="M44 46 Q50 50 56 46" stroke="#424242" stroke-width="1.5" fill="none"/><path d="M20 42 Q10 38 12 28 Q18 36 20 42Z" fill="#212121"/><path d="M80 42 Q90 38 88 28 Q82 36 80 42Z" fill="#212121"/></svg>'},
-  {id:"goldenfox",name:"Golden Trickster",color:"#FF8F00",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#3e2000"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#4e2c00"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#ff8f00"/><circle cx="50" cy="38" r="18" fill="#fdebd0"/><polygon points="28,22 18,2 42,32" fill="#e65100"/><polygon points="72,22 82,2 58,32" fill="#e65100"/><polygon points="30,24 22,6 42,32" fill="#ffd54f"/><polygon points="70,24 78,6 58,32" fill="#ffd54f"/><circle cx="42" cy="38" r="4" fill="#3e2000"/><circle cx="58" cy="38" r="4" fill="#3e2000"/><circle cx="43" cy="37" r="1.5" fill="#ffd54f"/><circle cx="59" cy="37" r="1.5" fill="#ffd54f"/><ellipse cx="50" cy="50" rx="6" ry="4" fill="#e65100"/><path d="M44 53 Q50 58 56 53" stroke="#3e2000" stroke-width="1.5" fill="none"/><path d="M32 54 Q24 50 22 56 Q26 62 34 58" fill="#fdebd0"/><path d="M68 54 Q76 50 78 56 Q74 62 66 58" fill="#fdebd0"/><path d="M58 72 Q70 64 74 72 Q68 80 58 72Z" fill="#ffd54f" opacity="0.8"/></svg>'},
-  {id:"moonhunter",name:"Moon Hunter",color:"#4FC3F7",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#0a1a2e"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#0d2040"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#1565c0"/><circle cx="50" cy="38" r="18" fill="#f0e8d0"/><path d="M32 24 Q50 4 68 24 Q56 10 50 8 Q44 10 32 24Z" fill="#0a1a2e"/><path d="M62 10 Q72 6 76 14 Q68 14 62 10Z" fill="#4fc3f7"/><circle cx="43" cy="38" r="3.5" fill="#0a1a2e"/><circle cx="57" cy="38" r="3.5" fill="#0a1a2e"/><circle cx="44" cy="37" r="1.2" fill="#4fc3f7"/><circle cx="58" cy="37" r="1.2" fill="#4fc3f7"/><path d="M44 46 Q50 50 56 46" stroke="#7986cb" stroke-width="1.5" fill="none"/><path d="M20 44 Q12 38 14 28 Q20 36 20 44Z" fill="#1565c0"/><path d="M80 44 Q88 38 86 28 Q80 36 80 44Z" fill="#1565c0"/><circle cx="22" cy="20" r="2" fill="#4fc3f7"/><circle cx="78" cy="16" r="1.5" fill="#4fc3f7"/><circle cx="88" cy="44" r="1.5" fill="#ffd54f"/></svg>'},
-  {id:"earthkeeper",name:"Earth Keeper",color:"#558B2F",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#1a2e10"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#2d4a1a"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#33691e"/><circle cx="50" cy="38" r="18" fill="#f0d8a0"/><path d="M30 22 Q50 4 70 22 Q58 8 50 6 Q42 8 30 22Z" fill="#1a2e10"/><circle cx="36" cy="20" r="5" fill="#8bc34a"/><circle cx="50" cy="14" r="4" fill="#4caf50"/><circle cx="64" cy="20" r="5" fill="#8bc34a"/><circle cx="43" cy="38" r="3.5" fill="#1a2e10"/><circle cx="57" cy="38" r="3.5" fill="#1a2e10"/><circle cx="44" cy="37" r="1.2" fill="#8bc34a"/><circle cx="58" cy="37" r="1.2" fill="#8bc34a"/><path d="M44 46 Q50 50 56 46" stroke="#558b2f" stroke-width="1.5" fill="none"/><path d="M22 52 Q14 46 16 36 Q22 44 22 52Z" fill="#33691e"/><path d="M78 52 Q86 46 84 36 Q78 44 78 52Z" fill="#33691e"/></svg>'},
-  {id:"starforged",name:"Star Forged",color:"#FF6F00",svg:'<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="48" fill="#1a1000"/><ellipse cx="50" cy="88" rx="32" ry="18" fill="#2d1800"/><ellipse cx="50" cy="60" rx="22" ry="24" fill="#e65100"/><circle cx="50" cy="38" r="18" fill="#f0c8a0"/><path d="M28 22 Q50 2 72 22 Q58 8 50 6 Q42 8 28 22Z" fill="#212121"/><path d="M28 22 Q20 18 22 10 Q30 12 28 22Z" fill="#ff8f00"/><path d="M72 22 Q80 18 78 10 Q70 12 72 22Z" fill="#ff8f00"/><circle cx="43" cy="38" r="3.5" fill="#1a1000"/><circle cx="57" cy="38" r="3.5" fill="#1a1000"/><circle cx="44" cy="37" r="1.5" fill="#ffd54f"/><circle cx="58" cy="37" r="1.5" fill="#ffd54f"/><path d="M44 46 Q50 50 56 46" stroke="#e65100" stroke-width="1.5" fill="none"/><polygon points="50,8 52,14 58,14 53,18 55,24 50,20 45,24 47,18 42,14 48,14" fill="#ffd54f"/></svg>'},
-];
-
-// ── AVATAR PICKER ─────────────────────────────────────────────────────────────
-function AvatarPicker({userKey,avatars,setAvatars,onClose,onSkip}){
-  const u=USERS.find(x=>x.key===userKey);
-  const [selected,setSelected]=useState(avatars?.[userKey]||null);
-  const saveAvatars=av=>{setAvatars(av);store.save("fp2:avatars",av);};
-  const confirm=()=>{if(!selected)return;saveAvatars({...avatars,[userKey]:selected});onClose();};
-  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:2500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-    <div style={{background:"#141410",border:`2px solid ${u.color}44`,borderRadius:16,padding:20,maxWidth:540,width:"100%",maxHeight:"92vh",overflowY:"auto"}}>
-      <div style={{textAlign:"center",marginBottom:12}}>
-        <div style={{fontSize:11,color:"#555",fontFamily:"monospace",letterSpacing:"0.2em",marginBottom:4}}>CHOOSE YOUR CHARACTER</div>
-        <div style={{fontSize:18,color:"#e8e0c8"}}>{u.label}</div>
-        {selected&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,margin:"8px 0"}}><div style={{width:64,height:64,borderRadius:"50%",border:`3px solid ${u.color}`,overflow:"hidden"}} dangerouslySetInnerHTML={{__html:selected.svg}}/><div style={{fontSize:12,color:u.color,fontFamily:"monospace"}}>{selected.name}</div></div>}
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:6,marginBottom:14}}>
-        {AVATARS.map(av=><div key={av.id} onClick={()=>setSelected(av)} style={{cursor:"pointer",borderRadius:8,padding:3,border:`2px solid ${selected?.id===av.id?u.color:"transparent"}`,background:selected?.id===av.id?u.color+"22":"transparent",transition:"all 0.15s",textAlign:"center"}}>
-          <div style={{width:"100%",aspectRatio:"1",borderRadius:6,overflow:"hidden"}} dangerouslySetInnerHTML={{__html:av.svg}}/>
-        </div>)}
-      </div>
-      <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
-        {selected&&<button onClick={confirm} style={{background:u.color,border:"none",borderRadius:8,padding:"9px 20px",color:"#fff",fontFamily:"Georgia,serif",fontSize:13,cursor:"pointer",fontWeight:"bold"}}>Use {selected.name}</button>}
-        {onSkip&&<button onClick={onSkip} style={{background:"transparent",border:"1px solid #333",borderRadius:8,padding:"9px 14px",color:"#555",fontFamily:"Georgia,serif",fontSize:12,cursor:"pointer"}}>Skip</button>}
-        <button onClick={onClose} style={{background:"transparent",border:"1px solid #333",borderRadius:8,padding:"9px 14px",color:"#555",fontFamily:"Georgia,serif",fontSize:12,cursor:"pointer"}}>Cancel</button>
-      </div>
-    </div>
-  </div>);
-}
-
 
 function WeatherWidget(){
   const [weather,setWeather]=useState(null),[loading,setLoading]=useState(true);
@@ -260,7 +189,7 @@ function PinnedAnnouncements({messages,S}){
 }
 
 // ── WEEKLY CHORE BOARD — visible on all home screens ─────────────────────────
-function WeeklyChoreBoard({chores,setChores,appSettings,avatars,S}){
+function WeeklyChoreBoard({chores,setChores,appSettings,S}){
   const tn=todayName();
   const todayIdx=DAYS.indexOf(tn);
   const saveChores=u=>{setChores(u);store.save("fp2:chores",u);};
@@ -292,7 +221,7 @@ function WeeklyChoreBoard({chores,setChores,appSettings,avatars,S}){
           return(<tr key={c.id}>
             <td style={{padding:"6px 8px",borderBottom:`1px solid ${S.T.border}`}}>
               <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                <UserAvatar userKey={c.assignee} avatars={avatars||{}} size={28}/>
+                <span style={{fontSize:18}}>{USERS.find(x=>x.key===c.assignee)?.emoji}</span>
                 <div><div style={{fontSize:12,color:S.T.text}}>{c.task}</div><div style={{fontSize:10,color:S.T.sub}}>{u?.label}</div></div>
               </div>
             </td>
@@ -315,7 +244,7 @@ function WeeklyChoreBoard({chores,setChores,appSettings,avatars,S}){
 }
 
 // ── PERSONAL HOME SCREEN (Brad / Mary Beth / Bradyn) ─────────────────────────
-function PersonalHomeScreen({currentUser,mealPlan,bills,chores,setChores,messages,appSettings,avatars,S}){
+function PersonalHomeScreen({currentUser,mealPlan,bills,chores,setChores,messages,appSettings,S}){
   const today=new Date(),tn=todayName();
   const tomorrowName=DAYS[(DAYS.indexOf(tn)+1)%7];
   const u=USERS.find(x=>x.key===currentUser);
@@ -330,7 +259,7 @@ function PersonalHomeScreen({currentUser,mealPlan,bills,chores,setChores,message
   const todayMeals=mealPlan[tn]||{},tomorrowMeals=mealPlan[tomorrowName]||{};
   return(<div style={{padding:"0 0 16px"}}>
     <PinnedAnnouncements messages={messages} S={S}/>
-    <WeeklyChoreBoard chores={chores||[]} setChores={setChores} appSettings={appSettings} avatars={avatars||{}} S={S}/>
+    <WeeklyChoreBoard chores={chores||[]} setChores={setChores} appSettings={appSettings} S={S}/>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:14}}>
       <div style={S.card}>
         <div style={S.h2}>Today and Tomorrow</div>
@@ -370,12 +299,12 @@ function PersonalHomeScreen({currentUser,mealPlan,bills,chores,setChores,message
   </div>);
 }
 
-function UserHeader({user,onLogout,extra,children,S,avatars}){
+function UserHeader({user,onLogout,extra,children,S}){
   const u=USERS.find(x=>x.key===user);
   return(<div style={{background:"linear-gradient(180deg,#1a1a0f,#0d0d08)",borderBottom:`1px solid ${BORDER}`,padding:"12px 16px",position:"sticky",top:0,zIndex:100}}>
     <div style={{maxWidth:1400,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:children?8:0,flexWrap:"wrap",gap:8}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}><UserAvatar userKey={user} avatars={avatars||{}} size={38}/><div><div style={{fontSize:9,color:"#444",fontFamily:"monospace",letterSpacing:"0.2em"}}>FAMILY HUB</div><div style={{fontSize:15,color:"#e8e0c8"}}>{u.label}</div></div></div>
+        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:24}}>{u.emoji}</span><div><div style={{fontSize:9,color:"#444",fontFamily:"monospace",letterSpacing:"0.2em"}}>FAMILY HUB</div><div style={{fontSize:15,color:"#e8e0c8"}}>{u.label}</div></div></div>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>{extra}<button onClick={onLogout} style={{...S.btnGhost,fontSize:12}}>Sign Out</button></div>
       </div>
       {children}
@@ -393,7 +322,7 @@ function ThemePicker({currentTheme,onSelect,S}){
 }
 
 // ── PUBLIC HOME SCREEN ────────────────────────────────────────────────────────
-function PublicHomeScreen({mealPlan,shopList,bills,expenses,onLogin,appSettings,messages,avatars}){
+function PublicHomeScreen({mealPlan,shopList,bills,expenses,onLogin,appSettings,messages}){
   const today=new Date(),tn=todayName();
   const tonightDinner=mealPlan[tn]?.Dinner||"";
   const unchecked=shopList.filter(i=>!i.checked);
@@ -421,7 +350,7 @@ function PublicHomeScreen({mealPlan,shopList,bills,expenses,onLogin,appSettings,
         {dueSoon.length>0&&<div style={S.card}><div style={S.h2}>Due This Week</div>{dueSoon.map(b=>{const dl=Math.ceil((new Date(b.dueDate+"T12:00:00")-today)/(864e5)),paid=b.bradPaid&&b.maryBethPaid;return(<div key={b.id} style={{...S.row,padding:"6px 0",borderBottom:`1px solid #1a1a0f`}}><div><div style={{fontSize:13,color:"#e8e0c8"}}>{b.name}</div><div style={{fontSize:11,color:"#555"}}>{dl===0?"Today":dl===1?"Tomorrow":`${dl} days`}</div></div><div style={{textAlign:"right"}}><div style={{fontFamily:"monospace",color:GOLD,fontSize:12,fontWeight:"bold"}}>{fmt(b.amount/2)} ea</div><div style={{fontSize:10,color:paid?"#4CAF50":"#FF9800"}}>{paid?"Paid":"Pending"}</div></div></div>);})}
         </div>}
       </div>
-      <div style={S.card}><div style={{textAlign:"center",marginBottom:14}}><div style={{fontSize:11,color:"#555",fontFamily:"monospace",letterSpacing:"0.2em"}}>SIGN IN AS</div></div><div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>{USERS.map(u=><button key={u.key} onClick={()=>onLogin(u.key)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"14px 20px",background:`${u.color}12`,border:`2px solid ${u.color}44`,borderRadius:14,cursor:"pointer",color:"#e8e0c8",fontFamily:"Georgia,serif",minWidth:90}}><UserAvatar userKey={u.key} avatars={avatars||{}} size={48}/><span style={{fontSize:13,color:u.color,fontWeight:"bold"}}>{u.label}</span></button>)}</div></div>
+      <div style={S.card}><div style={{textAlign:"center",marginBottom:14}}><div style={{fontSize:11,color:"#555",fontFamily:"monospace",letterSpacing:"0.2em"}}>SIGN IN AS</div></div><div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>{USERS.map(u=><button key={u.key} onClick={()=>onLogin(u.key)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"14px 20px",background:`${u.color}12`,border:`2px solid ${u.color}44`,borderRadius:14,cursor:"pointer",color:"#e8e0c8",fontFamily:"Georgia,serif",minWidth:90}}><span style={{fontSize:32}}>{u.emoji}</span><span style={{fontSize:13,color:u.color,fontWeight:"bold"}}>{u.label}</span></button>)}</div></div>
     </div>
   </div>);
 }
@@ -597,7 +526,7 @@ function KidChoreView({chores,setChores,userKey,userName,userColor,appSettings,S
   </div>);
 }
 // ── MESSAGE BOARD ─────────────────────────────────────────────────────────────
-function MessageBoard({messages,setMessages,currentUser,avatars,S}){
+function MessageBoard({messages,setMessages,currentUser,S}){
   const isParent=currentUser==="brad"||currentUser==="maryBeth";
   const [text,setText]=useState("");
   const save=u=>{setMessages(u);store.save("fp2:messages",u);};
@@ -638,7 +567,7 @@ function MessageBoard({messages,setMessages,currentUser,avatars,S}){
       </div>)}</div>}
       {rest.length===0&&pinned.length===0&&<div style={{textAlign:"center",padding:"24px 0",color:S.T.sub,fontSize:13}}>No announcements yet. Post something!</div>}
       {rest.map(m=><div key={m.id} style={{display:"flex",gap:10,padding:"10px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"flex-start"}}>
-        <div style={{flexShrink:0}}><UserAvatar userKey={m.author} avatars={avatars||{}} size={32}/></div>
+        <div style={{fontSize:22,flexShrink:0}}>{m.authorEmoji}</div>
         <div style={{flex:1}}>
           <div style={{...S.row,marginBottom:2,flexWrap:"wrap",gap:4}}>
             <span style={{fontSize:12,color:S.T.accent,fontWeight:"bold"}}>{m.authorLabel}</span>
@@ -653,7 +582,7 @@ function MessageBoard({messages,setMessages,currentUser,avatars,S}){
 }
 
 // ── SETTINGS TAB ─────────────────────────────────────────────────────────────
-function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings,setShopSettings,payAccounts,setPayAccounts,avatars,setAvatars,setShowAvatarPicker,S,currentUser}){
+function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings,setShopSettings,payAccounts,setPayAccounts,S,currentUser}){
   const [local,setLocal]=useState({...profile});
   const [saved,setSaved]=useState(false);
   const saveProfile=()=>{setProfile(local);store.save("fp2:profile",local);setSaved(true);setTimeout(()=>setSaved(false),2000);};
@@ -667,7 +596,6 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
   const [newMBAcct,setNewMBAcct]=useState("");
   const isParent=currentUser==="brad"||currentUser==="maryBeth";
   return(<div>
-    <div style={S.card}><div style={S.h2}>My Character</div><div style={{display:"flex",gap:14,alignItems:"center"}}><UserAvatar userKey={currentUser} avatars={avatars||{}} size={60}/><div><div style={{fontSize:13,color:S.T.text,marginBottom:6}}>{(avatars||{})[currentUser]?.name||"No character selected yet"}</div><button style={{...S.btn(),padding:"7px 16px",fontSize:12}} onClick={()=>setShowAvatarPicker(true)}>Change Character</button></div></div></div>
     {false&&<div style={S.card}>
       <div style={S.h2}>Profile</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,marginBottom:14}}>
@@ -861,7 +789,8 @@ function BillsTab({bills,setBills,billHistory,setBillHistory,profile,payAccounts
   const sharedTotal=shared.reduce((s,b)=>s+b.amount,0);
   const bradTotal=bradOnly.reduce((s,b)=>s+b.amount,0);
   const mbTotal=mbOnly.reduce((s,b)=>s+b.amount,0);
-  const bradOwes=sharedTotal/2+bradTotal,mbOwes=sharedTotal/2+mbTotal;
+  const bradOwes=shared.filter(b=>!b.bradPaid).reduce((s,b)=>s+b.amount/2,0)+bradOnly.filter(b=>!b.bradPaid).reduce((s,b)=>s+b.amount,0);
+  const mbOwes=shared.filter(b=>!b.maryBethPaid).reduce((s,b)=>s+b.amount/2,0)+mbOnly.filter(b=>!b.maryBethPaid).reduce((s,b)=>s+b.amount,0);
   const bradPaidAmt=shared.filter(b=>b.bradPaid).reduce((s,b)=>s+b.amount/2,0)+bradOnly.filter(b=>b.bradPaid).reduce((s,b)=>s+b.amount,0);
   const mbPaidAmt=shared.filter(b=>b.maryBethPaid).reduce((s,b)=>s+b.amount/2,0)+mbOnly.filter(b=>b.maryBethPaid).reduce((s,b)=>s+b.amount,0);
   return(<>
@@ -1182,7 +1111,134 @@ function DashboardTab({profile,accounts,debts,goals,expenses,transactions,totalA
 }
 
 
-function BradynDashboard({mealPlan,shopList,shopRequests,setShopRequests,mealSuggestions,setMealSuggestions,chores,setChores,messages,setMessages,appSettings,onLogout}){
+// ── BRADYN LEDGER (Brad <-> Bradyn private tracking, not part of shared Expenses) ─
+function BradynLedger({ledger,setLedger,currentUser,S}){
+  const isParent=currentUser==="brad";
+  const [showAdd,setShowAdd]=useState(false);
+  const [form,setForm]=useState({name:"",type:"recurring",defaultAmount:"",paymentsRemaining:"",notes:""});
+  const save=u=>{setLedger(u);store.save("fp2:bradynLedger",u);};
+  const monthKey=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");};
+  const addItem=()=>{
+    if(!form.name||!form.defaultAmount)return;
+    const item={
+      id:Date.now(),
+      name:form.name,
+      type:form.type,
+      defaultAmount:+form.defaultAmount,
+      paymentsRemaining:form.type==="recurring"&&form.paymentsRemaining?+form.paymentsRemaining:null,
+      notes:form.notes,
+      history:[],
+      currentMonthAmount:+form.defaultAmount,
+      currentMonthKey:monthKey(),
+      paid:false,
+    };
+    save([...ledger,item]);
+    setForm({name:"",type:"recurring",defaultAmount:"",paymentsRemaining:"",notes:""});
+    setShowAdd(false);
+  };
+  const del=id=>save(ledger.filter(i=>i.id!==id));
+  const updateAmount=(id,val)=>save(ledger.map(i=>i.id===id?{...i,currentMonthAmount:+val}:i));
+  const markPaid=id=>{
+    save(ledger.map(i=>{
+      if(i.id!==id)return i;
+      const entry={amount:i.currentMonthAmount,date:new Date().toLocaleDateString(),monthKey:i.currentMonthKey};
+      const newRemaining=i.type==="recurring"&&i.paymentsRemaining!=null?Math.max(0,i.paymentsRemaining-1):i.paymentsRemaining;
+      return{...i,paid:true,history:[entry,...(i.history||[])],paymentsRemaining:newRemaining};
+    }));
+  };
+  const resetForNewMonth=id=>{
+    save(ledger.map(i=>i.id===id?{...i,paid:false,currentMonthAmount:i.defaultAmount,currentMonthKey:monthKey()}:i));
+  };
+  // Auto-detect month rollover: if currentMonthKey differs from this month and item was paid, reset it
+  useEffect(()=>{
+    const mk=monthKey();
+    const needsReset=ledger.filter(i=>i.type==="recurring"&&i.currentMonthKey!==mk&&i.paid);
+    if(needsReset.length>0){
+      save(ledger.map(i=>(i.type==="recurring"&&i.currentMonthKey!==mk&&i.paid)?{...i,paid:false,currentMonthAmount:i.defaultAmount,currentMonthKey:mk}:i));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+  const totalOwed=ledger.filter(i=>!i.paid).reduce((s,i)=>s+i.currentMonthAmount,0);
+  const recurring=ledger.filter(i=>i.type==="recurring");
+  const oneTime=ledger.filter(i=>i.type==="oneTime");
+  return(<div>
+    <div style={{...S.alert(totalOwed>0?"#FF9800":"#4CAF50"),marginBottom:14}}>
+      <span style={{color:totalOwed>0?"#FF9800":"#4CAF50",fontWeight:"bold"}}>Bradyn currently owes Brad: {fmt(totalOwed)}</span>
+    </div>
+    {isParent&&<div style={{...S.row,marginBottom:14,flexWrap:"wrap",gap:8}}>
+      <div style={{fontSize:15,color:S.T.accent}}>Bradyn & Brad Ledger</div>
+      <button style={S.btn()} onClick={()=>setShowAdd(!showAdd)}>{showAdd?"Cancel":"Add Item"}</button>
+    </div>}
+    {showAdd&&isParent&&<div style={S.card}>
+      <div style={S.h2}>New Item</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:12}}>
+        <div><div style={S.label}>Name</div><input style={S.input} placeholder="e.g. Car Insurance" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></div>
+        <div><div style={S.label}>Type</div><select style={S.select} value={form.type} onChange={e=>setForm({...form,type:e.target.value})}><option value="recurring">Recurring Monthly</option><option value="oneTime">One-Time</option></select></div>
+        <div><div style={S.label}>{form.type==="recurring"?"Default Monthly Amount":"Amount"}</div><input style={S.input} type="number" placeholder="0.00" value={form.defaultAmount} onChange={e=>setForm({...form,defaultAmount:e.target.value})}/></div>
+        {form.type==="recurring"&&<div><div style={S.label}>Payments Remaining (optional)</div><input style={S.input} type="number" placeholder="e.g. 36" value={form.paymentsRemaining} onChange={e=>setForm({...form,paymentsRemaining:e.target.value})}/></div>}
+        <div><div style={S.label}>Notes</div><input style={S.input} placeholder="Any notes..." value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/></div>
+      </div>
+      <button style={{...S.btn(),padding:"9px 22px"}} onClick={addItem}>Add Item</button>
+    </div>}
+    {ledger.length===0&&<div style={{...S.card,textAlign:"center",padding:40,color:S.T.sub}}>Nothing tracked yet.{isParent?" Click Add Item to start.":""}</div>}
+    {recurring.length>0&&<div style={{marginBottom:14}}>
+      <div style={{fontSize:13,color:S.T.sub,fontFamily:"monospace",letterSpacing:"0.1em",marginBottom:8,borderLeft:`3px solid ${S.T.accent}`,paddingLeft:10}}>RECURRING MONTHLY</div>
+      {recurring.map(item=>(
+        <div key={item.id} style={{...S.card,borderLeft:`4px solid ${item.paid?"#4CAF50":"#FF9800"}`,marginBottom:8}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
+            <div style={{flex:1}}>
+              <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:4,flexWrap:"wrap"}}>
+                <span style={{fontSize:15,color:S.T.text,fontWeight:"bold"}}>{item.name}</span>
+                {item.paid&&<span style={S.tag("#4CAF50")}>PAID THIS MONTH</span>}
+                {item.paymentsRemaining!=null&&<span style={S.tag("#2196F3")}>{item.paymentsRemaining} left</span>}
+              </div>
+              {item.notes&&<div style={{fontSize:12,color:S.T.sub}}>{item.notes}</div>}
+              <div style={{fontSize:11,color:S.T.sub,marginTop:2}}>Default: {fmt(item.defaultAmount)}/mo</div>
+            </div>
+            {isParent&&<button style={S.btnDanger} onClick={()=>del(item.id)}>X</button>}
+          </div>
+          <div style={{display:"flex",gap:8,marginTop:10,paddingTop:10,borderTop:`1px solid ${S.T.border}`,alignItems:"center",flexWrap:"wrap"}}>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <span style={{fontSize:11,color:S.T.sub}}>This month:</span>
+              <input style={{...S.input,width:90,padding:"5px 8px",fontSize:13}} type="number" value={item.currentMonthAmount} onChange={e=>updateAmount(item.id,e.target.value)} disabled={item.paid}/>
+            </div>
+            {!item.paid
+              ?<button style={{...S.btn("#4CAF50"),padding:"7px 16px",fontSize:12}} onClick={()=>markPaid(item.id)}>Mark Paid - {fmt(item.currentMonthAmount)}</button>
+              :<button style={{...S.btnGhost,padding:"7px 12px",fontSize:11}} onClick={()=>resetForNewMonth(item.id)}>Undo / New Month</button>
+            }
+          </div>
+          {item.history&&item.history.length>0&&<div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${S.T.border}`}}>
+            <div style={{fontSize:10,color:S.T.sub,marginBottom:4}}>RECENT PAYMENTS</div>
+            {item.history.slice(0,3).map((h,i)=><div key={i} style={{fontSize:11,color:S.T.sub,display:"flex",justifyContent:"space-between",padding:"2px 0"}}><span>{h.date}</span><span style={{color:"#4CAF50"}}>{fmt(h.amount)}</span></div>)}
+          </div>}
+        </div>
+      ))}
+    </div>}
+    {oneTime.length>0&&<div>
+      <div style={{fontSize:13,color:S.T.sub,fontFamily:"monospace",letterSpacing:"0.1em",marginBottom:8,borderLeft:`3px solid ${S.T.accent}`,paddingLeft:10}}>ONE-TIME ITEMS</div>
+      {oneTime.map(item=>(
+        <div key={item.id} style={{...S.card,borderLeft:`4px solid ${item.paid?"#4CAF50":"#FF9800"}`,marginBottom:8}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+            <div>
+              <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:4,flexWrap:"wrap"}}>
+                <span style={{fontSize:15,color:S.T.text,fontWeight:"bold"}}>{item.name}</span>
+                {item.paid&&<span style={S.tag("#4CAF50")}>PAID</span>}
+              </div>
+              {item.notes&&<div style={{fontSize:12,color:S.T.sub}}>{item.notes}</div>}
+              <div style={{fontSize:13,color:GOLD,fontFamily:"monospace",fontWeight:"bold",marginTop:2}}>{fmt(item.currentMonthAmount)}</div>
+            </div>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              {!item.paid&&<button style={{...S.btn("#4CAF50"),padding:"7px 16px",fontSize:12}} onClick={()=>markPaid(item.id)}>Mark Paid</button>}
+              {isParent&&<button style={S.btnDanger} onClick={()=>del(item.id)}>X</button>}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>}
+  </div>);
+}
+
+function BradynDashboard({mealPlan,shopList,shopRequests,setShopRequests,mealSuggestions,setMealSuggestions,chores,setChores,messages,setMessages,appSettings,bradynLedger,setBradynLedger,onLogout}){
   const [tab,setTab]=useState("home");
   const [showS,setShowS]=useState(false),[showR,setShowR]=useState(false);
   const [sugg,setSugg]=useState({meal:"",dayPreference:"Friday",mealType:"Dinner",notes:""});
@@ -1193,7 +1249,7 @@ function BradynDashboard({mealPlan,shopList,shopRequests,setShopRequests,mealSug
   const sendItem=()=>{if(!item.name)return;saveReqs([...shopRequests,{...item,id:Date.now(),kidName:"Bradyn",item:item.name,status:"pending",date:new Date().toLocaleDateString()}]);setItem({name:"",qty:"",notes:""});setShowR(false);};
   const C={bg:"#090e1a",card:"#0f1628",border:"#1e2d4a",accent:"#00d4ff",text:"#c8d8f0",sub:"#4a6a8a"};
     const bS={page:{background:C.bg,minHeight:"100vh",fontFamily:"Georgia,serif",color:C.text},card:{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:16,marginBottom:12},cardSm:{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:12,marginBottom:8},h2:{fontSize:14,color:C.accent,fontWeight:"normal",borderBottom:`1px solid ${C.border}`,paddingBottom:8,marginBottom:12},btn:(c=C.accent)=>({background:c,border:"none",borderRadius:6,padding:"10px 18px",color:c===C.accent?C.bg:"#fff",fontFamily:"Georgia,serif",fontSize:13,cursor:"pointer",fontWeight:"bold",whiteSpace:"nowrap"}),btnGhost:{background:"transparent",border:`1px solid ${C.border}`,borderRadius:6,padding:"8px 14px",color:C.sub,fontFamily:"Georgia,serif",fontSize:12,cursor:"pointer"},btnDanger:{background:"transparent",border:"1px solid #f4433644",borderRadius:6,padding:"5px 10px",color:"#f44336",fontFamily:"Georgia,serif",fontSize:12,cursor:"pointer"},label:{fontSize:10,color:C.sub,textTransform:"uppercase",letterSpacing:"0.15em",marginBottom:5,fontFamily:"monospace"},input:{background:C.bg,border:`1px solid ${C.border}`,borderRadius:6,padding:"8px 12px",color:C.text,fontFamily:"Georgia,serif",fontSize:13,width:"100%",boxSizing:"border-box",outline:"none"},select:{background:C.bg,border:`1px solid ${C.border}`,borderRadius:6,padding:"8px 12px",color:C.text,fontFamily:"Georgia,serif",fontSize:13,width:"100%",boxSizing:"border-box",outline:"none"},row:{display:"flex",justifyContent:"space-between",alignItems:"center"},tag:co=>({background:co+"22",color:co,border:`1px solid ${co}44`,borderRadius:4,padding:"2px 8px",fontSize:11,fontFamily:"monospace"}),alert:co=>({background:co+"18",border:`1px solid ${co}44`,borderRadius:8,padding:"12px 16px",marginBottom:12}),T:{accent:C.accent,text:C.text,sub:C.sub,border:C.border,bg:C.bg}}
-  const TABS=[{id:"home",label:"Home",icon:"🏠"},{id:"chores",label:"Tasks",icon:"✅"},{id:"board",label:"Board",icon:"📢"}];
+  const TABS=[{id:"home",label:"Home",icon:"🏠"},{id:"chores",label:"Tasks",icon:"✅"},{id:"ledger",label:"Brad & Me",icon:"💵"},{id:"board",label:"Board",icon:"📢"}];
   return(<div style={bS.page}>
     <div style={{background:"rgba(0,0,0,0.3)",borderBottom:`1px solid ${C.border}`,padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
       <div><div style={{fontSize:9,color:C.sub,fontFamily:"monospace",letterSpacing:"0.2em"}}>FAMILY HUB</div><div style={{fontSize:16,color:C.text}}>Bradyn's View</div></div>
@@ -1212,7 +1268,8 @@ function BradynDashboard({mealPlan,shopList,shopRequests,setShopRequests,mealSug
         </div>
       </div>}
       {tab==="chores"&&<KidChoreView chores={chores} setChores={setChores} userKey="bradyn" userName="Bradyn" userColor="#00d4ff" appSettings={appSettings} S={bS}/>}
-      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="bradyn" avatars={{}} S={bS}/>}
+      {tab==="ledger"&&<BradynLedger ledger={bradynLedger||[]} setLedger={setBradynLedger} currentUser="bradyn" S={bS}/>}
+      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="bradyn" S={bS}/>}
     </div>
   </div>);
 }
@@ -1250,7 +1307,7 @@ function ParkerTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMea
         </div>
       </div>}
       {tab==="chores"&&<KidChoreView chores={chores} setChores={setChores} userKey="parker" userName="Parker" userColor="#b44fef" appSettings={appSettings} S={pS}/>}
-      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="parker" avatars={{}} S={pS}/>}
+      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="parker" S={pS}/>}
     </div>
   </div>);
 }
@@ -1282,15 +1339,14 @@ function RyderTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMeal
         {screen==="shop"&&<div style={rS.card}><div style={{fontSize:18,fontWeight:"bold",color:"#fff9f0",textAlign:"center",marginBottom:10}}>What do we need?</div><input autoFocus style={{background:"rgba(255,255,255,0.1)",border:"2px solid rgba(76,223,122,0.5)",borderRadius:10,padding:"12px 14px",color:"#fff",fontSize:16,fontFamily:"Georgia,serif",width:"100%",boxSizing:"border-box",outline:"none",textAlign:"center",marginBottom:10}} placeholder="Type what you want!" value={shopIn} onChange={e=>setShopIn(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")sendShop();}}/>{bigBtn("Add it!","linear-gradient(135deg,#4cdf7a,#22aa55)","#0d1f0d",sendShop)}<button onClick={()=>setScreen("home")} style={{width:"100%",padding:"8px",background:"transparent",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,color:"#887766",fontSize:12,cursor:"pointer",fontFamily:"Georgia,serif"}}>Go back</button></div>}
       </>}
       {tab==="chores"&&<KidChoreView chores={chores} setChores={setChores} userKey="ryder" userName="Ryder" userColor="#ff6b35" appSettings={appSettings} S={rS}/>}
-      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="ryder" avatars={{}} S={rS}/>}
+      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="ryder" S={rS}/>}
     </div>
   </div>);
 }
 
 // ── BRAD DASHBOARD ────────────────────────────────────────────────────────────
 function BradDashboard(props){
-  const [showAvatarPicker,setShowAvatarPicker]=useState(false);
-  const {onLogout,auth,setAuth,netWorth,accounts,setAccounts,debts,setDebts,expenses,setExpenses,goals,setGoals,transactions,setTransactions,pslf,setPslf,scenario,setScenario,reviewTxns,setReviewTxns,uploadLoading,handleUpload,confirmTxns,fileRef,saveAll,profile,setProfile,mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,totalAssets,totalDebtAmt,totalCC,combinedLiquid,cushion,dti,mortgageRate,monthlyMortgage,loanAmt,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,avatars,setAvatars}=props;
+  const {onLogout,auth,setAuth,netWorth,accounts,setAccounts,debts,setDebts,expenses,setExpenses,goals,setGoals,transactions,setTransactions,pslf,setPslf,scenario,setScenario,reviewTxns,setReviewTxns,uploadLoading,handleUpload,confirmTxns,fileRef,saveAll,profile,setProfile,mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,totalAssets,totalDebtAmt,totalCC,combinedLiquid,cushion,dti,mortgageRate,monthlyMortgage,loanAmt,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger}=props;
   const [tab,setTab]=useState("home");
   const [userTheme,setUserTheme]=useState(appSettings?.userThemes?.brad||"dark");
   const S=makeS(userTheme);
@@ -1299,13 +1355,12 @@ function BradDashboard(props){
   const msgPending=(messages||[]).filter(m=>!m.approved).length;
   const GROUPS=[
     {g:"Home",tabs:[{id:"home",label:"Home",icon:"🏠"}]},
-    {g:"Family",tabs:[{id:"meals",label:"Meals & Food",icon:"🍽"},{id:"chores",label:"Tasks",icon:"✅"},{id:"board",label:"Board",icon:"📢"},{id:"bills",label:"Expenses",icon:"🧾"}]},
+    {g:"Family",tabs:[{id:"meals",label:"Meals & Food",icon:"🍽"},{id:"chores",label:"Tasks",icon:"✅"},{id:"board",label:"Board",icon:"📢"},{id:"bills",label:"Expenses",icon:"🧾"},{id:"bradynledger",label:"Bradyn & Me",icon:"💵"}]},
     {g:"Finance",tabs:[{id:"dashboard",label:"Dashboard",icon:"◈"},{id:"accounts",label:"Accounts",icon:"🏦"},{id:"debts",label:"Debts",icon:"💳"},{id:"budget",label:"Budget",icon:"📊"},{id:"goals",label:"Goals",icon:"🎯"},{id:"statements",label:"Statements",icon:"📄"},{id:"scenarios",label:"Scenarios",icon:"⚗"},{id:"pslf",label:"PSLF",icon:"🎓"}]},
     {g:"Settings",tabs:[{id:"settings",label:"Settings",icon:"⚙️"},{id:"admin",label:"Admin",icon:"🔐"}]},
   ];
   return(<div style={S.page}>
-    {showAvatarPicker&&<AvatarPicker userKey="brad" avatars={avatars} setAvatars={setAvatars} onClose={()=>setShowAvatarPicker(false)} onSkip={()=>setShowAvatarPicker(false)}/>}
-    <UserHeader user="brad" onLogout={onLogout} S={S} avatars={avatars} extra={<div style={{fontSize:13,color:S.T.accent,fontFamily:"monospace"}}>{fmt(netWorth)} net worth</div>}>
+    <UserHeader user="brad" onLogout={onLogout} S={S} extra={<div style={{fontSize:13,color:S.T.accent,fontFamily:"monospace"}}>{fmt(netWorth)} net worth</div>}>
       <div style={{display:"flex",gap:0,overflowX:"auto",alignItems:"center",marginBottom:4}}>
         {GROUPS.map((group,gi)=><div key={group.g} style={{display:"flex",alignItems:"center"}}>
           {gi>0&&<div style={{width:1,height:18,background:S.T.border,margin:"0 6px",flexShrink:0}}/>}
@@ -1321,11 +1376,12 @@ function BradDashboard(props){
     </UserHeader>
     <div style={{maxWidth:1400,margin:"0 auto",padding:"16px 16px"}}>
       {tab!=="home"&&bills&&<BillsBanner bills={bills} S={S}/> }
-      {tab==="home"&&<PersonalHomeScreen currentUser="brad" mealPlan={mealPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} avatars={avatars||{}} S={S}/> }
+      {tab==="home"&&<PersonalHomeScreen currentUser="brad" mealPlan={mealPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} S={S}/> }
       {tab==="meals"&&<MealsTab mealPlan={mealPlan} setMealPlan={setMealPlan} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} shopSettings={shopSettings} profile={profile} S={S}/>}
       {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} appSettings={appSettings} S={S} currentUser="brad"/>}
-      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="brad" avatars={avatars||{}} S={S}/>}
+      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="brad" S={S}/>}
       {tab==="bills"&&<BillsTab bills={bills} setBills={setBills} billHistory={billHistory} setBillHistory={setBillHistory} profile={profile} payAccounts={payAccounts} S={S}/>}
+      {tab==="bradynledger"&&<BradynLedger ledger={bradynLedger||[]} setLedger={setBradynLedger} currentUser="brad" S={S}/>}
       {tab==="dashboard"&&<DashboardTab profile={profile} accounts={accounts} debts={debts} goals={goals} expenses={expenses} transactions={transactions} totalAssets={totalAssets} totalDebtAmt={totalDebtAmt} netWorth={netWorth} combinedLiquid={combinedLiquid} totalCC={totalCC} cushion={cushion} dti={dti} mortgageRate={mortgageRate} monthlyMortgage={monthlyMortgage} loanAmt={loanAmt} surplus={surplus} takeHome={takeHome} totalExpenses={totalExpenses} slPayment={slPayment} downNeeded={downNeeded} closing={closing} homePrice={homePrice} setTab={setTab} bills={bills} mealPlan={mealPlan} mealSuggestions={mealSuggestions} shopRequests={shopRequests} S={S}/>}
       {tab==="accounts"&&<AccountsTab accounts={accounts} setAccounts={setAccounts} profile={profile} S={S}/>}
       {tab==="debts"&&<DebtsTab debts={debts} setDebts={setDebts} profile={profile} S={S}/>}
@@ -1334,15 +1390,14 @@ function BradDashboard(props){
       {tab==="statements"&&<StatementsTab transactions={transactions} setTransactions={setTransactions} handleUpload={handleUpload} uploadLoading={uploadLoading} reviewTxns={reviewTxns} setReviewTxns={setReviewTxns} confirmTxns={confirmTxns} fileRef={fileRef} S={S}/>}
       {tab==="scenarios"&&<ScenariosTab scenario={scenario} setScenario={setScenario} debts={debts} profile={profile} combinedLiquid={combinedLiquid} totalCC={totalCC} surplus={surplus} mortgageRate={mortgageRate} loanAmt={loanAmt} homePrice={homePrice} slPayment={slPayment} S={S}/>}
       {tab==="pslf"&&<PslfTab pslf={pslf} setPslf={setPslf} debts={debts} S={S}/>}
-      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} shopSettings={shopSettings} setShopSettings={setShopSettings} payAccounts={payAccounts} setPayAccounts={setPayAccounts} avatars={avatars} setAvatars={setAvatars} setShowAvatarPicker={setShowAvatarPicker} S={S} currentUser="brad"/>}
+      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} shopSettings={shopSettings} setShopSettings={setShopSettings} payAccounts={payAccounts} setPayAccounts={setPayAccounts} S={S} currentUser="brad"/>}
       {tab==="admin"&&<AdminPanel auth={auth} setAuth={setAuth} S={S}/>}
     </div>
   </div>);
 }
 
 // ── MARY BETH DASHBOARD ───────────────────────────────────────────────────────
-function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,profile,setProfile,expenses,debts,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,avatars,setAvatars,onLogout}){
-  const [showAvatarPicker,setShowAvatarPicker]=useState(false);
+function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,profile,setProfile,expenses,debts,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,onLogout}){
   const [tab,setTab]=useState("home");
   const [userTheme,setUserTheme]=useState(appSettings?.userThemes?.maryBeth||"dark");
   const S=makeS(userTheme);
@@ -1351,8 +1406,7 @@ function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,s
   const msgPending=(messages||[]).filter(m=>!m.approved).length;
   const TABS=[{id:"home",label:"Home",icon:"🏠"},{id:"meals",label:"Meals & Food",icon:"🍽"},{id:"chores",label:"Tasks",icon:"✅"},{id:"board",label:"Board",icon:"📢"},{id:"bills",label:"Expenses",icon:"🧾"},{id:"settings",label:"Settings",icon:"⚙️"}];
   return(<div style={S.page}>
-    {showAvatarPicker&&<AvatarPicker userKey="maryBeth" avatars={avatars} setAvatars={setAvatars} onClose={()=>setShowAvatarPicker(false)} onSkip={()=>setShowAvatarPicker(false)}/>}
-    <UserHeader user="maryBeth" onLogout={onLogout} S={S} avatars={avatars}>
+    <UserHeader user="maryBeth" onLogout={onLogout} S={S}>
       <div style={{display:"flex",gap:0,overflowX:"auto",marginBottom:4}}>
         {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{padding:"7px 11px",cursor:"pointer",fontSize:11,background:"none",border:"none",borderBottom:tab===t.id?`2px solid ${S.T.accent}`:"2px solid transparent",color:tab===t.id?S.T.accent:S.T.sub,fontFamily:"Georgia,serif",whiteSpace:"nowrap",position:"relative"}}>
           {t.icon} {t.label}
@@ -1364,12 +1418,12 @@ function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,s
     </UserHeader>
     <div style={{maxWidth:1300,margin:"0 auto",padding:"16px 16px"}}>
       {tab!=="home"&&bills&&<BillsBanner bills={bills} S={S}/> }
-      {tab==="home"&&<PersonalHomeScreen currentUser="maryBeth" mealPlan={mealPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} avatars={avatars||{}} S={S}/> }
+      {tab==="home"&&<PersonalHomeScreen currentUser="maryBeth" mealPlan={mealPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} S={S}/> }
       {tab==="meals"&&<MealsTab mealPlan={mealPlan} setMealPlan={setMealPlan} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} shopSettings={shopSettings} profile={profile} S={S}/>}
       {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} appSettings={appSettings} S={S} currentUser="maryBeth"/>}
-      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="maryBeth" avatars={avatars||{}} S={S}/>}
+      {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="maryBeth" S={S}/>}
       {tab==="bills"&&<BillsTab bills={bills} setBills={setBills} billHistory={billHistory} setBillHistory={setBillHistory} profile={profile} payAccounts={payAccounts} S={S}/>}
-      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} shopSettings={shopSettings} setShopSettings={setShopSettings} payAccounts={payAccounts} setPayAccounts={setPayAccounts} avatars={avatars} setAvatars={setAvatars} setShowAvatarPicker={setShowAvatarPicker} S={S} currentUser="maryBeth"/>}
+      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} shopSettings={shopSettings} setShopSettings={setShopSettings} payAccounts={payAccounts} setPayAccounts={setPayAccounts} S={S} currentUser="maryBeth"/>}
     </div>
   </div>);
 }
@@ -1396,9 +1450,8 @@ export default function App(){
   const [appSettings,setAppSettings]=useState(D.appSettings);
   const [shopSettings,setShopSettings]=useState(D.shopSettings);
   const [payAccounts,setPayAccounts]=useState(D.payAccounts);
-  const [avatars,setAvatars]=useState(D.avatars);
   const [currentUser,setCurrentUser]=useState(null);
-  const [showAvatarPicker,setShowAvatarPicker]=useState(false);
+  const [bradynLedger,setBradynLedger]=useState([]);
   const [loginTarget,setLoginTarget]=useState(null);
   const [loaded,setLoaded]=useState(false);
   const [scenario,setScenario]=useState({extraPayment:500,incomeBoost:0,downPct:20,extraSavings:0});
@@ -1410,7 +1463,7 @@ export default function App(){
 
   useEffect(()=>{
     (async()=>{
-      const [p,a,d,e,g,t,ps,bl,mp,sl,ms,sr,au,ch,mg,bh,as,md,ss,pa,av]=await Promise.all([
+      const [p,a,d,e,g,t,ps,bl,mp,sl,ms,sr,au,ch,mg,bh,as,md,ss,pa,bn]=await Promise.all([
         store.load("fp2:profile",D.profile),store.load("fp2:accounts",D.accounts),
         store.load("fp2:debts",D.debts),store.load("fp2:expenses",D.expenses),
         store.load("fp2:goals",D.goals),store.load("fp2:transactions",D.transactions),
@@ -1421,7 +1474,7 @@ export default function App(){
         store.load("fp2:messages",D.messages),store.load("fp2:billHistory",D.billHistory),
         store.load("fp2:appSettings",D.appSettings),store.load("fp2:mealDetails",{}),
         store.load("fp2:shopSettings",D.shopSettings),store.load("fp2:payAccounts",D.payAccounts),
-        store.load("fp2:avatars",D.avatars),
+        store.load("fp2:bradynLedger",[]),
       ]);
       setProfile(p);setAccounts(a);setDebts(d);setExpenses(e);setGoals(g);setTransactions(t);setPslf(ps);
       setBills(bl);setBillHistory(bh||[]);
@@ -1432,7 +1485,7 @@ export default function App(){
       setAppSettings({...D.appSettings,...(as||{})});
       setShopSettings({...D.shopSettings,...(ss||{})});
       setPayAccounts({...D.payAccounts,...(pa||{})});
-      setAvatars(av||{});
+      setBradynLedger(bn||[]);
       setLoaded(true);
     })();
   },[]);
@@ -1485,20 +1538,19 @@ export default function App(){
   const confirmTxns=sel=>{const upd=[...transactions,...sel.map(t=>({...t,confirmed:true}))].slice(-500);setTransactions(upd);store.save("fp2:transactions",upd);setReviewTxns(null);};
 
   const handleLogin=userKey=>setLoginTarget(userKey);
-  const handleLoginSuccess=(userKey,newPwd)=>{if(newPwd){const upd={...auth,[userKey]:newPwd};setAuth(upd);store.save("fp2:auth",upd);}setCurrentUser(userKey);setLoginTarget(null);lastActivity.current=Date.now();if(!avatars[userKey])setShowAvatarPicker(true);};
+  const handleLoginSuccess=(userKey,newPwd)=>{if(newPwd){const upd={...auth,[userKey]:newPwd};setAuth(upd);store.save("fp2:auth",upd);}setCurrentUser(userKey);setLoginTarget(null);lastActivity.current=Date.now();};
   const handleLogout=()=>setCurrentUser(null);
 
   if(!loaded)return <div style={{...S.page,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:GOLD}}>Loading Family Hub...</div>;
 
-  const sharedProps={mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,profile,setProfile,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,avatars,setAvatars};
+  const sharedProps={mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,profile,setProfile,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger};
 
   return(<div style={S.page}>
-    {showAvatarPicker&&currentUser&&<AvatarPicker userKey={currentUser} avatars={avatars} setAvatars={setAvatars} onClose={()=>setShowAvatarPicker(false)} onSkip={()=>setShowAvatarPicker(false)}/>}
-    {loginTarget&&<LoginModal user={loginTarget} auth={auth} avatars={avatars} onSuccess={pwd=>handleLoginSuccess(loginTarget,pwd)} onClose={()=>setLoginTarget(null)}/>}
+    {loginTarget&&<LoginModal user={loginTarget} auth={auth} onSuccess={pwd=>handleLoginSuccess(loginTarget,pwd)} onClose={()=>setLoginTarget(null)}/>}
     {!currentUser&&<PublicHomeScreen mealPlan={mealPlan} shopList={shopList} bills={bills} expenses={expenses} onLogin={handleLogin} appSettings={appSettings} messages={messages}/>}
     {currentUser==="brad"&&<BradDashboard {...sharedProps} accounts={accounts} setAccounts={setAccounts} debts={debts} setDebts={setDebts} expenses={expenses} setExpenses={setExpenses} goals={goals} setGoals={setGoals} transactions={transactions} setTransactions={setTransactions} pslf={pslf} setPslf={setPslf} scenario={scenario} setScenario={setScenario} reviewTxns={reviewTxns} setReviewTxns={setReviewTxns} uploadLoading={uploadLoading} handleUpload={handleUpload} confirmTxns={confirmTxns} fileRef={fileRef} saveAll={saveAll} auth={auth} setAuth={setAuth} totalAssets={totalAssets} totalDebtAmt={totalDebtAmt} netWorth={netWorth} totalCC={totalCC} combinedLiquid={combinedLiquid} cushion={cushion} dti={dti} mortgageRate={mortgageRate} monthlyMortgage={monthlyMortgage} loanAmt={loanAmt} surplus={surplus} takeHome={takeHome} totalExpenses={totalExpenses} slPayment={slPayment} downNeeded={downNeeded} closing={closing} homePrice={homePrice} onLogout={handleLogout}/>}
     {currentUser==="maryBeth"&&<MaryBethDashboard {...sharedProps} expenses={expenses} debts={debts} onLogout={handleLogout} setChores={setChores}/>}
-    {currentUser==="bradyn"&&<BradynDashboard mealPlan={mealPlan} shopList={shopList} shopRequests={shopRequests} setShopRequests={setShopRequests} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} chores={chores} setChores={setChores} messages={messages} setMessages={setMessages} appSettings={appSettings} onLogout={handleLogout}/>}
+    {currentUser==="bradyn"&&<BradynDashboard mealPlan={mealPlan} shopList={shopList} shopRequests={shopRequests} setShopRequests={setShopRequests} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} chores={chores} setChores={setChores} messages={messages} setMessages={setMessages} appSettings={appSettings} bradynLedger={bradynLedger} setBradynLedger={setBradynLedger} onLogout={handleLogout}/>}
     {currentUser==="parker"&&<ParkerTab mealPlan={mealPlan} shopRequests={shopRequests} setShopRequests={setShopRequests} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} chores={chores} setChores={setChores} messages={messages} setMessages={setMessages} appSettings={appSettings} onLogout={handleLogout}/>}
     {currentUser==="ryder"&&<RyderTab mealPlan={mealPlan} shopRequests={shopRequests} setShopRequests={setShopRequests} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} chores={chores} setChores={setChores} messages={messages} setMessages={setMessages} appSettings={appSettings} onLogout={handleLogout}/>}
   </div>);
