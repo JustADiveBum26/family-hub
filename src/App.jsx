@@ -1557,15 +1557,38 @@ function ParkerTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMea
       <div style={{display:"flex",gap:6,alignItems:"center"}}>{TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{...pBtnG,color:tab===t.id?"#b44fef":"#7a6aaa",borderColor:tab===t.id?"rgba(180,79,239,0.6)":"rgba(180,79,239,0.2)"}}>{t.label}</button>)}<button onClick={onLogout} style={pBtnG}>Sign Out ↩</button></div>
     </div>
     <div style={{maxWidth:800,margin:"0 auto",padding:16}}>
-      {tab==="home"&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:14}}>
-        <div>
-          <div style={pS.card}><div style={pS.h2}>This Week's Meals</div><div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>{DAYS.map(d=>{const isToday=d===todayName;return(<div key={d} style={{textAlign:"center",padding:"6px 2px",borderRadius:7,background:isToday?"rgba(180,79,239,0.2)":"rgba(255,255,255,0.03)",border:`1px solid ${isToday?"rgba(180,79,239,0.5)":"rgba(255,255,255,0.05)"}`}}><div style={{fontSize:8,color:isToday?"#b44fef":"#7a6aaa",fontFamily:"monospace",marginBottom:2}}>{d.slice(0,2).toUpperCase()}</div>{MEAL_TYPES.map(mt=>mealPlan[d]?.[mt]&&<div key={mt} style={{fontSize:9,color:"#e8e0ff",lineHeight:"1.2"}}>{mealPlan[d][mt]}</div>)}{!mealPlan[d]?.Breakfast&&!mealPlan[d]?.Lunch&&!mealPlan[d]?.Dinner&&<div style={{fontSize:9,color:"#3a2a5a"}}>?</div>}</div>);})}</div></div>
+      {tab==="home"&&<div>
+        <div style={pS.card}>
+          <div style={pS.h2}>🍽 This Week's Meals</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {DAYS.map(d=>{
+              const isToday=d===todayName;
+              const m=mealPlan[d]||{};
+              const hasMeal=m.Breakfast||m.Lunch||m.Dinner;
+              return(<div key={d} style={{borderRadius:12,padding:"14px 18px",background:isToday?"rgba(180,79,239,0.18)":"rgba(255,255,255,0.04)",border:`2px solid ${isToday?"rgba(180,79,239,0.7)":"rgba(180,79,239,0.12)"}`,display:"flex",gap:16,alignItems:"flex-start"}}>
+                <div style={{minWidth:44,textAlign:"center"}}>
+                  <div style={{fontSize:11,color:isToday?"#b44fef":"#5a4a7a",fontFamily:"monospace",letterSpacing:"0.15em",fontWeight:"bold"}}>{d.slice(0,3).toUpperCase()}</div>
+                  {isToday&&<div style={{fontSize:10,color:"#b44fef",marginTop:2}}>TODAY</div>}
+                </div>
+                <div style={{flex:1}}>
+                  {hasMeal
+                    ?MEAL_TYPES.map(mt=>m[mt]&&<div key={mt} style={{display:"flex",gap:10,marginBottom:4,alignItems:"center"}}>
+                        <span style={{fontSize:18}}>{mt==="Breakfast"?"🌅":mt==="Lunch"?"☀️":"🌙"}</span>
+                        <span style={{fontSize:17,color:"#e8e0ff",fontWeight:isToday?"bold":"normal"}}>{m[mt]}</span>
+                      </div>)
+                    :<div style={{fontSize:15,color:"#3a2a5a",fontStyle:"italic"}}>Nothing planned yet</div>
+                  }
+                </div>
+              </div>);
+            })}
+          </div>
         </div>
-        <div>
-          {!showS&&!showR&&<><button style={pBtn} onClick={()=>setShowS(true)}>Suggest a Meal!</button><button style={{...pBtn,background:"linear-gradient(135deg,#3ef0d4,#0ab8a0)",color:"#0d1a2e"}} onClick={()=>setShowR(true)}>Request Something!</button></>}
-          {showS&&<div style={pS.card}><div style={pS.h2}>What should we eat?</div><input style={pInp} placeholder="e.g. Tacos, Pizza..." value={sugg.meal} onChange={e=>setSugg({...sugg,meal:e.target.value})}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:6}}><select style={{...pInp,marginBottom:0}} value={sugg.dayPreference} onChange={e=>setSugg({...sugg,dayPreference:e.target.value})}>{DAYS.map(d=><option key={d}>{d}</option>)}</select><select style={{...pInp,marginBottom:0}} value={sugg.mealType} onChange={e=>setSugg({...sugg,mealType:e.target.value})}>{MEAL_TYPES.map(m=><option key={m}>{m}</option>)}</select></div><input style={pInp} placeholder="Why? 😄" value={sugg.notes} onChange={e=>setSugg({...sugg,notes:e.target.value})}/><div style={{display:"flex",gap:6}}><button style={{...pBtn,marginBottom:0,flex:1}} onClick={sendSugg}>Send it!</button><button style={{...pBtnG,flex:1}} onClick={()=>setShowS(false)}>Cancel</button></div></div>}
-          {showR&&<div style={pS.card}><div style={pS.h2}>What do we need?</div><input style={pInp} placeholder="What do you want?" value={item.name} onChange={e=>setItem({...item,name:e.target.value})}/><input style={pInp} placeholder="How many?" value={item.qty} onChange={e=>setItem({...item,qty:e.target.value})}/><div style={{display:"flex",gap:6}}><button style={{...pBtn,marginBottom:0,flex:1,background:"linear-gradient(135deg,#3ef0d4,#0ab8a0)",color:"#0d1a2e"}} onClick={sendItem}>Add it!</button><button style={{...pBtnG,flex:1}} onClick={()=>setShowR(false)}>Cancel</button></div></div>}
-        </div>
+        {!showS&&!showR&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <button style={pBtn} onClick={()=>setShowS(true)}>🍕 Suggest a Meal!</button>
+          <button style={{...pBtn,background:"linear-gradient(135deg,#3ef0d4,#0ab8a0)",color:"#0d1a2e"}} onClick={()=>setShowR(true)}>🛒 Request Something!</button>
+        </div>}
+        {showS&&<div style={pS.card}><div style={pS.h2}>What should we eat?</div><input style={pInp} placeholder="e.g. Tacos, Pizza..." value={sugg.meal} onChange={e=>setSugg({...sugg,meal:e.target.value})}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}><select style={{...pInp,marginBottom:0}} value={sugg.dayPreference} onChange={e=>setSugg({...sugg,dayPreference:e.target.value})}>{DAYS.map(d=><option key={d}>{d}</option>)}</select><select style={{...pInp,marginBottom:0}} value={sugg.mealType} onChange={e=>setSugg({...sugg,mealType:e.target.value})}>{MEAL_TYPES.map(m=><option key={m}>{m}</option>)}</select></div><input style={pInp} placeholder="Why? 😄" value={sugg.notes} onChange={e=>setSugg({...sugg,notes:e.target.value})}/><div style={{display:"flex",gap:8}}><button style={{...pBtn,marginBottom:0,flex:1}} onClick={sendSugg}>Send it! 🚀</button><button style={{...pBtnG,flex:1}} onClick={()=>setShowS(false)}>Cancel</button></div></div>}
+        {showR&&<div style={pS.card}><div style={pS.h2}>What do we need?</div><input style={pInp} placeholder="What do you want?" value={item.name} onChange={e=>setItem({...item,name:e.target.value})}/><input style={pInp} placeholder="How many?" value={item.qty} onChange={e=>setItem({...item,qty:e.target.value})}/><div style={{display:"flex",gap:8}}><button style={{...pBtn,marginBottom:0,flex:1,background:"linear-gradient(135deg,#3ef0d4,#0ab8a0)",color:"#0d1a2e"}} onClick={sendItem}>Add it! ✅</button><button style={{...pBtnG,flex:1}} onClick={()=>setShowR(false)}>Cancel</button></div></div>}
       </div>}
       {tab==="chores"&&<KidChoreView chores={chores} setChores={setChores} userKey="parker" userName="Parker" userColor="#b44fef" appSettings={appSettings} S={pS}/>}
       {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="parker" S={pS}/>}
@@ -1587,16 +1610,40 @@ function RyderTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMeal
   return(<div style={rS.page}>
     <div style={{background:"rgba(0,0,0,0.3)",borderBottom:"1px solid rgba(255,107,53,0.2)",padding:"10px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
       <div style={{fontSize:15,color:"#ff6b35",fontWeight:"bold"}}>Ryder's Hub</div>
-      <div style={{display:"flex",gap:6,alignItems:"center"}}>{TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{background:"transparent",border:`1px solid ${tab===t.id?"rgba(255,107,53,0.6)":"rgba(255,107,53,0.2)"}`,borderRadius:6,padding:"5px 10px",color:tab===t.id?"#ff6b35":"#887766",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:12}}>{t.label}</button>)}<button onClick={onLogout} style={{background:"transparent",border:"1px solid rgba(255,107,53,0.2)",borderRadius:6,padding:"5px 10px",color:"#887766",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:12}}>Sign Out ↩</button></div>
+      <div style={{display:"flex",gap:6,alignItems:"center"}}>{TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{background:"transparent",border:`1px solid ${tab===t.id?"rgba(255,107,53,0.6)":"rgba(255,107,53,0.2)"}`,borderRadius:6,padding:"8px 14px",color:tab===t.id?"#ff6b35":"#887766",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:15}}>{t.label}</button>)}<button onClick={onLogout} style={{background:"transparent",border:"1px solid rgba(255,107,53,0.2)",borderRadius:6,padding:"8px 14px",color:"#887766",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:15}}>Sign Out ↩</button></div>
     </div>
-    <div style={{maxWidth:480,margin:"0 auto",padding:16}}>
+    <div style={{maxWidth:800,margin:"0 auto",padding:16}}>
       {tab==="home"&&<>
         {flash&&<div style={{textAlign:"center",padding:"14px 0",marginBottom:10}}><div style={{fontSize:48,marginBottom:4}}>{flash==="meal"?"🎉":"✅"}</div><div style={{fontSize:18,color:flash==="meal"?"#ff6b35":"#4cdf7a",fontWeight:"bold"}}>{flash==="meal"?"Sent to Mom & Dad!":"Added to the list!"}</div></div>}
         <div style={{textAlign:"center",marginBottom:16}}><div style={{fontSize:44,marginBottom:2}}>🌟</div><div style={{fontSize:30,fontWeight:"bold",color:"#ff6b35"}}>Hey Ryder!</div></div>
-        <div style={{...rS.card,textAlign:"center",marginBottom:14}}><div style={{fontSize:10,color:"#ff6b35",fontFamily:"monospace",letterSpacing:"0.2em",marginBottom:4}}>TONIGHT</div><div style={{fontSize:24,color:tonightDinner?"#fff9f0":"#665544",fontWeight:"bold"}}>{tonightDinner||"Not planned yet!"}</div></div>
-        {screen==="home"&&<>{bigBtn("I want this for dinner!","linear-gradient(135deg,#ff6b35,#cc4411)","#fff",()=>setScreen("meal"))}{bigBtn("Can we get something?","linear-gradient(135deg,#4cdf7a,#22aa55)","#0d1f0d",()=>setScreen("shop"))}</>}
-        {screen==="meal"&&<div style={rS.card}><div style={{fontSize:18,fontWeight:"bold",color:"#fff9f0",textAlign:"center",marginBottom:10}}>What do you want?</div><input autoFocus style={{background:"rgba(255,255,255,0.1)",border:"2px solid rgba(255,107,53,0.5)",borderRadius:10,padding:"12px 14px",color:"#fff",fontSize:16,fontFamily:"Georgia,serif",width:"100%",boxSizing:"border-box",outline:"none",textAlign:"center",marginBottom:10}} placeholder="Type it here!" value={mealIn} onChange={e=>setMealIn(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")sendMeal();}}/>{bigBtn("Send it!","linear-gradient(135deg,#ff6b35,#cc4411)","#fff",sendMeal)}<button onClick={()=>setScreen("home")} style={{width:"100%",padding:"8px",background:"transparent",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,color:"#887766",fontSize:12,cursor:"pointer",fontFamily:"Georgia,serif"}}>Go back</button></div>}
-        {screen==="shop"&&<div style={rS.card}><div style={{fontSize:18,fontWeight:"bold",color:"#fff9f0",textAlign:"center",marginBottom:10}}>What do we need?</div><input autoFocus style={{background:"rgba(255,255,255,0.1)",border:"2px solid rgba(76,223,122,0.5)",borderRadius:10,padding:"12px 14px",color:"#fff",fontSize:16,fontFamily:"Georgia,serif",width:"100%",boxSizing:"border-box",outline:"none",textAlign:"center",marginBottom:10}} placeholder="Type what you want!" value={shopIn} onChange={e=>setShopIn(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")sendShop();}}/>{bigBtn("Add it!","linear-gradient(135deg,#4cdf7a,#22aa55)","#0d1f0d",sendShop)}<button onClick={()=>setScreen("home")} style={{width:"100%",padding:"8px",background:"transparent",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,color:"#887766",fontSize:12,cursor:"pointer",fontFamily:"Georgia,serif"}}>Go back</button></div>}
+        <div style={rS.card}>
+          <div style={rS.h2}>🍽 This Week's Meals</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {DAYS.map(d=>{
+              const isToday=d===todayName;
+              const m=mealPlan[d]||{};
+              const hasMeal=m.Breakfast||m.Lunch||m.Dinner;
+              return(<div key={d} style={{borderRadius:12,padding:"14px 18px",background:isToday?"rgba(255,107,53,0.18)":"rgba(255,255,255,0.04)",border:`2px solid ${isToday?"rgba(255,107,53,0.7)":"rgba(255,107,53,0.12)"}`,display:"flex",gap:16,alignItems:"flex-start"}}>
+                <div style={{minWidth:44,textAlign:"center"}}>
+                  <div style={{fontSize:11,color:isToday?"#ff6b35":"#665544",fontFamily:"monospace",letterSpacing:"0.15em",fontWeight:"bold"}}>{d.slice(0,3).toUpperCase()}</div>
+                  {isToday&&<div style={{fontSize:10,color:"#ff6b35",marginTop:2}}>TODAY</div>}
+                </div>
+                <div style={{flex:1}}>
+                  {hasMeal
+                    ?MEAL_TYPES.map(mt=>m[mt]&&<div key={mt} style={{display:"flex",gap:10,marginBottom:4,alignItems:"center"}}>
+                        <span style={{fontSize:18}}>{mt==="Breakfast"?"🌅":mt==="Lunch"?"☀️":"🌙"}</span>
+                        <span style={{fontSize:17,color:"#fff9f0",fontWeight:isToday?"bold":"normal"}}>{m[mt]}</span>
+                      </div>)
+                    :<div style={{fontSize:15,color:"#443322",fontStyle:"italic"}}>Nothing planned yet</div>
+                  }
+                </div>
+              </div>);
+            })}
+          </div>
+        </div>
+        {screen==="home"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>{bigBtn("🍕 I want this for dinner!","linear-gradient(135deg,#ff6b35,#cc4411)","#fff",()=>setScreen("meal"))}{bigBtn("🛒 Can we get something?","linear-gradient(135deg,#4cdf7a,#22aa55)","#0d1f0d",()=>setScreen("shop"))}</div>}
+        {screen==="meal"&&<div style={rS.card}><div style={{fontSize:18,fontWeight:"bold",color:"#fff9f0",textAlign:"center",marginBottom:10}}>What do you want?</div><input autoFocus style={{background:"rgba(255,255,255,0.1)",border:"2px solid rgba(255,107,53,0.5)",borderRadius:10,padding:"12px 14px",color:"#fff",fontSize:16,fontFamily:"Georgia,serif",width:"100%",boxSizing:"border-box",outline:"none",textAlign:"center",marginBottom:10}} placeholder="Type it here!" value={mealIn} onChange={e=>setMealIn(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")sendMeal();}}/>{bigBtn("Send it! 🚀","linear-gradient(135deg,#ff6b35,#cc4411)","#fff",sendMeal)}<button onClick={()=>setScreen("home")} style={{width:"100%",padding:"8px",background:"transparent",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,color:"#887766",fontSize:14,cursor:"pointer",fontFamily:"Georgia,serif"}}>Go back</button></div>}
+        {screen==="shop"&&<div style={rS.card}><div style={{fontSize:18,fontWeight:"bold",color:"#fff9f0",textAlign:"center",marginBottom:10}}>What do we need?</div><input autoFocus style={{background:"rgba(255,255,255,0.1)",border:"2px solid rgba(76,223,122,0.5)",borderRadius:10,padding:"12px 14px",color:"#fff",fontSize:16,fontFamily:"Georgia,serif",width:"100%",boxSizing:"border-box",outline:"none",textAlign:"center",marginBottom:10}} placeholder="Type what you want!" value={shopIn} onChange={e=>setShopIn(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")sendShop();}}/>{bigBtn("Add it! ✅","linear-gradient(135deg,#4cdf7a,#22aa55)","#0d1f0d",sendShop)}<button onClick={()=>setScreen("home")} style={{width:"100%",padding:"8px",background:"transparent",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,color:"#887766",fontSize:14,cursor:"pointer",fontFamily:"Georgia,serif"}}>Go back</button></div>}
       </>}
       {tab==="chores"&&<KidChoreView chores={chores} setChores={setChores} userKey="ryder" userName="Ryder" userColor="#ff6b35" appSettings={appSettings} S={rS}/>}
       {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="ryder" S={rS}/>}
