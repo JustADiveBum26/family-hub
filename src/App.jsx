@@ -409,8 +409,9 @@ function ThemePicker({currentTheme,onSelect,S}){
 }
 
 // ── PUBLIC HOME SCREEN ────────────────────────────────────────────────────────
-function PublicHomeScreen({mealPlan,shopList,bills,expenses,onLogin,appSettings,messages}){
+function PublicHomeScreen({mealPlan,shopList,setShopList,bills,expenses,onLogin,appSettings,messages,shopSettings}){
   const today=new Date(),tn=todayName();
+  const [showShopView,setShowShopView]=useState(false);
   const tonightDinner=mealPlan[tn]?.Dinner||"";
   const unchecked=shopList.filter(i=>!i.checked);
   const dueSoon=bills.filter(b=>{const d=new Date(b.dueDate+"T12:00:00");return Math.ceil((d-today)/(864e5))>=0&&Math.ceil((d-today)/(864e5))<=7;});
@@ -425,6 +426,7 @@ function PublicHomeScreen({mealPlan,shopList,bills,expenses,onLogin,appSettings,
       </div>
     </div>
     <div style={{maxWidth:1300,margin:"0 auto",padding:"16px 16px"}}>
+      {showShopView&&<ShoppingListView shopList={shopList} setShopList={setShopList} shopSettings={shopSettings} onClose={()=>setShowShopView(false)}/>}
       <PinnedAnnouncements messages={messages||[]} S={S}/>
       {dueSoon.length>0&&<BillsBanner bills={bills} S={S}/>}
       <div style={{overflowX:"auto",marginBottom:14}}>
@@ -433,7 +435,7 @@ function PublicHomeScreen({mealPlan,shopList,bills,expenses,onLogin,appSettings,
         </div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:12,marginBottom:14}}>
-        <div style={S.card}><div style={S.h2}>Shopping List</div>{unchecked.length===0?<div style={{color:"#444",fontSize:13,textAlign:"center",padding:"10px 0"}}>Nothing on the list!</div>:unchecked.slice(0,8).map(item=><div key={item.id} style={{display:"flex",gap:10,padding:"5px 0",borderBottom:`1px solid #1a1a0f`,alignItems:"center"}}><div style={{width:7,height:7,borderRadius:"50%",background:GOLD,flexShrink:0}}/><span style={{fontSize:13,color:"#e8e0c8",flex:1}}>{item.qty&&item.qty!=="1"?`${item.qty}x `:""}{item.name}</span>{item.addedBy&&item.addedBy!=="Parents"&&<span style={{fontSize:10,color:"#555"}}>{item.addedBy}</span>}</div>)}{unchecked.length>8&&<div style={{fontSize:11,color:"#555",marginTop:4}}>+{unchecked.length-8} more</div>}</div>
+        <div style={S.card}><div style={{...S.h2,...S.row}}><span>Shopping List</span><button onClick={()=>setShowShopView(true)} style={{...S.btnGhost,fontSize:12,padding:"4px 12px"}}>🛒 Full View</button></div>{unchecked.length===0?<div style={{color:"#444",fontSize:13,textAlign:"center",padding:"10px 0"}}>Nothing on the list!</div>:unchecked.slice(0,8).map(item=><div key={item.id} style={{display:"flex",gap:10,padding:"5px 0",borderBottom:`1px solid #1a1a0f`,alignItems:"center"}}><div style={{width:7,height:7,borderRadius:"50%",background:GOLD,flexShrink:0}}/><span style={{fontSize:13,color:"#e8e0c8",flex:1}}>{item.qty&&item.qty!=="1"?`${item.qty}x `:""}{item.name}</span>{item.addedBy&&item.addedBy!=="Parents"&&<span style={{fontSize:10,color:"#555"}}>{item.addedBy}</span>}</div>)}{unchecked.length>8&&<div style={{fontSize:11,color:"#555",marginTop:4}}>+{unchecked.length-8} more</div>}</div>
         {dueSoon.length>0&&<div style={S.card}><div style={S.h2}>Due This Week</div>{dueSoon.map(b=>{const dl=Math.ceil((new Date(b.dueDate+"T12:00:00")-today)/(864e5)),paid=b.bradPaid&&b.maryBethPaid;return(<div key={b.id} style={{...S.row,padding:"6px 0",borderBottom:`1px solid #1a1a0f`}}><div><div style={{fontSize:13,color:"#e8e0c8"}}>{b.name}</div><div style={{fontSize:11,color:"#555"}}>{dl===0?"Today":dl===1?"Tomorrow":`${dl} days`}</div></div><div style={{textAlign:"right"}}><div style={{fontFamily:"monospace",color:GOLD,fontSize:12,fontWeight:"bold"}}>{fmt(b.amount/2)} ea</div><div style={{fontSize:10,color:paid?"#4CAF50":"#FF9800"}}>{paid?"Paid":"Pending"}</div></div></div>);})}
         </div>}
       </div>
@@ -1544,9 +1546,9 @@ function ParkerTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMea
   const sendItem=()=>{if(!item.name)return;saveReqs([...shopRequests,{...item,id:Date.now(),kidName:"Parker",item:item.name,status:"pending",date:new Date().toLocaleDateString()}]);setItem({name:"",qty:"",notes:""});setShowR(false);};
   const todayName=DAYS[new Date().getDay()===0?6:new Date().getDay()-1];
   const pc="rgba(180,79,239,0.12)",pb="1px solid rgba(180,79,239,0.25)";
-  const pInp={background:"rgba(255,255,255,0.08)",border:"1px solid rgba(180,79,239,0.4)",borderRadius:8,padding:"10px 12px",color:"#e8e0ff",fontFamily:"Georgia,serif",fontSize:13,width:"100%",boxSizing:"border-box",outline:"none",marginBottom:8};
-  const pBtn={background:"linear-gradient(135deg,#b44fef,#7b2fc0)",border:"none",borderRadius:10,padding:"12px 18px",color:"#fff",fontSize:13,cursor:"pointer",fontWeight:"bold",fontFamily:"Georgia,serif",width:"100%",marginBottom:8};
-  const pBtnG={background:"transparent",border:"1px solid rgba(180,79,239,0.3)",borderRadius:8,padding:"8px 14px",color:"#7a6aaa",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:12};
+  const pInp={background:"rgba(255,255,255,0.08)",border:"1px solid rgba(180,79,239,0.4)",borderRadius:8,padding:"11px 14px",color:"#e8e0ff",fontFamily:"Georgia,serif",fontSize:16,width:"100%",boxSizing:"border-box",outline:"none",marginBottom:10};
+  const pBtn={background:"linear-gradient(135deg,#b44fef,#7b2fc0)",border:"none",borderRadius:10,padding:"14px 20px",color:"#fff",fontSize:16,cursor:"pointer",fontWeight:"bold",fontFamily:"Georgia,serif",width:"100%",marginBottom:10};
+  const pBtnG={background:"transparent",border:"1px solid rgba(180,79,239,0.3)",borderRadius:8,padding:"10px 16px",color:"#7a6aaa",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:15};
   const pS={page:{background:"linear-gradient(135deg,#1a0a2e,#0d1a2e)",minHeight:"100vh",fontFamily:"Georgia,serif",color:"#e8e0ff",fontSize:17},card:{background:"rgba(180,79,239,0.1)",border:"1px solid rgba(180,79,239,0.25)",borderRadius:12,padding:24,marginBottom:16},cardSm:{background:"rgba(180,79,239,0.07)",border:"1px solid rgba(180,79,239,0.15)",borderRadius:10,padding:18,marginBottom:12},h2:{fontSize:18,color:"#b44fef",fontWeight:"bold",marginBottom:16},btn:(c="#b44fef")=>({background:c,border:"none",borderRadius:10,padding:"13px 22px",color:"#fff",fontSize:16,cursor:"pointer",fontWeight:"bold",fontFamily:"Georgia,serif",whiteSpace:"nowrap"}),btnGhost:{background:"transparent",border:"1px solid rgba(180,79,239,0.3)",borderRadius:8,padding:"10px 15px",color:"#7a6aaa",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:15},btnDanger:{background:"transparent",border:"1px solid #f4433644",borderRadius:6,padding:"7px 13px",color:"#f44336",fontFamily:"Georgia,serif",fontSize:15,cursor:"pointer"},label:{fontSize:12,color:"#7a6aaa",textTransform:"uppercase",letterSpacing:"0.15em",marginBottom:6,fontFamily:"monospace"},input:{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(180,79,239,0.4)",borderRadius:8,padding:"10px 14px",color:"#e8e0ff",fontFamily:"Georgia,serif",fontSize:16,width:"100%",boxSizing:"border-box",outline:"none"},select:{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(180,79,239,0.4)",borderRadius:8,padding:"10px 14px",color:"#e8e0ff",fontFamily:"Georgia,serif",fontSize:16,width:"100%",boxSizing:"border-box",outline:"none"},row:{display:"flex",justifyContent:"space-between",alignItems:"center"},tag:c=>({background:c+"22",color:c,border:`1px solid ${c}44`,borderRadius:4,padding:"4px 10px",fontSize:13,fontFamily:"monospace"}),alert:c=>({background:c+"18",border:`1px solid ${c}44`,borderRadius:8,padding:"14px 18px",marginBottom:14}),T:{accent:"#b44fef",text:"#e8e0ff",sub:"#7a6aaa",border:"rgba(180,79,239,0.25)",bg:"#1a0a2e"}};
   const TABS=[{id:"home",label:"Home"},{id:"chores",label:"Tasks"},{id:"board",label:"Board"}];
   return(<div style={pS.page}>
@@ -1606,6 +1608,7 @@ function RyderTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMeal
 function BradDashboard(props){
   const {onLogout,auth,setAuth,netWorth,accounts,setAccounts,debts,setDebts,expenses,setExpenses,goals,setGoals,transactions,setTransactions,pslf,setPslf,scenario,setScenario,reviewTxns,setReviewTxns,uploadLoading,handleUpload,confirmTxns,fileRef,saveAll,profile,setProfile,mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,totalAssets,totalDebtAmt,totalCC,combinedLiquid,cushion,dti,mortgageRate,monthlyMortgage,loanAmt,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger}=props;
   const [tab,setTab]=useState("home");
+  const [showShopView,setShowShopView]=useState(false);
   const [userTheme,setUserTheme]=useState(appSettings?.userThemes?.brad||"dark");
   const S=makeS(userTheme);
   const saveTheme=key=>{setUserTheme(key);const updated={...appSettings,userThemes:{...appSettings.userThemes,brad:key}};setAppSettings(updated);store.save("fp2:appSettings",updated);};
@@ -1808,7 +1811,7 @@ export default function App(){
 
   return(<div style={S.page}>
     {loginTarget&&<LoginModal user={loginTarget} auth={auth} onSuccess={pwd=>handleLoginSuccess(loginTarget,pwd)} onClose={()=>setLoginTarget(null)}/>}
-    {!currentUser&&<PublicHomeScreen mealPlan={mealPlan} shopList={shopList} bills={bills} expenses={expenses} onLogin={handleLogin} appSettings={appSettings} messages={messages}/>}
+    {!currentUser&&<PublicHomeScreen mealPlan={mealPlan} shopList={shopList} setShopList={setShopList} bills={bills} expenses={expenses} onLogin={handleLogin} appSettings={appSettings} messages={messages} shopSettings={shopSettings}/>}
     {currentUser==="brad"&&<BradDashboard {...sharedProps} accounts={accounts} setAccounts={setAccounts} debts={debts} setDebts={setDebts} expenses={expenses} setExpenses={setExpenses} goals={goals} setGoals={setGoals} transactions={transactions} setTransactions={setTransactions} pslf={pslf} setPslf={setPslf} scenario={scenario} setScenario={setScenario} reviewTxns={reviewTxns} setReviewTxns={setReviewTxns} uploadLoading={uploadLoading} handleUpload={handleUpload} confirmTxns={confirmTxns} fileRef={fileRef} saveAll={saveAll} auth={auth} setAuth={setAuth} totalAssets={totalAssets} totalDebtAmt={totalDebtAmt} netWorth={netWorth} totalCC={totalCC} combinedLiquid={combinedLiquid} cushion={cushion} dti={dti} mortgageRate={mortgageRate} monthlyMortgage={monthlyMortgage} loanAmt={loanAmt} surplus={surplus} takeHome={takeHome} totalExpenses={totalExpenses} slPayment={slPayment} downNeeded={downNeeded} closing={closing} homePrice={homePrice} onLogout={handleLogout}/>}
     {currentUser==="maryBeth"&&<MaryBethDashboard {...sharedProps} expenses={expenses} debts={debts} onLogout={handleLogout} setChores={setChores}/>}
     {currentUser==="bradyn"&&<BradynDashboard mealPlan={mealPlan} shopList={shopList} setShopList={setShopList} shopRequests={shopRequests} setShopRequests={setShopRequests} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} mealDetails={mealDetails} setMealDetails={setMealDetails} chores={chores} setChores={setChores} messages={messages} setMessages={setMessages} appSettings={appSettings} shopSettings={shopSettings} bradynLedger={bradynLedger} setBradynLedger={setBradynLedger} onLogout={handleLogout}/>}
