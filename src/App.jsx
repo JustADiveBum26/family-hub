@@ -887,6 +887,19 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList
 function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,mealDetails,setMealDetails,shopSettings,profile,S}){
   const [editCell,setEditCell]=useState(null),[cellVal,setCellVal]=useState("");
   const [showAdd,setShowAdd]=useState(false),[newItem,setNewItem]=useState({name:"",qty:"1",category:"Grocery",store:"",notes:""});
+  const [addMode,setAddMode]=useState("single"); // "single" or "bulk"
+  const blankRow=()=>({id:Date.now()+Math.random(),name:"",qty:"1",category:cats[0]||"Grocery",store:""});
+  const [bulkRows,setBulkRows]=useState([blankRow(),blankRow(),blankRow(),blankRow(),blankRow()]);
+  const updateRow=(i,field,val)=>setBulkRows(rows=>rows.map((r,ri)=>ri===i?{...r,[field]:val}:r));
+  const addRow=()=>setBulkRows(rows=>[...rows,blankRow()]);
+  const removeRow=i=>setBulkRows(rows=>rows.filter((_,ri)=>ri!==i));
+  const addBulk=()=>{
+    const valid=bulkRows.filter(r=>r.name.trim());
+    if(!valid.length)return;
+    saveShop([...shopList,...valid.map(r=>({...r,name:r.name.trim(),id:Date.now()+Math.random(),addedBy:"Parents",checked:false,notes:""}))]);
+    setBulkRows([blankRow(),blankRow(),blankRow(),blankRow(),blankRow()]);
+    setShowAdd(false);
+  };
   const [filterCat,setFilterCat]=useState("All");
   const [filterStore,setFilterStore]=useState("All");
   const cats=shopSettings?.categories||["Grocery","Dairy","Produce","Meat","Snacks","Beverages","Household","Personal Care","Other"];
@@ -962,8 +975,17 @@ function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,set
     </div>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
       <div style={S.card}>
-        <div style={{...S.h2,...S.row,flexWrap:"wrap",gap:8}}><span>Shopping List</span><button style={S.btn()} onClick={()=>setShowAdd(!showAdd)}>{showAdd?"Cancel":"Add Item"}</button></div>
-        {showAdd&&<div style={{marginBottom:14,padding:12,background:S.T.bg,borderRadius:8}}>
+        <div style={{...S.h2,...S.row,flexWrap:"wrap",gap:8}}>
+          <span>Shopping List</span>
+          <div style={{display:"flex",gap:6}}>
+            {showAdd&&<div style={{display:"flex",gap:4,background:S.T.bg,borderRadius:8,padding:3}}>
+              <button onClick={()=>setAddMode("single")} style={{padding:"4px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontFamily:"Georgia,serif",background:addMode==="single"?GOLD:"transparent",color:addMode==="single"?"#0d0d08":S.T.sub}}>Single</button>
+              <button onClick={()=>setAddMode("bulk")} style={{padding:"4px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontFamily:"Georgia,serif",background:addMode==="bulk"?GOLD:"transparent",color:addMode==="bulk"?"#0d0d08":S.T.sub}}>Bulk</button>
+            </div>}
+            <button style={S.btn()} onClick={()=>{setShowAdd(!showAdd);setBulkRows([blankRow(),blankRow(),blankRow(),blankRow(),blankRow()])}}>{showAdd?"Cancel":"Add Item"}</button>
+          </div>
+        </div>
+        {showAdd&&addMode==="single"&&<div style={{marginBottom:14,padding:12,background:S.T.bg,borderRadius:8}}>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,marginBottom:8}}>
             <div><div style={S.label}>Item</div><input style={S.input} placeholder="e.g. Milk" value={newItem.name} onChange={e=>setNewItem({...newItem,name:e.target.value})}/></div>
             <div><div style={S.label}>Qty</div><input style={S.input} value={newItem.qty} onChange={e=>setNewItem({...newItem,qty:e.target.value})}/></div>
@@ -971,6 +993,29 @@ function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,set
             <div><div style={S.label}>Store</div><select style={S.select} value={newItem.store} onChange={e=>setNewItem({...newItem,store:e.target.value})}><option value="">Any store</option>{stores.map(s=><option key={s}>{s}</option>)}</select></div>
           </div>
           <div style={{display:"flex",gap:8}}><input style={{...S.input,flex:1}} placeholder="Notes" value={newItem.notes} onChange={e=>setNewItem({...newItem,notes:e.target.value})}/><button style={S.btn()} onClick={addItem}>Add</button></div>
+        </div>}
+        {showAdd&&addMode==="bulk"&&<div style={{marginBottom:14,padding:12,background:S.T.bg,borderRadius:8}}>
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",minWidth:420}}>
+              <thead><tr style={{borderBottom:`1px solid ${S.T.border}`}}><th style={{...S.label,textAlign:"left",padding:"4px 6px",fontWeight:"normal"}}>Item *</th><th style={{...S.label,textAlign:"left",padding:"4px 6px",fontWeight:"normal",width:60}}>Qty</th><th style={{...S.label,textAlign:"left",padding:"4px 6px",fontWeight:"normal",width:120}}>Category</th><th style={{...S.label,textAlign:"left",padding:"4px 6px",fontWeight:"normal",width:120}}>Store</th><th style={{width:28}}></th></tr></thead>
+              <tbody>
+                {bulkRows.map((row,i)=><tr key={row.id}>
+                  <td style={{padding:"4px 4px 4px 0"}}><input style={{...S.input,padding:"6px 8px"}} placeholder="Item name" value={row.name} onChange={e=>updateRow(i,"name",e.target.value)}/></td>
+                  <td style={{padding:"4px 4px"}}><input style={{...S.input,padding:"6px 8px"}} value={row.qty} onChange={e=>updateRow(i,"qty",e.target.value)}/></td>
+                  <td style={{padding:"4px 4px"}}><select style={{...S.select,padding:"6px 8px"}} value={row.category} onChange={e=>updateRow(i,"category",e.target.value)}>{cats.map(c=><option key={c}>{c}</option>)}</select></td>
+                  <td style={{padding:"4px 4px"}}><select style={{...S.select,padding:"6px 8px"}} value={row.store} onChange={e=>updateRow(i,"store",e.target.value)}><option value="">Any</option>{stores.map(s=><option key={s}>{s}</option>)}</select></td>
+                  <td style={{padding:"4px 0 4px 4px"}}><button onClick={()=>removeRow(i)} style={{...S.btnDanger,padding:"5px 7px"}}>×</button></td>
+                </tr>)}
+              </tbody>
+            </table>
+          </div>
+          <div style={{display:"flex",gap:8,marginTop:10,justifyContent:"space-between",alignItems:"center"}}>
+            <button style={{...S.btnGhost,fontSize:12,padding:"6px 12px"}} onClick={addRow}>+ Add Row</button>
+            <div style={{display:"flex",gap:8}}>
+              <div style={{fontSize:11,color:S.T.sub,alignSelf:"center"}}>{bulkRows.filter(r=>r.name.trim()).length} item{bulkRows.filter(r=>r.name.trim()).length!==1?"s":""} ready</div>
+              <button style={{...S.btn("#4CAF50"),padding:"8px 18px"}} onClick={addBulk}>Add All to List</button>
+            </div>
+          </div>
         </div>}
         <div style={{marginBottom:8}}>
           <div style={{...S.label,marginBottom:4}}>Filter by Store</div>
@@ -1292,6 +1337,19 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
 function BradynDashboard({mealPlan,shopList,setShopList,shopRequests,setShopRequests,mealSuggestions,setMealSuggestions,mealDetails,setMealDetails,chores,setChores,messages,setMessages,appSettings,shopSettings,bradynLedger,setBradynLedger,onLogout}){
   const [tab,setTab]=useState("home");
   const [showS,setShowS]=useState(false),[showAdd,setShowAdd]=useState(false);
+  const [addMode,setAddMode]=useState("single");
+  const blankRow=()=>({id:Date.now()+Math.random(),name:"",qty:"1",category:cats[0]||"Grocery",store:""});
+  const [bulkRows,setBulkRows]=useState(null);
+  const updateBulkRow=(i,field,val)=>setBulkRows(rows=>rows.map((r,ri)=>ri===i?{...r,[field]:val}:r));
+  const addBulkRow=()=>setBulkRows(rows=>[...rows,blankRow()]);
+  const removeBulkRow=i=>setBulkRows(rows=>rows.filter((_,ri)=>ri!==i));
+  const addBulkItems=()=>{
+    const valid=(bulkRows||[]).filter(r=>r.name.trim());
+    if(!valid.length)return;
+    saveShop([...shopList,...valid.map(r=>({...r,name:r.name.trim(),id:Date.now()+Math.random(),addedBy:"Bradyn",checked:false,notes:""}))]);
+    setBulkRows(null);setShowAdd(false);
+  };
+  const openAdd=()=>{setShowAdd(!showAdd);setAddMode("single");setBulkRows([blankRow(),blankRow(),blankRow(),blankRow(),blankRow()]);setShowS(false);};
   const [sugg,setSugg]=useState({meal:"",suggestDate:"",mealType:"Dinner",notes:""});
   const [newItem,setNewItem]=useState({name:"",qty:"1",category:"Grocery",store:"",notes:""});
   const [detailSlot,setDetailSlot]=useState(null);
@@ -1334,9 +1392,19 @@ function BradynDashboard({mealPlan,shopList,setShopList,shopRequests,setShopRequ
           </div>}
         </div>
         <div>
-          <div style={bS.card}><div style={bS.h2}>Quick Actions</div><button style={{...bS.btn(),width:"100%",marginBottom:10,textAlign:"left"}} onClick={()=>{setShowS(!showS);setShowAdd(false);}}>Suggest a Meal</button><button style={{...bS.btnGhost,width:"100%",textAlign:"left"}} onClick={()=>{setShowAdd(!showAdd);setShowS(false);}}>Add to Shopping List</button></div>
+          <div style={bS.card}><div style={bS.h2}>Quick Actions</div><button style={{...bS.btn(),width:"100%",marginBottom:10,textAlign:"left"}} onClick={()=>{setShowS(!showS);setShowAdd(false);}}>Suggest a Meal</button><button style={{...bS.btnGhost,width:"100%",textAlign:"left"}} onClick={openAdd}>{showAdd?"Cancel Add":"Add to Shopping List"}</button></div>
           {showS&&<div style={bS.card}><div style={bS.h2}>Suggest a Meal</div><div style={{marginBottom:8}}><div style={bS.label}>Meal</div><input style={bS.input} placeholder="e.g. Lasagna, Tacos..." value={sugg.meal} onChange={e=>setSugg({...sugg,meal:e.target.value})}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}><div><div style={bS.label}>Date</div><input style={bS.input} type="date" value={sugg.suggestDate} onChange={e=>setSugg({...sugg,suggestDate:e.target.value})}/></div><div><div style={bS.label}>Meal</div><select style={bS.select} value={sugg.mealType} onChange={e=>setSugg({...sugg,mealType:e.target.value})}>{MEAL_TYPES.map(m=><option key={m}>{m}</option>)}</select></div></div><div style={{marginBottom:10}}><div style={bS.label}>Notes</div><input style={bS.input} placeholder="Why you want it..." value={sugg.notes} onChange={e=>setSugg({...sugg,notes:e.target.value})}/></div><div style={{fontSize:11,color:C.sub,marginBottom:10}}>Tip: after submitting, you can add ingredients and a recipe from "My Suggestions" below.</div><div style={{display:"flex",gap:8}}><button style={bS.btn()} onClick={sendSugg}>Submit</button><button style={bS.btnGhost} onClick={()=>setShowS(false)}>Cancel</button></div></div>}
-          {showAdd&&<div style={bS.card}><div style={bS.h2}>Add to Shopping List</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,marginBottom:8}}><div><div style={bS.label}>Item</div><input style={bS.input} placeholder="e.g. Milk" value={newItem.name} onChange={e=>setNewItem({...newItem,name:e.target.value})}/></div><div><div style={bS.label}>Qty</div><input style={bS.input} value={newItem.qty} onChange={e=>setNewItem({...newItem,qty:e.target.value})}/></div><div><div style={bS.label}>Category</div><select style={bS.select} value={newItem.category} onChange={e=>setNewItem({...newItem,category:e.target.value})}>{cats.map(c=><option key={c}>{c}</option>)}</select></div><div><div style={bS.label}>Store</div><select style={bS.select} value={newItem.store} onChange={e=>setNewItem({...newItem,store:e.target.value})}><option value="">Any store</option>{stores.map(s=><option key={s}>{s}</option>)}</select></div></div><div style={{marginBottom:10}}><div style={bS.label}>Notes</div><input style={bS.input} placeholder="Optional notes..." value={newItem.notes} onChange={e=>setNewItem({...newItem,notes:e.target.value})}/></div><div style={{display:"flex",gap:8}}><button style={bS.btn()} onClick={addShopItem}>Add to List</button><button style={bS.btnGhost} onClick={()=>setShowAdd(false)}>Cancel</button></div></div>}
+          {showAdd&&<div style={bS.card}>
+            <div style={{...bS.h2,...bS.row,flexWrap:"wrap",gap:8}}>
+              <span>Add to Shopping List</span>
+              <div style={{display:"flex",gap:4,background:"rgba(0,0,0,0.3)",borderRadius:8,padding:3}}>
+                <button onClick={()=>setAddMode("single")} style={{padding:"3px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontFamily:"Georgia,serif",background:addMode==="single"?"#00d4ff":"transparent",color:addMode==="single"?"#090e1a":C.sub}}>Single</button>
+                <button onClick={()=>setAddMode("bulk")} style={{padding:"3px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontFamily:"Georgia,serif",background:addMode==="bulk"?"#00d4ff":"transparent",color:addMode==="bulk"?"#090e1a":C.sub}}>Bulk</button>
+              </div>
+            </div>
+            {addMode==="single"&&<><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,marginBottom:8}}><div><div style={bS.label}>Item</div><input style={bS.input} placeholder="e.g. Milk" value={newItem.name} onChange={e=>setNewItem({...newItem,name:e.target.value})}/></div><div><div style={bS.label}>Qty</div><input style={bS.input} value={newItem.qty} onChange={e=>setNewItem({...newItem,qty:e.target.value})}/></div><div><div style={bS.label}>Category</div><select style={bS.select} value={newItem.category} onChange={e=>setNewItem({...newItem,category:e.target.value})}>{cats.map(c=><option key={c}>{c}</option>)}</select></div><div><div style={bS.label}>Store</div><select style={bS.select} value={newItem.store} onChange={e=>setNewItem({...newItem,store:e.target.value})}><option value="">Any store</option>{stores.map(s=><option key={s}>{s}</option>)}</select></div></div><div style={{marginBottom:10}}><div style={bS.label}>Notes</div><input style={bS.input} placeholder="Optional notes..." value={newItem.notes} onChange={e=>setNewItem({...newItem,notes:e.target.value})}/></div><div style={{display:"flex",gap:8}}><button style={bS.btn()} onClick={addShopItem}>Add to List</button><button style={bS.btnGhost} onClick={()=>setShowAdd(false)}>Cancel</button></div></>}
+            {addMode==="bulk"&&<><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr style={{borderBottom:`1px solid ${C.border}`}}><th style={{...bS.label,textAlign:"left",padding:"4px 4px",fontWeight:"normal"}}>Item *</th><th style={{...bS.label,textAlign:"left",padding:"4px 4px",fontWeight:"normal",width:56}}>Qty</th><th style={{...bS.label,textAlign:"left",padding:"4px 4px",fontWeight:"normal",width:110}}>Category</th><th style={{...bS.label,textAlign:"left",padding:"4px 4px",fontWeight:"normal",width:110}}>Store</th><th style={{width:26}}></th></tr></thead><tbody>{(bulkRows||[]).map((row,i)=><tr key={row.id}><td style={{padding:"3px 3px 3px 0"}}><input style={{...bS.input,padding:"5px 7px"}} placeholder="Item name" value={row.name} onChange={e=>updateBulkRow(i,"name",e.target.value)}/></td><td style={{padding:"3px 3px"}}><input style={{...bS.input,padding:"5px 7px"}} value={row.qty} onChange={e=>updateBulkRow(i,"qty",e.target.value)}/></td><td style={{padding:"3px 3px"}}><select style={{...bS.select,padding:"5px 7px"}} value={row.category} onChange={e=>updateBulkRow(i,"category",e.target.value)}>{cats.map(c=><option key={c}>{c}</option>)}</select></td><td style={{padding:"3px 3px"}}><select style={{...bS.select,padding:"5px 7px"}} value={row.store} onChange={e=>updateBulkRow(i,"store",e.target.value)}><option value="">Any</option>{stores.map(s=><option key={s}>{s}</option>)}</select></td><td style={{padding:"3px 0 3px 3px"}}><button onClick={()=>removeBulkRow(i)} style={{...bS.btnDanger,padding:"4px 6px"}}>×</button></td></tr>)}</tbody></table></div><div style={{display:"flex",gap:8,marginTop:8,justifyContent:"space-between",alignItems:"center"}}><button style={{...bS.btnGhost,fontSize:11,padding:"5px 10px"}} onClick={addBulkRow}>+ Add Row</button><div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:11,color:C.sub}}>{(bulkRows||[]).filter(r=>r.name.trim()).length} items ready</span><button style={{...bS.btn("#4CAF50"),padding:"7px 16px",fontSize:12}} onClick={addBulkItems}>Add All to List</button></div></div></>}
+          </div>}
         </div>
       </div>}
       {tab==="chores"&&<KidChoreView chores={chores} setChores={setChores} userKey="bradyn" userName="Bradyn" userColor="#00d4ff" appSettings={appSettings} S={bS}/>}
