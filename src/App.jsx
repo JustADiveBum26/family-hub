@@ -887,7 +887,9 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList
 function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,mealDetails,setMealDetails,shopSettings,profile,S}){
   const [editCell,setEditCell]=useState(null),[cellVal,setCellVal]=useState("");
   const [showAdd,setShowAdd]=useState(false),[newItem,setNewItem]=useState({name:"",qty:"1",category:"Grocery",store:"",notes:""});
-  const [addMode,setAddMode]=useState("single"); // "single" or "bulk"
+  const [addMode,setAddMode]=useState("single");
+  const cats=shopSettings?.categories||["Grocery","Dairy","Produce","Meat","Snacks","Beverages","Household","Personal Care","Other"];
+  const stores=shopSettings?.stores||["Walmart","Kroger","Target","Costco","Aldi","Other"];
   const blankRow=()=>({id:Date.now()+Math.random(),name:"",qty:"1",category:cats[0]||"Grocery",store:""});
   const [bulkRows,setBulkRows]=useState([blankRow(),blankRow(),blankRow(),blankRow(),blankRow()]);
   const updateRow=(i,field,val)=>setBulkRows(rows=>rows.map((r,ri)=>ri===i?{...r,[field]:val}:r));
@@ -902,8 +904,6 @@ function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,set
   };
   const [filterCat,setFilterCat]=useState("All");
   const [filterStore,setFilterStore]=useState("All");
-  const cats=shopSettings?.categories||["Grocery","Dairy","Produce","Meat","Snacks","Beverages","Household","Personal Care","Other"];
-  const stores=shopSettings?.stores||["Walmart","Kroger","Target","Costco","Aldi","Other"];
   const [detailSlot,setDetailSlot]=useState(null);
   const saveMeals=u=>{setMealPlan(u);store.save("fp2:mealPlan",u);};
   const saveShop=u=>{setShopList(u);store.save("fp2:shopList",u);};
