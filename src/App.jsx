@@ -823,8 +823,12 @@ function BillsTab({bills,setBills,billHistory,setBillHistory,profile,payAccounts
 
 // ── MEALS TAB ─────────────────────────────────────────────────────────────────
 // ── MEAL DETAIL MODAL (top-level component — must NOT be inside MealsTab) ─────
-function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList,saveDetails,saveShop,S}){
-  const [newIng,setNewIng]=useState({name:"",qty:"1"});
+function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList,saveDetails,saveShop,onClearMeal,S}){
+  const [newIngs,setNewIngs]=useState([{id:1,name:"",qty:"1"},{id:2,name:"",qty:"1"},{id:3,name:"",qty:"1"},{id:4,name:"",qty:"1"},{id:5,name:"",qty:"1"}]);
+  const blankIng=()=>({id:Date.now()+Math.random(),name:"",qty:"1"});
+  const updateNewIng=(i,field,val)=>setNewIngs(rows=>rows.map((r,ri)=>ri===i?{...r,[field]:val}:r));
+  const addNewIngRow=()=>setNewIngs(rows=>[...rows,blankIng()]);
+  const removeNewIngRow=i=>setNewIngs(rows=>rows.filter((_,ri)=>ri!==i));
   const slotKey=(day,mt)=>day+"__"+mt;
   const getDetail=(key)=>mealDetails[key]||{ingredients:[],recipe:""};
   const updateDetail=(key,patch)=>{saveDetails({...mealDetails,[key]:{...getDetail(key),...patch}});};
@@ -836,17 +840,24 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList
     }
   };
   const addAllIngsToShop=(key)=>{const d=getDetail(key);d.ingredients.forEach(ing=>addIngToShop(ing));};
+  const saveNewIngs=(key)=>{
+    const valid=newIngs.filter(r=>r.name.trim());
+    if(!valid.length)return;
+    const d=getDetail(key);
+    updateDetail(key,{ingredients:[...d.ingredients,...valid.map(r=>({id:Date.now()+Math.random(),name:r.name.trim(),qty:r.qty||"1"}))]});
+    setNewIngs([blankIng(),blankIng(),blankIng(),blankIng(),blankIng()]);
+  };
   if(!detailSlot)return null;
-  // detailSlot can be either {day,mt} (grid slot) or {key,label} (a standalone item like a kid's suggestion)
   const key=detailSlot.key||slotKey(detailSlot.day,detailSlot.mt);
   const headerTop=detailSlot.day?detailSlot.day.toUpperCase()+" — "+detailSlot.mt.toUpperCase():(detailSlot.sublabel||"MEAL SUGGESTION");
   const mealName=detailSlot.label||(detailSlot.day?mealPlan[detailSlot.day]?.[detailSlot.mt]:"")||"";
   const detail=getDetail(key);
   const shopNames=new Set(shopList.filter(i=>!i.checked).map(i=>i.name.toLowerCase()));
-  const close=()=>{setDetailSlot(null);setNewIng({name:"",qty:"1"});};
+  const close=()=>{setDetailSlot(null);setNewIngs([blankIng(),blankIng(),blankIng(),blankIng(),blankIng()]);};
   const currentRecipe=detail.recipe||"";
+  const readyCount=newIngs.filter(r=>r.name.trim()).length;
   return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={close}>
-    <div style={{background:S.T.card,border:`1px solid ${S.T.border}`,borderRadius:14,padding:24,maxWidth:560,width:"100%",maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+    <div style={{background:S.T.card,border:`1px solid ${S.T.border}`,borderRadius:14,padding:24,maxWidth:580,width:"100%",maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
       <div style={{...S.row,marginBottom:16,flexWrap:"wrap",gap:8}}>
         <div>
           <div style={{fontSize:10,color:S.T.sub,fontFamily:"monospace",letterSpacing:"0.15em"}}>{headerTop}</div>
@@ -854,12 +865,13 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           <button style={{...S.btn("#4CAF50"),padding:"6px 12px",fontSize:12}} onClick={()=>addAllIngsToShop(key)} disabled={detail.ingredients.length===0}>Add All to List</button>
+          {onClearMeal&&detailSlot.day&&mealName&&<button style={{...S.btnDanger,padding:"6px 12px",fontSize:12}} onClick={()=>{onClearMeal(detailSlot.day,detailSlot.mt);close();}}>Clear Meal</button>}
           <button style={{...S.btnGhost,padding:"6px 12px",fontSize:12}} onClick={close}>Close</button>
         </div>
       </div>
       <div style={{marginBottom:16}}>
-        <div style={S.h2}>Ingredients</div>
-        {detail.ingredients.length===0&&<div style={{fontSize:13,color:S.T.sub,marginBottom:10}}>No ingredients yet. Add them below.</div>}
+        <div style={S.h2}>Saved Ingredients</div>
+        {detail.ingredients.length===0&&<div style={{fontSize:13,color:S.T.sub,marginBottom:8}}>None saved yet.</div>}
         {detail.ingredients.map(ing=>{
           const onList=shopNames.has(ing.name.toLowerCase());
           return(<div key={ing.id} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"center"}}>
@@ -868,16 +880,33 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList
             <button onClick={()=>delIngredient(key,ing.id)} style={S.btnDanger}>X</button>
           </div>);
         })}
-        <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap",alignItems:"flex-end"}}>
-          <div style={{flex:1}}><div style={S.label}>Ingredient</div><input style={S.input} placeholder="e.g. Chicken breast" value={newIng.name} onChange={e=>setNewIng({...newIng,name:e.target.value})} onKeyDown={e=>{if(e.key==="Enter"&&newIng.name.trim()){addIngredient(key,{name:newIng.name.trim(),qty:newIng.qty});setNewIng({name:"",qty:"1"});}}}/></div>
-          <div style={{width:80}}><div style={S.label}>Qty</div><input style={S.input} placeholder="1" value={newIng.qty} onChange={e=>setNewIng({...newIng,qty:e.target.value})}/></div>
-          <button style={{...S.btn(),padding:"9px 14px"}} onClick={()=>{if(!newIng.name.trim())return;addIngredient(key,{name:newIng.name.trim(),qty:newIng.qty});setNewIng({name:"",qty:"1"});}}>Add</button>
+        <div style={{marginTop:12}}>
+          <div style={{...S.h2,marginBottom:8}}>Add Ingredients</div>
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr style={{borderBottom:`1px solid ${S.T.border}`}}>
+              <th style={{...S.label,textAlign:"left",padding:"3px 4px",fontWeight:"normal"}}>Ingredient</th>
+              <th style={{...S.label,textAlign:"left",padding:"3px 4px",fontWeight:"normal",width:70}}>Qty</th>
+              <th style={{width:26}}></th>
+            </tr></thead>
+            <tbody>{newIngs.map((row,i)=><tr key={row.id}>
+              <td style={{padding:"3px 4px 3px 0"}}><input style={{...S.input,padding:"5px 8px"}} placeholder="e.g. Chicken breast" value={row.name} onChange={e=>updateNewIng(i,"name",e.target.value)}/></td>
+              <td style={{padding:"3px 4px"}}><input style={{...S.input,padding:"5px 8px"}} placeholder="1" value={row.qty} onChange={e=>updateNewIng(i,"qty",e.target.value)}/></td>
+              <td style={{padding:"3px 0 3px 4px"}}><button onClick={()=>removeNewIngRow(i)} style={{...S.btnDanger,padding:"4px 6px"}}>×</button></td>
+            </tr>)}</tbody>
+          </table>
+          <div style={{display:"flex",gap:8,marginTop:8,justifyContent:"space-between",alignItems:"center"}}>
+            <button style={{...S.btnGhost,fontSize:12,padding:"5px 10px"}} onClick={addNewIngRow}>+ Add Row</button>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              {readyCount>0&&<span style={{fontSize:11,color:S.T.sub}}>{readyCount} ingredient{readyCount!==1?"s":""} ready</span>}
+              <button style={{...S.btn(),padding:"7px 16px",fontSize:12}} onClick={()=>saveNewIngs(key)} disabled={readyCount===0}>Save Ingredients</button>
+            </div>
+          </div>
         </div>
       </div>
       <div>
         <div style={S.h2}>Recipe / Instructions</div>
         <textarea style={{...S.input,height:160,resize:"vertical",lineHeight:1.5}} placeholder="Type or paste your recipe steps here..." defaultValue={currentRecipe} onBlur={e=>updateDetail(key,{recipe:e.target.value})}/>
-        <div style={{fontSize:11,color:S.T.sub,marginTop:4}}>Changes save automatically when you click away from the text box.</div>
+        <div style={{fontSize:11,color:S.T.sub,marginTop:4}}>Changes save automatically when you click away.</div>
       </div>
     </div>
   </div>);
@@ -911,6 +940,7 @@ function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,set
   const saveReqs=u=>{setShopRequests(u);store.save("fp2:shopRequests",u);};
   const saveDetails=u=>{setMealDetails(u);store.save("fp2:mealDetails",u);};
   const saveCell=()=>{if(!editCell)return;saveMeals({...mealPlan,[editCell.day]:{...mealPlan[editCell.day],[editCell.mt]:cellVal}});setEditCell(null);setCellVal("");};
+  const clearCell=(day,mt)=>{saveMeals({...mealPlan,[day]:{...mealPlan[day],[mt]:""}});};
   const addItem=()=>{if(!newItem.name)return;saveShop([...shopList,{...newItem,id:Date.now(),addedBy:"Parents",checked:false}]);setNewItem({name:"",qty:"1",category:"Grocery",store:"",notes:""});setShowAdd(false);};
   const toggleItem=id=>saveShop(shopList.map(i=>i.id===id?{...i,checked:!i.checked}:i));
   const delItem=id=>saveShop(shopList.filter(i=>i.id!==id));
@@ -949,7 +979,7 @@ function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,set
   const slotKey=(day,mt)=>day+"__"+mt;
   const hasDetail=(day,mt)=>{const d=mealDetails[slotKey(day,mt)];return d&&(d.ingredients?.length>0||d.recipe?.trim());};
   return(<>
-    <MealDetailModal detailSlot={detailSlot} setDetailSlot={setDetailSlot} mealPlan={mealPlan} mealDetails={mealDetails} shopList={shopList} saveDetails={saveDetails} saveShop={saveShop} S={S}/>
+    <MealDetailModal detailSlot={detailSlot} setDetailSlot={setDetailSlot} mealPlan={mealPlan} mealDetails={mealDetails} shopList={shopList} saveDetails={saveDetails} saveShop={saveShop} onClearMeal={clearCell} S={S}/>
     {(pendS.length>0||pendR.length>0)&&<div style={{...S.alert(GOLD),marginBottom:14}}><span style={{color:GOLD,fontWeight:"bold"}}>★ {pendS.length+pendR.length} pending request{pendS.length+pendR.length!==1?"s":""} from the kids — </span><span style={{color:S.T.sub,fontSize:13}}>scroll down to review</span></div>}
     <div style={S.card}><div style={S.h2}>This Week — click a meal name to add ingredients or a recipe</div>
       <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:620}}>
@@ -964,6 +994,7 @@ function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,set
                   <div style={{display:"flex",gap:4,alignItems:"center"}}>
                     {hasDet&&<span style={{fontSize:9,color:"#4CAF50",fontFamily:"monospace"}}>📋</span>}
                     <span onClick={()=>{setEditCell({day,mt});setCellVal(val);}} style={{fontSize:9,color:S.T.sub,cursor:"pointer"}}>✏ edit</span>
+                    <span onClick={()=>clearCell(day,mt)} style={{fontSize:9,color:"#f44336",cursor:"pointer"}}>✕ del</span>
                   </div>
                 </div>
                 :<div onClick={()=>{setEditCell({day,mt});setCellVal("");}} style={{cursor:"pointer",color:"#2a2a18",fontSize:10,textAlign:"center",paddingTop:6}}>+</div>
