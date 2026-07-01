@@ -137,6 +137,91 @@ function PinPad({onSubmit,color="#ff6b35",error}){
   return(<div style={{textAlign:"center"}}><div style={{display:"flex",justifyContent:"center",gap:14,marginBottom:20}}>{[0,1,2,3].map(i=><div key={i} style={{width:18,height:18,borderRadius:"50%",background:pin.length>i?color:"transparent",border:`2px solid ${color}`,transition:"background 0.15s"}}/>)}</div>{error&&<div style={{color:"#f44336",fontSize:12,marginBottom:10}}>{error}</div>}<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,maxWidth:220,margin:"0 auto"}}>{[1,2,3,4,5,6,7,8,9,"",0,"X"].map((n,i)=><button key={i} onClick={()=>typeof n==="number"?add(String(n)):n==="X"?setPin(p=>p.slice(0,-1)):null} style={{padding:"15px",fontSize:22,fontFamily:"Georgia,serif",fontWeight:"bold",background:n===""?"transparent":`${color}22`,border:`2px solid ${n===""?"transparent":color}`,borderRadius:12,color:n===""?"transparent":"#fff",cursor:n===""?"default":"pointer"}}>{n}</button>)}</div></div>);
 }
 
+// ── FULL-SCREEN SHOPPING LIST VIEW ───────────────────────────────────────────
+function ShoppingListView({shopList,setShopList,shopSettings,onClose}){
+  const [sortMode,setSortMode]=useState("store"); // "store" or "category"
+  const saveShop=u=>{setShopList(u);store.save("fp2:shopList",u);};
+  const toggle=id=>saveShop(shopList.map(i=>i.id===id?{...i,checked:!i.checked}:i));
+  const clearDone=()=>saveShop(shopList.filter(i=>!i.checked));
+  const cats=shopSettings?.categories||["Grocery","Dairy","Produce","Meat","Snacks","Beverages","Household","Personal Care","Other"];
+  const stores=shopSettings?.stores||["Walmart","Kroger","Target","Costco","Aldi","Other"];
+  const unchecked=shopList.filter(i=>!i.checked);
+  const checked=shopList.filter(i=>i.checked);
+  const doneCount=checked.length;
+
+  // Group unchecked by store then category, or by category then store
+  const grouped=sortMode==="store"
+    ?[...new Set(unchecked.map(i=>i.store||"No Store"))].sort().reduce((acc,s)=>{
+        const storeItems=unchecked.filter(i=>(i.store||"No Store")===s);
+        const byCat=cats.reduce((a,c)=>{const ci=storeItems.filter(i=>i.category===c);if(ci.length)a[c]=ci;return a;},{});
+        const uncatted=storeItems.filter(i=>!cats.includes(i.category));
+        if(uncatted.length)byCat["Other"]=uncatted;
+        if(Object.keys(byCat).length)acc[s]=byCat;
+        return acc;
+      },{})
+    :cats.reduce((acc,c)=>{const ci=unchecked.filter(i=>i.category===c);if(ci.length)acc[c]=ci;return acc;},{});
+
+  return(<div style={{position:"fixed",inset:0,background:"#0d0d08",zIndex:4000,display:"flex",flexDirection:"column",overflowY:"auto"}}>
+    {/* Header */}
+    <div style={{background:"#141410",borderBottom:"1px solid #2a2a18",padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,zIndex:1}}>
+      <div style={{fontSize:20,color:"#e8e0c8",fontFamily:"Georgia,serif",fontWeight:"bold"}}>🛒 Shopping List</div>
+      <div style={{display:"flex",gap:10,alignItems:"center"}}>
+        {doneCount>0&&<button onClick={clearDone} style={{background:"transparent",border:"1px solid #f4433644",borderRadius:8,padding:"8px 14px",color:"#f44336",fontFamily:"Georgia,serif",fontSize:14,cursor:"pointer"}}>Clear Done ({doneCount})</button>}
+        <button onClick={onClose} style={{background:"transparent",border:"1px solid #2a2a18",borderRadius:8,padding:"8px 14px",color:"#888",fontFamily:"Georgia,serif",fontSize:14,cursor:"pointer"}}>✕ Close</button>
+      </div>
+    </div>
+
+    {/* Sort toggle */}
+    <div style={{padding:"12px 18px 6px",display:"flex",gap:8,alignItems:"center"}}>
+      <span style={{fontSize:13,color:"#555",fontFamily:"monospace"}}>VIEW BY</span>
+      <div style={{display:"flex",gap:4,background:"#1a1a0f",borderRadius:10,padding:3}}>
+        <button onClick={()=>setSortMode("store")} style={{padding:"7px 18px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:14,background:sortMode==="store"?GOLD:"transparent",color:sortMode==="store"?"#0d0d08":"#666"}}>Store</button>
+        <button onClick={()=>setSortMode("category")} style={{padding:"7px 18px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:14,background:sortMode==="category"?GOLD:"transparent",color:sortMode==="category"?"#0d0d08":"#666"}}>Category</button>
+      </div>
+      <span style={{fontSize:13,color:"#555",marginLeft:"auto"}}>{unchecked.length} item{unchecked.length!==1?"s":""} left</span>
+    </div>
+
+    {/* List */}
+    <div style={{flex:1,padding:"6px 18px 32px"}}>
+      {unchecked.length===0&&<div style={{textAlign:"center",padding:"60px 0",color:"#444",fontSize:18,fontFamily:"Georgia,serif"}}>All done! 🎉</div>}
+      {sortMode==="store"
+        ?Object.entries(grouped).map(([storeName,catGroups])=><div key={storeName} style={{marginBottom:24}}>
+            <div style={{fontSize:16,color:"#2196F3",fontWeight:"bold",fontFamily:"monospace",letterSpacing:"0.08em",padding:"10px 0 6px",borderBottom:"2px solid #2196F322",marginBottom:8}}>🏪 {storeName}</div>
+            {Object.entries(catGroups).map(([cat,items])=><div key={cat} style={{marginBottom:10}}>
+              <div style={{fontSize:12,color:"#555",fontFamily:"monospace",letterSpacing:"0.15em",marginBottom:4,paddingLeft:2}}>{cat}</div>
+              {items.map(item=><div key={item.id} onClick={()=>toggle(item.id)} style={{display:"flex",gap:14,padding:"14px 12px",marginBottom:4,borderRadius:10,background:"#141410",border:"1px solid #1a1a0f",alignItems:"center",cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
+                <div style={{width:28,height:28,borderRadius:6,border:"2px solid #333",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}/>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:17,color:"#e8e0c8"}}>{item.qty&&item.qty!=="1"?item.qty+"× ":""}{item.name}</div>
+                  {item.addedBy&&item.addedBy!=="Parents"&&<div style={{fontSize:12,color:"#555",marginTop:2}}>{item.addedBy}</div>}
+                </div>
+              </div>)}
+            </div>)}
+          </div>)
+        :Object.entries(grouped).map(([cat,items])=><div key={cat} style={{marginBottom:20}}>
+            <div style={{fontSize:16,color:GOLD,fontWeight:"bold",fontFamily:"monospace",letterSpacing:"0.08em",padding:"10px 0 6px",borderBottom:`2px solid ${GOLD}22`,marginBottom:8}}>{cat}</div>
+            {items.map(item=><div key={item.id} onClick={()=>toggle(item.id)} style={{display:"flex",gap:14,padding:"14px 12px",marginBottom:4,borderRadius:10,background:"#141410",border:"1px solid #1a1a0f",alignItems:"center",cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
+              <div style={{width:28,height:28,borderRadius:6,border:"2px solid #333",flexShrink:0}}/>
+              <div style={{flex:1}}>
+                <div style={{fontSize:17,color:"#e8e0c8"}}>{item.qty&&item.qty!=="1"?item.qty+"× ":""}{item.name}</div>
+                <div style={{fontSize:12,color:"#555",marginTop:2}}>{item.store||""}{item.addedBy&&item.addedBy!=="Parents"?" · "+item.addedBy:""}</div>
+              </div>
+            </div>)}
+          </div>)
+      }
+
+      {/* Done section */}
+      {checked.length>0&&<div style={{marginTop:24,opacity:0.5}}>
+        <div style={{fontSize:13,color:"#555",fontFamily:"monospace",letterSpacing:"0.15em",marginBottom:8,borderTop:"1px solid #1a1a0f",paddingTop:16}}>DONE ({doneCount})</div>
+        {checked.map(item=><div key={item.id} onClick={()=>toggle(item.id)} style={{display:"flex",gap:14,padding:"12px 12px",marginBottom:4,borderRadius:10,background:"#0d0d08",border:"1px solid #111",alignItems:"center",cursor:"pointer"}}>
+          <div style={{width:28,height:28,borderRadius:6,background:"#4CAF50",border:"2px solid #4CAF50",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#0d0d08",fontSize:16,fontWeight:"bold"}}>✓</div>
+          <div style={{fontSize:16,color:"#444",textDecoration:"line-through",flex:1}}>{item.name}</div>
+        </div>)}
+      </div>}
+    </div>
+  </div>);
+}
+
 function LoginModal({user,auth,onSuccess,onClose}){
   const [pwd,setPwd]=useState(""),[confirm,setConfirm]=useState(""),[error,setError]=useState(""),[pinErr,setPinErr]=useState("");
   const u=USERS.find(x=>x.key===user);
@@ -1369,6 +1454,7 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
 
 function BradynDashboard({mealPlan,shopList,setShopList,shopRequests,setShopRequests,mealSuggestions,setMealSuggestions,mealDetails,setMealDetails,chores,setChores,messages,setMessages,appSettings,shopSettings,bradynLedger,setBradynLedger,onLogout}){
   const [tab,setTab]=useState("home");
+  const [showShopView,setShowShopView]=useState(false);
   const [showS,setShowS]=useState(false),[showAdd,setShowAdd]=useState(false);
   const [addMode,setAddMode]=useState("single");
   const blankRow=()=>({id:Date.now()+Math.random(),name:"",qty:"1",category:cats[0]||"Grocery",store:""});
@@ -1397,9 +1483,10 @@ function BradynDashboard({mealPlan,shopList,setShopList,shopRequests,setShopRequ
         const bS={page:{background:C.bg,minHeight:"100vh",fontFamily:"Georgia,serif",color:C.text,fontSize:17},card:{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:24,marginBottom:16},cardSm:{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:18,marginBottom:12},h2:{fontSize:18,color:C.accent,fontWeight:"normal",borderBottom:`1px solid ${C.border}`,paddingBottom:10,marginBottom:18},btn:(c=C.accent)=>({background:c,border:"none",borderRadius:6,padding:"13px 22px",color:c===C.accent?C.bg:"#fff",fontFamily:"Georgia,serif",fontSize:16,cursor:"pointer",fontWeight:"bold",whiteSpace:"nowrap"}),btnGhost:{background:"transparent",border:`1px solid ${C.border}`,borderRadius:6,padding:"10px 17px",color:C.sub,fontFamily:"Georgia,serif",fontSize:15,cursor:"pointer"},btnDanger:{background:"transparent",border:"1px solid #f4433644",borderRadius:6,padding:"7px 13px",color:"#f44336",fontFamily:"Georgia,serif",fontSize:15,cursor:"pointer"},label:{fontSize:12,color:C.sub,textTransform:"uppercase",letterSpacing:"0.15em",marginBottom:6,fontFamily:"monospace"},input:{background:C.bg,border:`1px solid ${C.border}`,borderRadius:6,padding:"10px 14px",color:C.text,fontFamily:"Georgia,serif",fontSize:16,width:"100%",boxSizing:"border-box",outline:"none"},select:{background:C.bg,border:`1px solid ${C.border}`,borderRadius:6,padding:"10px 14px",color:C.text,fontFamily:"Georgia,serif",fontSize:16,width:"100%",boxSizing:"border-box",outline:"none"},row:{display:"flex",justifyContent:"space-between",alignItems:"center"},tag:co=>({background:co+"22",color:co,border:`1px solid ${co}44`,borderRadius:4,padding:"4px 10px",fontSize:13,fontFamily:"monospace"}),alert:co=>({background:co+"18",border:`1px solid ${co}44`,borderRadius:8,padding:"15px 20px",marginBottom:15}),T:{accent:C.accent,text:C.text,sub:C.sub,border:C.border,bg:C.bg}};
   return(<div style={bS.page}>
     <MealDetailModal detailSlot={detailSlot} setDetailSlot={setDetailSlot} mealPlan={mealPlan} mealDetails={mealDetails||{}} shopList={shopList} saveDetails={saveDetails} saveShop={saveShop} S={bS}/>
+    {showShopView&&<ShoppingListView shopList={shopList} setShopList={setShopList} shopSettings={shopSettings} onClose={()=>setShowShopView(false)}/>}
     <div style={{background:"rgba(0,0,0,0.3)",borderBottom:`1px solid ${C.border}`,padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
       <div><div style={{fontSize:9,color:C.sub,fontFamily:"monospace",letterSpacing:"0.2em"}}>FAMILY HUB</div><div style={{fontSize:16,color:C.text}}>Bradyn's View</div></div>
-      <div style={{display:"flex",gap:8,alignItems:"center"}}>{TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{...bS.btnGhost,borderBottom:tab===t.id?`2px solid ${C.accent}`:"2px solid transparent",borderRadius:0,color:tab===t.id?C.accent:C.sub,padding:"6px 10px",fontSize:12}}>{t.icon} {t.label}</button>)}<button onClick={onLogout} style={{...bS.btnGhost,fontSize:12}}>Sign Out ↩</button></div>
+      <div style={{display:"flex",gap:8,alignItems:"center"}}>{TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{...bS.btnGhost,borderBottom:tab===t.id?`2px solid ${C.accent}`:"2px solid transparent",borderRadius:0,color:tab===t.id?C.accent:C.sub,padding:"6px 10px",fontSize:12}}>{t.icon} {t.label}</button>)}<button onClick={()=>setShowShopView(true)} style={{...bS.btnGhost,fontSize:12,padding:"6px 10px"}}>🛒</button><button onClick={onLogout} style={{...bS.btnGhost,fontSize:12}}>Sign Out ↩</button></div>
     </div>
     <div style={{maxWidth:900,margin:"0 auto",padding:16}}>
       {tab==="home"&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:14}}>
@@ -1461,7 +1548,7 @@ function ParkerTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMea
   const pBtn={background:"linear-gradient(135deg,#b44fef,#7b2fc0)",border:"none",borderRadius:10,padding:"12px 18px",color:"#fff",fontSize:13,cursor:"pointer",fontWeight:"bold",fontFamily:"Georgia,serif",width:"100%",marginBottom:8};
   const pBtnG={background:"transparent",border:"1px solid rgba(180,79,239,0.3)",borderRadius:8,padding:"8px 14px",color:"#7a6aaa",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:12};
   const pS={page:{background:"linear-gradient(135deg,#1a0a2e,#0d1a2e)",minHeight:"100vh",fontFamily:"Georgia,serif",color:"#e8e0ff",fontSize:17},card:{background:"rgba(180,79,239,0.1)",border:"1px solid rgba(180,79,239,0.25)",borderRadius:12,padding:24,marginBottom:16},cardSm:{background:"rgba(180,79,239,0.07)",border:"1px solid rgba(180,79,239,0.15)",borderRadius:10,padding:18,marginBottom:12},h2:{fontSize:18,color:"#b44fef",fontWeight:"bold",marginBottom:16},btn:(c="#b44fef")=>({background:c,border:"none",borderRadius:10,padding:"13px 22px",color:"#fff",fontSize:16,cursor:"pointer",fontWeight:"bold",fontFamily:"Georgia,serif",whiteSpace:"nowrap"}),btnGhost:{background:"transparent",border:"1px solid rgba(180,79,239,0.3)",borderRadius:8,padding:"10px 15px",color:"#7a6aaa",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:15},btnDanger:{background:"transparent",border:"1px solid #f4433644",borderRadius:6,padding:"7px 13px",color:"#f44336",fontFamily:"Georgia,serif",fontSize:15,cursor:"pointer"},label:{fontSize:12,color:"#7a6aaa",textTransform:"uppercase",letterSpacing:"0.15em",marginBottom:6,fontFamily:"monospace"},input:{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(180,79,239,0.4)",borderRadius:8,padding:"10px 14px",color:"#e8e0ff",fontFamily:"Georgia,serif",fontSize:16,width:"100%",boxSizing:"border-box",outline:"none"},select:{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(180,79,239,0.4)",borderRadius:8,padding:"10px 14px",color:"#e8e0ff",fontFamily:"Georgia,serif",fontSize:16,width:"100%",boxSizing:"border-box",outline:"none"},row:{display:"flex",justifyContent:"space-between",alignItems:"center"},tag:c=>({background:c+"22",color:c,border:`1px solid ${c}44`,borderRadius:4,padding:"4px 10px",fontSize:13,fontFamily:"monospace"}),alert:c=>({background:c+"18",border:`1px solid ${c}44`,borderRadius:8,padding:"14px 18px",marginBottom:14}),T:{accent:"#b44fef",text:"#e8e0ff",sub:"#7a6aaa",border:"rgba(180,79,239,0.25)",bg:"#1a0a2e"}};
-  return(<div style={pS.page}>
+  const TABS=[{id:"home",label:"Home"},{id:"chores",label:"Tasks"},{id:"board",label:"Board"}];
     <div style={{background:"rgba(0,0,0,0.3)",borderBottom:"1px solid rgba(180,79,239,0.2)",padding:"10px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
       <div style={{fontSize:15,color:"#b44fef",fontWeight:"bold"}}>Parker's Hub</div>
       <div style={{display:"flex",gap:6,alignItems:"center"}}>{TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{...pBtnG,color:tab===t.id?"#b44fef":"#7a6aaa",borderColor:tab===t.id?"rgba(180,79,239,0.6)":"rgba(180,79,239,0.2)"}}>{t.label}</button>)}<button onClick={onLogout} style={pBtnG}>Sign Out ↩</button></div>
@@ -1530,7 +1617,8 @@ function BradDashboard(props){
     {g:"Settings",tabs:[{id:"settings",label:"Settings",icon:"⚙️"},{id:"admin",label:"Admin",icon:"🔐"}]},
   ];
   return(<div style={S.page}>
-    <UserHeader user="brad" onLogout={onLogout} S={S} extra={<div style={{fontSize:13,color:S.T.accent,fontFamily:"monospace"}}>{fmt(netWorth)} net worth</div>}>
+    {showShopView&&<ShoppingListView shopList={shopList} setShopList={setShopList} shopSettings={shopSettings} onClose={()=>setShowShopView(false)}/>}
+    <UserHeader user="brad" onLogout={onLogout} S={S} extra={<div style={{display:"flex",gap:8,alignItems:"center"}}><button onClick={()=>setShowShopView(true)} style={{...S.btnGhost,fontSize:12,padding:"5px 12px"}}>🛒</button><div style={{fontSize:13,color:S.T.accent,fontFamily:"monospace"}}>{fmt(netWorth)} net worth</div></div>}>
       <div style={{display:"flex",gap:0,overflowX:"auto",alignItems:"center",marginBottom:4}}>
         {GROUPS.map((group,gi)=><div key={group.g} style={{display:"flex",alignItems:"center"}}>
           {gi>0&&<div style={{width:1,height:18,background:S.T.border,margin:"0 6px",flexShrink:0}}/>}
@@ -1569,6 +1657,7 @@ function BradDashboard(props){
 // ── MARY BETH DASHBOARD ───────────────────────────────────────────────────────
 function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,profile,setProfile,expenses,debts,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,onLogout}){
   const [tab,setTab]=useState("home");
+  const [showShopView,setShowShopView]=useState(false);
   const [userTheme,setUserTheme]=useState(appSettings?.userThemes?.maryBeth||"dark");
   const S=makeS(userTheme);
   const saveTheme=key=>{setUserTheme(key);const updated={...appSettings,userThemes:{...appSettings.userThemes,maryBeth:key}};setAppSettings(updated);store.save("fp2:appSettings",updated);};
@@ -1576,7 +1665,8 @@ function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,s
   const msgPending=(messages||[]).filter(m=>!m.approved).length;
   const TABS=[{id:"home",label:"Home",icon:"🏠"},{id:"meals",label:"Meals & Food",icon:"🍽"},{id:"chores",label:"Tasks",icon:"✅"},{id:"board",label:"Board",icon:"📢"},{id:"bills",label:"Expenses",icon:"🧾"},{id:"settings",label:"Settings",icon:"⚙️"}];
   return(<div style={S.page}>
-    <UserHeader user="maryBeth" onLogout={onLogout} S={S}>
+    {showShopView&&<ShoppingListView shopList={shopList} setShopList={setShopList} shopSettings={shopSettings} onClose={()=>setShowShopView(false)}/>}
+    <UserHeader user="maryBeth" onLogout={onLogout} S={S} extra={<button onClick={()=>setShowShopView(true)} style={{...S.btnGhost,fontSize:12,padding:"5px 12px"}}>🛒</button>}>
       <div style={{display:"flex",gap:0,overflowX:"auto",marginBottom:4}}>
         {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{padding:"7px 11px",cursor:"pointer",fontSize:11,background:"none",border:"none",borderBottom:tab===t.id?`2px solid ${S.T.accent}`:"2px solid transparent",color:tab===t.id?S.T.accent:S.T.sub,fontFamily:"Georgia,serif",whiteSpace:"nowrap",position:"relative"}}>
           {t.icon} {t.label}
