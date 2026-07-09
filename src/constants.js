@@ -61,6 +61,16 @@ const todayName=()=>{const d=new Date().getDay();return DAYS[d===0?6:d-1];};
 // History and are hidden from every other view.
 const billPaid=b=>(!b.owner||b.owner==="shared")?!!(b.bradPaid&&b.maryBethPaid):b.owner==="brad"?!!b.bradPaid:!!b.maryBethPaid;
 
+// ── Week helpers for the dated meal planner ───────────────────────────────────
+// Weeks start on Monday (matching DAYS). A week is identified by its Monday's
+// local date, e.g. "2026-07-06".
+const localISO=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const weekKeyOf=(d=new Date())=>{const x=new Date(d);x.setDate(x.getDate()-((x.getDay()+6)%7));return localISO(x);};
+const weekKeyOffset=(wk,weeks)=>{const d=new Date(wk+"T12:00:00");d.setDate(d.getDate()+7*weeks);return localISO(d);};
+const dateOfWeekDay=(wk,dayIdx)=>{const d=new Date(wk+"T12:00:00");d.setDate(d.getDate()+dayIdx);return d;};
+const weekLabel=wk=>{const s=dateOfWeekDay(wk,0),e=dateOfWeekDay(wk,6);return s.toLocaleDateString("en-US",{month:"short",day:"numeric"})+" – "+e.toLocaleDateString("en-US",{month:"short",day:"numeric"});};
+const normalizeWeek=p=>Object.fromEntries(DAYS.map(dy=>[dy,{Breakfast:p?.[dy]?.Breakfast||"",Lunch:p?.[dy]?.Lunch||"",Dinner:p?.[dy]?.Dinner||""}]));
+
 function getTheme(k){return THEMES[k]||THEMES.dark;}
 function makeS(theme,scale=1.15){
   const T=getTheme(theme);
@@ -93,5 +103,6 @@ export {
   DAYS, DSHORT, MEAL_TYPES, CATS, ACCT_TYPES, DEBT_TYPES, BILL_CATS, SHOP_CATS,
   CHORE_MASTER, GOLD, DARK, MID, BORDER, TIMEOUT_MS, THEMES, USERS,
   blankMealPlan, D, fmt, calcMortgage, scoreToRate, calcPayoff, todayName, billPaid,
+  weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek,
   getTheme, makeS, S,
 };

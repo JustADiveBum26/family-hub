@@ -20,7 +20,10 @@ const pad2=n=>String(n).padStart(2,"0");
 const dateKey=d=>`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
 const parseKey=k=>new Date(k+"T12:00:00");
 const todayKey=()=>dateKey(new Date());
-const ownerOf=ev=>OWNERS.find(o=>o.key===(ev.owner||"family"))||OWNERS[0];
+// Events can be tagged with several people (owners: ["brad","parker"]). Older
+// events only have a single `owner` string — both shapes are supported.
+const evOwners=ev=>{const keys=(ev.owners&&ev.owners.length)?ev.owners:[ev.owner||"family"];return keys.map(k=>OWNERS.find(o=>o.key===k)).filter(Boolean);};
+const ownerOf=ev=>evOwners(ev)[0]||OWNERS[0];
 const catOf=ev=>EVENT_CATS.find(c=>c.key===(ev.category||"other"))||EVENT_CATS[EVENT_CATS.length-1];
 const spansDay=(ev,key)=>ev.date<=key&&key<=(ev.endDate||ev.date);
 const fmtTime=t=>{if(!t)return"";const[h,m]=t.split(":").map(Number);const ap=h>=12?"PM":"AM";const h12=h%12===0?12:h%12;return m?`${h12}:${pad2(m)} ${ap}`:`${h12} ${ap}`;};
@@ -98,8 +101,9 @@ function MonthCalendar({events,S,selectedKey,onSelectDay}){
               {dayEvents.length>4&&<div style={{fontSize:8,color:S.T.sub,lineHeight:"6px"}}>+</div>}
             </div>
             :<>
-              {dayEvents.slice(0,maxChips).map(ev=>{const o=ownerOf(ev);return(
+              {dayEvents.slice(0,maxChips).map(ev=>{const os=evOwners(ev),o=os[0];return(
                 <div key={ev.id} style={{background:o.color+"22",border:`1px solid ${o.color}55`,borderRadius:4,padding:"1px 4px",marginBottom:2,fontSize:10,color:S.T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                  {os.length>1&&os.slice(0,4).map(o2=><span key={o2.key} style={{display:"inline-block",width:6,height:6,borderRadius:"50%",background:o2.color,marginRight:2,verticalAlign:"middle"}}/>)}
                   {ev.time&&ev.date===c.key?<span style={{color:o.color,fontFamily:"monospace"}}>{fmtTime(ev.time)} </span>:null}{catOf(ev).emoji} {ev.title}
                 </div>);})}
               {dayEvents.length>maxChips&&<div style={{fontSize:9,color:S.T.sub}}>+{dayEvents.length-maxChips} more</div>}
@@ -116,14 +120,14 @@ function MonthCalendar({events,S,selectedKey,onSelectDay}){
 
 // ── EVENT ROW (used in day detail + upcoming lists) ───────────────────────────
 function EventRow({ev,S,showDate,canEdit,onEdit,onDelete,onDeleteSeries}){
-  const o=ownerOf(ev),c=catOf(ev);
+  const os=evOwners(ev),o=os[0]||OWNERS[0],c=catOf(ev);
   const multi=ev.endDate&&ev.endDate!==ev.date;
   return(<div style={{display:"flex",gap:10,padding:"9px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"flex-start"}}>
-    <div style={{width:4,alignSelf:"stretch",borderRadius:2,background:o.color,flexShrink:0}}/>
+    <div style={{width:4,alignSelf:"stretch",borderRadius:2,background:os.length>1?`linear-gradient(${os.map(x=>x.color).join(",")})`:o.color,flexShrink:0}}/>
     <div style={{flex:1,minWidth:0}}>
       <div style={{fontSize:14,color:S.T.text,fontWeight:"bold"}}>{c.emoji} {ev.title}</div>
       <div style={{fontSize:11,color:S.T.sub,marginTop:2,display:"flex",gap:8,flexWrap:"wrap"}}>
-        <span style={{color:o.color}}>{o.emoji} {o.label}</span>
+        {os.map(x=><span key={x.key} style={{color:x.color}}>{x.emoji} {x.label}</span>)}
         {showDate&&<span>{fmtDayShort(ev.date)}{multi?" → "+fmtDayShort(ev.endDate):""}</span>}
         {ev.time&&<span>{fmtTime(ev.time)}{ev.endTime?" – "+fmtTime(ev.endTime):""}</span>}
         {!showDate&&multi&&<span>thru {fmtDayShort(ev.endDate)}</span>}
@@ -140,10 +144,20 @@ function EventRow({ev,S,showDate,canEdit,onEdit,onDelete,onDeleteSeries}){
 
 // ── ADD / EDIT FORM ───────────────────────────────────────────────────────────
 function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
-  const blank={title:"",owner:"family",category:"other",date:defaultDate||todayKey(),endDate:"",time:"",endTime:"",notes:"",repeatWeekly:false,repeatUntil:""};
-  const [f,setF]=useState(initial?{...blank,...initial,repeatWeekly:false,repeatUntil:""}:blank);
+  const blank={title:"",owners:["family"],category:"other",date:defaultDate||todayKey(),endDate:"",time:"",endTime:"",notes:"",repeatWeekly:false,repeatUntil:""};
+  const [f,setF]=useState(initial?{...blank,...initial,owners:(initial.owners&&initial.owners.length)?initial.owners:[initial.owner||"family"],repeatWeekly:false,repeatUntil:""}:blank);
   const [err,setErr]=useState("");
   const set=(k,v)=>{setF(x=>({...x,[k]:v}));setErr("");};
+  // "Family" means everyone and can't be combined; picking people drops it.
+  const toggleOwner=key=>{
+    setF(x=>{
+      if(key==="family")return{...x,owners:["family"]};
+      let next=x.owners.filter(k=>k!=="family");
+      next=next.includes(key)?next.filter(k=>k!==key):[...next,key];
+      return{...x,owners:next.length?next:["family"]};
+    });
+    setErr("");
+  };
   const submit=()=>{
     if(!f.title.trim()){setErr("Give the event a name.");return;}
     if(!f.date){setErr("Pick a date.");return;}
@@ -155,7 +169,14 @@ function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
     <div style={{fontSize:14,color:S.T.accent,fontWeight:"bold",marginBottom:10}}>{initial?"Edit Event":"Add to Family Calendar"}</div>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:10}}>
       <div style={{gridColumn:"1/-1"}}><div style={S.label}>What *</div><input style={S.input} placeholder="e.g. Brad works 3–11, Parker's game..." value={f.title} onChange={e=>set("title",e.target.value)}/></div>
-      <div><div style={S.label}>Who</div><select style={S.select} value={f.owner} onChange={e=>set("owner",e.target.value)}>{OWNERS.map(o=><option key={o.key} value={o.key}>{o.emoji} {o.label}</option>)}</select></div>
+      <div style={{gridColumn:"1/-1"}}>
+        <div style={S.label}>Who is this for? (tap all that apply)</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {OWNERS.map(o=>{const on=f.owners.includes(o.key);return(
+            <button key={o.key} onClick={()=>toggleOwner(o.key)} style={{padding:"7px 12px",borderRadius:10,fontSize:13,fontFamily:"Georgia,serif",cursor:"pointer",background:on?o.color+"33":"transparent",border:`2px solid ${on?o.color:S.T.border}`,color:on?o.color:S.T.sub,fontWeight:on?"bold":"normal",WebkitTapHighlightColor:"transparent"}}>{o.emoji} {o.label}{on?" ✓":""}</button>
+          );})}
+        </div>
+      </div>
       <div><div style={S.label}>Type</div><select style={S.select} value={f.category} onChange={e=>set("category",e.target.value)}>{EVENT_CATS.map(c=><option key={c.key} value={c.key}>{c.emoji} {c.label}</option>)}</select></div>
       <div><div style={S.label}>Date *</div><input style={S.input} type="date" value={f.date} onChange={e=>set("date",e.target.value)}/></div>
       <div><div style={S.label}>End date (optional)</div><input style={S.input} type="date" value={f.endDate} onChange={e=>set("endDate",e.target.value)}/></div>
@@ -199,7 +220,7 @@ function CalendarTab({events,setEvents,currentUser,canEdit,S}){
   const [editing,setEditing]=useState(null);
   const save=u=>{setEvents(u);store.save("fp2:events",u);};
   const addEvent=f=>{
-    const base={title:f.title.trim(),owner:f.owner,category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),createdBy:currentUser||""};
+    const base={title:f.title.trim(),owners:f.owners,owner:f.owners[0],category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),createdBy:currentUser||""};
     let added=[];
     if(f.repeatWeekly&&f.repeatUntil){
       const seriesId=Date.now();
@@ -216,7 +237,7 @@ function CalendarTab({events,setEvents,currentUser,canEdit,S}){
     setSelected(f.date);
   };
   const updateEvent=f=>{
-    save((events||[]).map(ev=>ev.id===editing.id?{...ev,title:f.title.trim(),owner:f.owner,category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim()}:ev));
+    save((events||[]).map(ev=>ev.id===editing.id?{...ev,title:f.title.trim(),owners:f.owners,owner:f.owners[0],category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim()}:ev));
     setEditing(null);
   };
   const del=id=>save((events||[]).filter(ev=>ev.id!==id));

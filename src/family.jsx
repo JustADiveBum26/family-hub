@@ -1,7 +1,7 @@
 // ── Family features: chores, message board, settings, bills, meals, ledger ────
 import { useState, useEffect } from "react";
 import { store } from "./store";
-import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, fmt, todayName, billPaid } from "./constants";
+import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek } from "./constants";
 import { DayPills } from "./shared";
 
 // ── CHORES TAB ────────────────────────────────────────────────────────────────
@@ -344,12 +344,28 @@ function AdminPanel({auth,setAuth,S}){
 }
 
 // ── BILL CARD (top-level — must not be inside BillsTab) ──────────────────────
-function BillCard({bill,today,togglePaid,setPaidFrom,del,profile,payAccounts,S}){
+function BillCard({bill,today,togglePaid,setPaidFrom,del,profile,payAccounts,S,editingId,editForm,setEditForm,startEdit,saveEdit,cancelEdit}){
   const due=new Date(bill.dueDate+"T12:00:00"),dl=Math.ceil((due-today)/(864e5));
   const isOver=dl<0,isSoon=dl>=0&&dl<=3;
   const isShared=!bill.owner||bill.owner==="shared";
   const isBradOnly=bill.owner==="brad",isMBOnly=bill.owner==="maryBeth";
   const share=isShared?bill.amount/2:bill.amount;
+  if(editingId===bill.id)return(<div style={{...S.card,borderLeft:`4px solid ${S.T.accent}`,marginBottom:8}}>
+    <div style={{fontSize:13,color:S.T.accent,fontWeight:"bold",marginBottom:10}}>Edit Expense</div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:12}}>
+      <div><div style={S.label}>Expense Name</div><input style={S.input} value={editForm.name} onChange={e=>setEditForm({...editForm,name:e.target.value})}/></div>
+      <div><div style={S.label}>Payee</div><input style={S.input} value={editForm.payee} onChange={e=>setEditForm({...editForm,payee:e.target.value})}/></div>
+      <div><div style={S.label}>Category</div><select style={S.select} value={editForm.category} onChange={e=>setEditForm({...editForm,category:e.target.value})}>{BILL_CATS.map(c=><option key={c}>{c}</option>)}</select></div>
+      <div><div style={S.label}>Who Pays</div><select style={S.select} value={editForm.owner} onChange={e=>setEditForm({...editForm,owner:e.target.value})}><option value="shared">Shared 50/50</option><option value="brad">{profile.myName} Only</option><option value="maryBeth">{profile.fianceName} Only</option></select></div>
+      <div><div style={S.label}>Amount</div><input style={S.input} type="number" value={editForm.amount} onChange={e=>setEditForm({...editForm,amount:e.target.value})}/></div>
+      <div><div style={S.label}>Due Date</div><input style={S.input} type="date" value={editForm.dueDate} onChange={e=>setEditForm({...editForm,dueDate:e.target.value})}/></div>
+      <div><div style={S.label}>Notes</div><input style={S.input} value={editForm.notes} onChange={e=>setEditForm({...editForm,notes:e.target.value})}/></div>
+    </div>
+    <div style={{display:"flex",gap:8}}>
+      <button style={{...S.btn("#4CAF50"),padding:"8px 18px",fontSize:13}} onClick={()=>saveEdit(bill.id)}>Save Changes</button>
+      <button style={S.btnGhost} onClick={cancelEdit}>Cancel</button>
+    </div>
+  </div>);
   const full=isShared?(bill.bradPaid&&bill.maryBethPaid):isBradOnly?bill.bradPaid:bill.maryBethPaid;
   const edge=full?"#4CAF50":isOver?"#f44336":isSoon?"#FF9800":S.T.border;
   return(<div style={{...S.card,borderLeft:`4px solid ${edge}`,marginBottom:8}}>
@@ -395,7 +411,10 @@ function BillCard({bill,today,togglePaid,setPaidFrom,del,profile,payAccounts,S})
         </div>
         {bill.paidFromMB&&<div style={{fontSize:10,color:"#E91E63",marginTop:3}}>Paid from: {bill.paidFromMB}</div>}
       </div>}
-      <button style={S.btnDanger} onClick={()=>del(bill.id)}>X</button>
+      <div style={{display:"flex",gap:6}}>
+        <button style={{...S.btnGhost,padding:"5px 12px",fontSize:12}} onClick={()=>startEdit(bill)}>✏ Edit</button>
+        <button style={S.btnDanger} onClick={()=>del(bill.id)}>X</button>
+      </div>
     </div>
   </div>);
 }
@@ -408,7 +427,15 @@ function SecHead({label,total,color,S}){
 function BillsTab({bills,setBills,billHistory,setBillHistory,profile,payAccounts,S}){
   const blank={name:"",payee:"",category:"Utilities",amount:"",dueDate:"",notes:"",owner:"shared",paidFromBrad:"",paidFromMB:""};
   const [form,setForm]=useState(blank),[showForm,setShowForm]=useState(false),[showHistory,setShowHistory]=useState(false),[clearConfirm,setClearConfirm]=useState(false);
+  const [editingId,setEditingId]=useState(null),[editForm,setEditForm]=useState({});
   const save=u=>{setBills(u);store.save("fp2:bills",u);};
+  const startEdit=b=>{setEditingId(b.id);setEditForm({name:b.name,payee:b.payee||"",category:b.category,owner:b.owner||"shared",amount:String(b.amount),dueDate:b.dueDate,notes:b.notes||""});};
+  const saveEdit=id=>{
+    if(!editForm.name||!editForm.amount||!editForm.dueDate)return;
+    save(bills.map(b=>b.id===id?{...b,name:editForm.name,payee:editForm.payee,category:editForm.category,owner:editForm.owner,amount:+editForm.amount,dueDate:editForm.dueDate,notes:editForm.notes}:b));
+    setEditingId(null);
+  };
+  const cancelEdit=()=>setEditingId(null);
   const saveHistory=u=>{setBillHistory(u);store.save("fp2:billHistory",u);};
   const addBill=()=>{if(!form.name||!form.amount||!form.dueDate)return;save([...bills,{...form,id:Date.now(),amount:+form.amount,bradPaid:false,bradPaidDate:null,maryBethPaid:false,maryBethPaidDate:null}]);setForm(blank);setShowForm(false);};
   const togglePaid=(id,person)=>{
@@ -498,9 +525,9 @@ function BillsTab({bills,setBills,billHistory,setBillHistory,profile,payAccounts
       <button style={{...S.btn(),padding:"9px 22px"}} onClick={addBill}>Add Expense</button>
     </div>}
     {active.length===0&&<div style={{...S.card,textAlign:"center",padding:40,color:S.T.sub}}>{bills.length===0?"No expenses yet. Click Add Expense to start.":"All caught up! 🎉 Every bill is paid — see History for the details."}</div>}
-    {shared.length>0&&<><SecHead label="Shared Expenses - 50/50" total={sharedTotal} color="#2196F3" S={S}/>{shared.map(b=><BillCard key={b.id} bill={b} today={today} togglePaid={togglePaid} setPaidFrom={setPaidFrom} del={del} profile={profile} payAccounts={payAccounts} S={S}/>)}</>}
-    {bradOnly.length>0&&<><SecHead label={profile.myName+"'s Bills"} total={bradTotal} color="#2196F3" S={S}/>{bradOnly.map(b=><BillCard key={b.id} bill={b} today={today} togglePaid={togglePaid} setPaidFrom={setPaidFrom} del={del} profile={profile} payAccounts={payAccounts} S={S}/>)}</>}
-    {mbOnly.length>0&&<><SecHead label={profile.fianceName+"'s Bills"} total={mbTotal} color="#E91E63" S={S}/>{mbOnly.map(b=><BillCard key={b.id} bill={b} today={today} togglePaid={togglePaid} setPaidFrom={setPaidFrom} del={del} profile={profile} payAccounts={payAccounts} S={S}/>)}</>}
+    {shared.length>0&&<><SecHead label="Shared Expenses - 50/50" total={sharedTotal} color="#2196F3" S={S}/>{shared.map(b=><BillCard key={b.id} bill={b} today={today} togglePaid={togglePaid} setPaidFrom={setPaidFrom} del={del} profile={profile} payAccounts={payAccounts} S={S} editingId={editingId} editForm={editForm} setEditForm={setEditForm} startEdit={startEdit} saveEdit={saveEdit} cancelEdit={cancelEdit}/>)}</>}
+    {bradOnly.length>0&&<><SecHead label={profile.myName+"'s Bills"} total={bradTotal} color="#2196F3" S={S}/>{bradOnly.map(b=><BillCard key={b.id} bill={b} today={today} togglePaid={togglePaid} setPaidFrom={setPaidFrom} del={del} profile={profile} payAccounts={payAccounts} S={S} editingId={editingId} editForm={editForm} setEditForm={setEditForm} startEdit={startEdit} saveEdit={saveEdit} cancelEdit={cancelEdit}/>)}</>}
+    {mbOnly.length>0&&<><SecHead label={profile.fianceName+"'s Bills"} total={mbTotal} color="#E91E63" S={S}/>{mbOnly.map(b=><BillCard key={b.id} bill={b} today={today} togglePaid={togglePaid} setPaidFrom={setPaidFrom} del={del} profile={profile} payAccounts={payAccounts} S={S} editingId={editingId} editForm={editForm} setEditForm={setEditForm} startEdit={startEdit} saveEdit={saveEdit} cancelEdit={cancelEdit}/>)}</>}
   </>);
 }
 
@@ -596,7 +623,14 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList
 }
 
 // ── MEALS TAB ─────────────────────────────────────────────────────────────────
-function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,mealDetails,setMealDetails,shopSettings,profile,S}){
+function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,mealDetails,setMealDetails,shopSettings,profile,S}){
+  // Week navigation: plans are stored per week (keyed by Monday's date), so the
+  // family can plan next week and look back at past menus.
+  const curWk=weekKeyOf();
+  const [wk,setWk]=useState(curWk);
+  const mealPlan=normalizeWeek(mealPlans[wk]);
+  const isCur=wk===curWk,isNext=wk===weekKeyOffset(curWk,1),isPast=wk<curWk;
+  const weekTitle=isCur?"This Week":isNext?"Next Week":isPast?"Past Week":"Week of "+weekLabel(wk).split(" – ")[0];
   const [editCell,setEditCell]=useState(null),[cellVal,setCellVal]=useState("");
   const [showAdd,setShowAdd]=useState(false),[newItem,setNewItem]=useState({name:"",qty:"1",category:"Grocery",store:"",notes:""});
   const [addMode,setAddMode]=useState("single");
@@ -617,7 +651,8 @@ function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,set
   const [filterCat,setFilterCat]=useState("All");
   const [filterStore,setFilterStore]=useState("All");
   const [detailSlot,setDetailSlot]=useState(null);
-  const saveMeals=u=>{setMealPlan(u);store.save("fp2:mealPlan",u);};
+  const saveWeek=(wkKey,weekPlan)=>{const u={...mealPlans,[wkKey]:weekPlan};setMealPlans(u);store.save("fp2:mealPlans",u);};
+  const saveMeals=u=>saveWeek(wk,u);
   const saveShop=u=>{setShopList(u);store.save("fp2:shopList",u);};
   const saveSugg=u=>{setMealSuggestions(u);store.save("fp2:mealSuggestions",u);};
   const saveReqs=u=>{setShopRequests(u);store.save("fp2:shopRequests",u);};
@@ -630,20 +665,23 @@ function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,set
   const approveSugg=id=>{
     const s=mealSuggestions.find(x=>x.id===id);
     if(!s)return;
-    // Suggestions from Parker/Ryder use dayPreference (a day name).
-    // Suggestions from Bradyn use suggestDate (an actual date) — convert to the matching day name if it falls in the current week, otherwise just mark approved without writing to the grid.
-    let targetDay=s.dayPreference;
+    // Suggestions from Parker/Ryder use dayPreference (a day name → this week).
+    // Suggestions from Bradyn use suggestDate (an actual date → its own week).
+    let targetDay=s.dayPreference&&s.dayPreference!=="Any day"?s.dayPreference:null;
+    let targetWk=curWk;
     if(!targetDay&&s.suggestDate){
       const d=new Date(s.suggestDate+"T12:00:00");
       targetDay=DAYS[d.getDay()===0?6:d.getDay()-1];
+      targetWk=weekKeyOf(d);
     }
     if(targetDay){
-      saveMeals({...mealPlan,[targetDay]:{...mealPlan[targetDay],[s.mealType]:s.meal}});
+      const plan=normalizeWeek(mealPlans[targetWk]);
+      saveWeek(targetWk,{...plan,[targetDay]:{...plan[targetDay],[s.mealType]:s.meal}});
       // Carry over any ingredients/recipe the kid attached to their suggestion onto the real grid slot
       const suggKey="sugg_"+s.id;
       const suggDetail=mealDetails[suggKey];
       if(suggDetail&&(suggDetail.ingredients?.length>0||suggDetail.recipe?.trim())){
-        const gridKey=targetDay+"__"+s.mealType;
+        const gridKey=targetWk+"__"+targetDay+"__"+s.mealType;
         saveDetails({...mealDetails,[gridKey]:suggDetail});
       }
     }
@@ -659,21 +697,35 @@ function MealsTab({mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,set
     ?[...new Set(filteredItems.map(i=>i.store||"No Store"))].reduce((acc,s)=>{const items=filteredItems.filter(i=>(i.store||"No Store")===s);if(items.length>0)acc[s]=items;return acc;},{})
     :{[filterStore]:filteredItems};
   const groupedUnchecked=Object.fromEntries(Object.entries(groupedByStore).map(([s,items])=>[s,cats.reduce((acc,cat)=>{const ci=items.filter(i=>i.category===cat);if(ci.length>0)acc[cat]=ci;return acc;},{})]));
-  const slotKey=(day,mt)=>day+"__"+mt;
+  // Recipe/ingredient details are stored per week. Recipes saved before dated
+  // weeks existed used day-only keys — keep using those until a weeked one exists.
+  const slotKey=(day,mt)=>{const wkKey=wk+"__"+day+"__"+mt;if(mealDetails[wkKey])return wkKey;const legacy=day+"__"+mt;return mealDetails[legacy]?legacy:wkKey;};
   const hasDetail=(day,mt)=>{const d=mealDetails[slotKey(day,mt)];return d&&(d.ingredients?.length>0||d.recipe?.trim());};
   return(<>
     <MealDetailModal detailSlot={detailSlot} setDetailSlot={setDetailSlot} mealPlan={mealPlan} mealDetails={mealDetails} shopList={shopList} saveDetails={saveDetails} saveShop={saveShop} onClearMeal={clearCell} S={S}/>
     {(pendS.length>0||pendR.length>0)&&<div style={{...S.alert(GOLD),marginBottom:14}}><span style={{color:GOLD,fontWeight:"bold"}}>★ {pendS.length+pendR.length} pending request{pendS.length+pendR.length!==1?"s":""} from the kids — </span><span style={{color:S.T.sub,fontSize:13}}>scroll down to review</span></div>}
-    <div style={S.card}><div style={S.h2}>This Week — click a meal name to add ingredients or a recipe</div>
+    <div style={S.card}>
+      <div style={{...S.row,flexWrap:"wrap",gap:8,marginBottom:10}}>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <button style={{...S.btnGhost,padding:"7px 14px",fontSize:15,lineHeight:1}} onClick={()=>setWk(weekKeyOffset(wk,-1))}>‹</button>
+          <div style={{textAlign:"center",minWidth:130}}>
+            <div style={{fontSize:15,color:isPast?S.T.sub:S.T.accent,fontWeight:"bold"}}>{weekTitle}</div>
+            <div style={{fontSize:11,color:S.T.sub,fontFamily:"monospace"}}>{weekLabel(wk)}</div>
+          </div>
+          <button style={{...S.btnGhost,padding:"7px 14px",fontSize:15,lineHeight:1}} onClick={()=>setWk(weekKeyOffset(wk,1))}>›</button>
+          {!isCur&&<button style={{...S.btnGhost,padding:"7px 12px",fontSize:12}} onClick={()=>setWk(curWk)}>Back to Today</button>}
+        </div>
+        <div style={{fontSize:11,color:S.T.sub}}>{isPast?"Browsing past menus — edits still save":"Click a meal name to add ingredients or a recipe"}</div>
+      </div>
       <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:620}}>
-        <thead><tr><th style={{width:90,padding:"8px 8px",textAlign:"left",color:S.T.sub,fontSize:11,fontFamily:"monospace",borderBottom:`1px solid ${S.T.border}`}}></th>{DAYS.map(d=><th key={d} style={{padding:"6px 4px",textAlign:"center",borderBottom:`1px solid ${S.T.border}`,fontFamily:"Georgia,serif",fontWeight:"normal",minWidth:80}}><div style={{fontSize:9,color:GOLD,fontFamily:"monospace",letterSpacing:"0.1em"}}>{d.slice(0,3).toUpperCase()}</div></th>)}</tr></thead>
+        <thead><tr><th style={{width:90,padding:"8px 8px",textAlign:"left",color:S.T.sub,fontSize:11,fontFamily:"monospace",borderBottom:`1px solid ${S.T.border}`}}></th>{DAYS.map((d,di)=>{const isToday=isCur&&d===todayName();return(<th key={d} style={{padding:"6px 4px",textAlign:"center",borderBottom:`1px solid ${S.T.border}`,fontFamily:"Georgia,serif",fontWeight:"normal",minWidth:80,background:isToday?GOLD+"14":"transparent"}}><div style={{fontSize:9,color:isToday?GOLD:S.T.sub,fontFamily:"monospace",letterSpacing:"0.1em"}}>{d.slice(0,3).toUpperCase()}</div><div style={{fontSize:12,color:isToday?GOLD:S.T.text,fontWeight:isToday?"bold":"normal"}}>{dateOfWeekDay(wk,di).toLocaleDateString("en-US",{month:"numeric",day:"numeric"})}</div></th>);})}</tr></thead>
         <tbody>{MEAL_TYPES.map(mt=><tr key={mt}><td style={{padding:"6px 8px",fontSize:10,color:S.T.sub,fontFamily:"monospace",borderRight:`1px solid ${S.T.border}`,whiteSpace:"nowrap",minWidth:90}}>{mt==="Breakfast"?"🌅":mt==="Lunch"?"☀️":"🌙"} {mt}</td>{DAYS.map(day=>{const val=mealPlan[day]?.[mt]||"",isEdit=editCell?.day===day&&editCell?.mt===mt,hasDet=hasDetail(day,mt);return(<td key={day} style={{padding:3,borderBottom:`1px solid #1a1a0f`,verticalAlign:"top"}}>
           {isEdit
             ?<div><input autoFocus style={{...S.input,fontSize:12,padding:"5px 7px"}} value={cellVal} onChange={e=>setCellVal(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveCell();if(e.key==="Escape"){setEditCell(null);setCellVal("");}}}/><div style={{display:"flex",gap:4,marginTop:3}}><button style={{...S.btn(),padding:"3px 8px",fontSize:11}} onClick={saveCell}>OK</button><button style={{...S.btnGhost,padding:"3px 8px",fontSize:11}} onClick={()=>{setEditCell(null);setCellVal("");}}>X</button></div></div>
             :<div style={{minHeight:38,padding:"5px 6px",borderRadius:5}}>
               {val
                 ?<div>
-                  <div onClick={()=>setDetailSlot({day,mt})} style={{fontSize:11,color:S.T.text,cursor:"pointer",marginBottom:2,textDecoration:"underline",textDecorationStyle:"dotted"}}>{val}</div>
+                  <div onClick={()=>setDetailSlot({day,mt,key:slotKey(day,mt)})} style={{fontSize:11,color:S.T.text,cursor:"pointer",marginBottom:2,textDecoration:"underline",textDecorationStyle:"dotted"}}>{val}</div>
                   <div style={{display:"flex",gap:4,alignItems:"center"}}>
                     {hasDet&&<span style={{fontSize:9,color:"#4CAF50",fontFamily:"monospace"}}>📋</span>}
                     <span onClick={()=>{setEditCell({day,mt});setCellVal(val);}} style={{fontSize:9,color:S.T.sub,cursor:"pointer"}}>✏ edit</span>

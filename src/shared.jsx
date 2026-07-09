@@ -1,7 +1,7 @@
 // ── Shared UI components (login, home screens, widgets) ───────────────────────
 import { useState, useEffect } from "react";
 import { store } from "./store";
-import { DAYS, DSHORT, MEAL_TYPES, GOLD, BORDER, THEMES, USERS, fmt, todayName, billPaid, S } from "./constants";
+import { DAYS, DSHORT, MEAL_TYPES, GOLD, BORDER, THEMES, USERS, fmt, todayName, billPaid, weekKeyOf, dateOfWeekDay, S } from "./constants";
 import { MonthCalendar, UpcomingEvents, EventRow, eventsOnDay, todayKey, fmtDayLong } from "./calendar";
 
 function Ring({pct:p=0,size=80,stroke=8,color=GOLD,label,sub}){const r=(size-stroke)/2,circ=2*Math.PI*r,filled=circ*Math.min(p/100,1);return(<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}><div style={{position:"relative",width:size,height:size}}><svg width={size} height={size} style={{transform:"rotate(-90deg)"}}><circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#1a1a0f" strokeWidth={stroke}/><circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={`${filled} ${circ}`} style={{transition:"stroke-dasharray 0.6s"}}/></svg>{label&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:"bold",color}}>{label}</div>}</div>{sub&&<div style={{fontSize:10,color:"#888",textAlign:"center",maxWidth:80}}>{sub}</div>}</div>);}
@@ -107,26 +107,58 @@ function LoginModal({user,auth,onSuccess,onClose}){
   return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}><div style={{background:"#141410",border:`2px solid ${u.color}44`,borderRadius:16,padding:32,maxWidth:380,width:"100%"}} onClick={e=>e.stopPropagation()}><div style={{textAlign:"center",marginBottom:24}}><div style={{fontSize:44,marginBottom:6}}>{u.emoji}</div><div style={{fontSize:22,color:"#e8e0c8",marginBottom:4}}>{isFirst&&!isPin?`Welcome, ${u.label}!`:`Hey ${u.label}!`}</div><div style={{fontSize:13,color:"#666"}}>{isFirst&&!isPin?"Create your password to get started":isPin?pinNotSet?"Your PIN has not been set — ask Brad!":"Enter your 4-digit code":"Enter your password"}</div></div>{isPin&&!pinNotSet&&<PinPad onSubmit={submitPin} color={u.color} error={pinErr}/>}{isPin&&pinNotSet&&<div style={{textAlign:"center",padding:"20px 0",color:"#666",fontSize:14}}>Ask Brad to set your code!</div>}{!isPin&&<div><div style={{marginBottom:12}}><div style={S.label}>{isFirst?"Create Password":"Password"}</div><input autoFocus style={S.input} type="password" value={pwd} onChange={e=>{setPwd(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&submitPwd()}/></div>{isFirst&&<div style={{marginBottom:12}}><div style={S.label}>Confirm Password</div><input style={S.input} type="password" value={confirm} onChange={e=>{setConfirm(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&submitPwd()}/></div>}{error&&<div style={{color:"#f44336",fontSize:12,marginBottom:10}}>{error}</div>}<button style={{...S.btn(u.color),width:"100%",padding:"11px",fontSize:15,marginTop:4}} onClick={submitPwd}>{isFirst?"Create Password and Sign In":"Sign In"}</button></div>}<button onClick={onClose} style={{...S.btnGhost,width:"100%",marginTop:12,textAlign:"center"}}>Cancel</button></div></div>);
 }
 
-function WeatherWidget(){
-  const [weather,setWeather]=useState(null),[loading,setLoading]=useState(true);
-  useEffect(()=>{
-    if(!navigator.geolocation){setLoading(false);return;}
-    navigator.geolocation.getCurrentPosition(async pos=>{
-      try{
-        const {latitude:lat,longitude:lon}=pos.coords;
-        const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph`);
-        const d=await r.json();
-        const code=d.current.weathercode;
-        const icon=code===0?"☀️":code<=2?"🌤":code<=3?"☁️":code<=48?"🌫":code<=57?"🌧":code<=67?"🌨":code<=77?"❄️":code<=82?"🌦":code<=86?"🌨":"⛈";
-        const desc=code===0?"Clear":code<=2?"Partly Cloudy":code<=3?"Cloudy":code<=48?"Foggy":code<=67?"Rainy":code<=77?"Snowy":code<=82?"Showers":"Stormy";
-        setWeather({temp:Math.round(d.current.temperature_2m),icon,desc,wind:Math.round(d.current.windspeed_10m)});
-      }catch(e){}
-      setLoading(false);
-    },()=>setLoading(false),{timeout:5000});
-  },[]);
-  if(loading)return <div style={{fontSize:11,color:"#555"}}>Loading weather...</div>;
-  if(!weather)return null;
-  return(<div style={{display:"flex",alignItems:"center",gap:8,padding:"5px 12px",background:"rgba(255,255,255,0.04)",borderRadius:20,border:`1px solid ${BORDER}`}}><span style={{fontSize:18}}>{weather.icon}</span><div><div style={{fontSize:13,fontWeight:"bold",color:"#e8e0c8"}}>{weather.temp}F</div><div style={{fontSize:10,color:"#666"}}>{weather.desc}</div></div></div>);
+// ── WEATHER STRIP — current conditions + rest-of-week forecast ────────────────
+// One shared module-level cache: every header/view reuses the same fetch and it
+// refreshes at most every 30 minutes.
+let weatherCache={at:0,data:null,promise:null};
+const wxIcon=code=>code===0?"☀️":code<=2?"🌤":code<=3?"☁️":code<=48?"🌫":code<=57?"🌧":code<=67?"🌧":code<=77?"❄️":code<=82?"🌦":code<=86?"🌨":"⛈";
+const wxDesc=code=>code===0?"Clear":code<=2?"Partly Cloudy":code<=3?"Cloudy":code<=48?"Foggy":code<=67?"Rainy":code<=77?"Snowy":code<=82?"Showers":"Stormy";
+function loadWeather(){
+  if(weatherCache.data&&Date.now()-weatherCache.at<30*60*1000)return Promise.resolve(weatherCache.data);
+  if(weatherCache.promise)return weatherCache.promise;
+  weatherCache.promise=(async()=>{
+    const pos=await new Promise((res,rej)=>{
+      if(!navigator.geolocation)return rej(new Error("no geolocation"));
+      navigator.geolocation.getCurrentPosition(res,rej,{timeout:8000});
+    });
+    const {latitude:lat,longitude:lon}=pos.coords;
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,windspeed_10m&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=auto&forecast_days=7`);
+    const d=await r.json();
+    const data={
+      current:{temp:Math.round(d.current.temperature_2m),icon:wxIcon(d.current.weathercode),desc:wxDesc(d.current.weathercode),wind:Math.round(d.current.windspeed_10m)},
+      days:(d.daily?.time||[]).map((t,i)=>({date:t,day:new Date(t+"T12:00:00").toLocaleDateString("en-US",{weekday:"short"}),icon:wxIcon(d.daily.weathercode[i]),hi:Math.round(d.daily.temperature_2m_max[i]),lo:Math.round(d.daily.temperature_2m_min[i]),rain:d.daily.precipitation_probability_max?.[i]??null})),
+    };
+    weatherCache={at:Date.now(),data,promise:null};
+    return data;
+  })();
+  weatherCache.promise.catch(()=>{weatherCache.promise=null;});
+  return weatherCache.promise;
+}
+function WeatherStrip({big}){
+  const [wx,setWx]=useState(weatherCache.data);
+  useEffect(()=>{let live=true;loadWeather().then(d=>{if(live)setWx(d);}).catch(()=>{});return()=>{live=false;};},[]);
+  if(!wx)return null;
+  const fs=big?{t:36,d:15,day:13,hilo:15,ic:34,cic:48,cell:78,gap:12,pad:"14px 20px"}:{t:17,d:10,day:9,hilo:11,ic:17,cic:24,cell:46,gap:4,pad:"6px 12px"};
+  return(<div style={{display:"flex",alignItems:"center",gap:big?18:10,padding:fs.pad,background:"rgba(255,255,255,0.04)",borderRadius:big?16:12,border:"1px solid rgba(255,255,255,0.09)",overflowX:"auto",WebkitOverflowScrolling:"touch",maxWidth:"100%"}}>
+    <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+      <span style={{fontSize:fs.cic}}>{wx.current.icon}</span>
+      <div>
+        <div style={{fontSize:fs.t,fontWeight:"bold",color:"#e8e0c8",lineHeight:1.05}}>{wx.current.temp}°</div>
+        <div style={{fontSize:fs.d,color:"#888",whiteSpace:"nowrap"}}>{wx.current.desc}</div>
+      </div>
+    </div>
+    <div style={{width:1,alignSelf:"stretch",background:"rgba(255,255,255,0.1)",flexShrink:0}}/>
+    <div style={{display:"flex",gap:fs.gap}}>
+      {wx.days.slice(0,7).map((d,i)=>(
+        <div key={d.date} style={{textAlign:"center",minWidth:fs.cell,flexShrink:0}}>
+          <div style={{fontSize:fs.day,color:i===0?"#e8e0c8":"#777",fontFamily:"monospace"}}>{i===0?"TODAY":d.day.toUpperCase()}</div>
+          <div style={{fontSize:fs.ic,lineHeight:1.25}}>{d.icon}</div>
+          <div style={{fontSize:fs.hilo,color:"#e8e0c8",whiteSpace:"nowrap"}}>{d.hi}°<span style={{color:"#666"}}> {d.lo}°</span></div>
+          {d.rain!=null&&d.rain>=20&&<div style={{fontSize:fs.day,color:"#4a9eff"}}>💧{d.rain}%</div>}
+        </div>
+      ))}
+    </div>
+  </div>);
 }
 
 function BillsBanner({bills,S}){
@@ -207,7 +239,7 @@ function WeeklyChoreBoard({chores,setChores,appSettings,S}){
 }
 
 // ── PERSONAL HOME SCREEN (Brad / Mary Beth / Bradyn) ─────────────────────────
-function PersonalHomeScreen({currentUser,mealPlan,bills,chores,setChores,messages,appSettings,events,S}){
+function PersonalHomeScreen({currentUser,mealPlan,nextWeekPlan,bills,chores,setChores,messages,appSettings,events,S}){
   const today=new Date(),tn=todayName();
   const tomorrowName=DAYS[(DAYS.indexOf(tn)+1)%7];
   const u=USERS.find(x=>x.key===currentUser);
@@ -219,7 +251,8 @@ function PersonalHomeScreen({currentUser,mealPlan,bills,chores,setChores,message
     return true;
   };
   const myOneOff=showFor(currentUser)?(chores||[]).filter(c=>c.assignee===currentUser&&!c.done&&(!c.days||c.days.length===0)):[];
-  const todayMeals=mealPlan[tn]||{},tomorrowMeals=mealPlan[tomorrowName]||{};
+  // On Sunday, "tomorrow" is next week's Monday.
+  const todayMeals=mealPlan[tn]||{},tomorrowMeals=(DAYS.indexOf(tn)===6?(nextWeekPlan||{})[tomorrowName]:mealPlan[tomorrowName])||{};
   return(<div style={{padding:"0 0 16px"}}>
     <PinnedAnnouncements messages={messages} S={S}/>
     <UpcomingEvents events={events} S={S} days={7} title="📅 Coming Up This Week"/>
@@ -267,8 +300,9 @@ function UserHeader({user,onLogout,extra,children,S}){
   const u=USERS.find(x=>x.key===user);
   return(<div style={{background:"linear-gradient(180deg,#1a1a0f,#0d0d08)",borderBottom:`1px solid ${BORDER}`,padding:"12px 16px",position:"sticky",top:0,zIndex:100}}>
     <div style={{maxWidth:1400,margin:"0 auto"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:children?8:0,flexWrap:"wrap",gap:8}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:8}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:24}}>{u.emoji}</span><div><div style={{fontSize:9,color:"#444",fontFamily:"monospace",letterSpacing:"0.2em"}}>FAMILY HUB</div><div style={{fontSize:15,color:"#e8e0c8"}}>{u.label}</div></div></div>
+        <WeatherStrip/>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>{extra}<button onClick={onLogout} style={{...S.btnGhost,fontSize:12}}>Sign Out</button></div>
       </div>
       {children}
@@ -286,7 +320,7 @@ function ThemePicker({currentTheme,onSelect,S}){
 }
 
 // ── PUBLIC HOME SCREEN ────────────────────────────────────────────────────────
-function PublicHomeScreen({mealPlan,shopList,setShopList,bills,expenses,onLogin,appSettings,messages,shopSettings,events}){
+function PublicHomeScreen({mealPlan,shopList,setShopList,bills,expenses,onLogin,appSettings,messages,shopSettings,events,onTv}){
   const today=new Date(),tn=todayName();
   const [showShopView,setShowShopView]=useState(false);
   const [calDay,setCalDay]=useState(todayKey());
@@ -299,7 +333,7 @@ function PublicHomeScreen({mealPlan,shopList,setShopList,bills,expenses,onLogin,
       <div style={{maxWidth:1300,margin:"0 auto"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
           <div><div style={{fontSize:9,color:"#555",letterSpacing:"0.28em",fontFamily:"monospace"}}>THE</div><h1 style={{margin:"1px 0 0",fontSize:26,fontWeight:"normal",color:"#e8e0c8"}}>Family <span style={{color:GOLD}}>Hub</span></h1><div style={{fontSize:11,color:"#444",fontFamily:"monospace"}}>Brad & Mary Beth</div></div>
-          <WeatherWidget/>
+          <WeatherStrip/>
           <div style={{textAlign:"right"}}><div style={{fontSize:10,color:"#444",fontFamily:"monospace",letterSpacing:"0.12em"}}>TONIGHT</div><div style={{fontSize:16,color:tonightDinner?GOLD:"#333",marginTop:2,fontStyle:tonightDinner?"normal":"italic"}}>{tonightDinner||"Nothing planned"}</div><div style={{fontSize:11,color:"#555",marginTop:3}}>{today.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</div></div>
         </div>
       </div>
@@ -319,7 +353,7 @@ function PublicHomeScreen({mealPlan,shopList,setShopList,bills,expenses,onLogin,
       </div>
       <div style={{overflowX:"auto",marginBottom:14}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(90px,1fr))",gap:6,minWidth:560}}>
-          {DAYS.map(d=>{const isToday=d===tn,m=mealPlan[d]||{};return(<div key={d} style={{background:isToday?`${GOLD}18`:"#1a1a0f",border:`1px solid ${isToday?GOLD:BORDER}`,borderRadius:10,padding:"8px 6px",textAlign:"center",minHeight:80}}><div style={{fontSize:9,fontFamily:"monospace",letterSpacing:"0.1em",color:isToday?GOLD:"#555",marginBottom:4}}>{d.slice(0,3).toUpperCase()}</div>{MEAL_TYPES.map(mt=>m[mt]?<div key={mt} style={{marginBottom:2}}><div style={{fontSize:8,color:"#555"}}>{mt==="Breakfast"?"🌅":mt==="Lunch"?"☀️":"🌙"}</div><div style={{fontSize:10,color:isToday?"#e8e0c8":"#888",lineHeight:"1.2"}}>{m[mt]}</div></div>:null)}{!m.Breakfast&&!m.Lunch&&!m.Dinner&&<div style={{fontSize:10,color:"#2a2a18",marginTop:8}}>—</div>}</div>);})}
+          {DAYS.map((d,di)=>{const isToday=d===tn,m=mealPlan[d]||{};return(<div key={d} style={{background:isToday?`${GOLD}18`:"#1a1a0f",border:`1px solid ${isToday?GOLD:BORDER}`,borderRadius:10,padding:"8px 6px",textAlign:"center",minHeight:80}}><div style={{fontSize:9,fontFamily:"monospace",letterSpacing:"0.1em",color:isToday?GOLD:"#555"}}>{d.slice(0,3).toUpperCase()}</div><div style={{fontSize:11,color:isToday?GOLD:"#666",marginBottom:4}}>{dateOfWeekDay(weekKeyOf(),di).toLocaleDateString("en-US",{month:"numeric",day:"numeric"})}</div>{MEAL_TYPES.map(mt=>m[mt]?<div key={mt} style={{marginBottom:2}}><div style={{fontSize:8,color:"#555"}}>{mt==="Breakfast"?"🌅":mt==="Lunch"?"☀️":"🌙"}</div><div style={{fontSize:10,color:isToday?"#e8e0c8":"#888",lineHeight:"1.2"}}>{m[mt]}</div></div>:null)}{!m.Breakfast&&!m.Lunch&&!m.Dinner&&<div style={{fontSize:10,color:"#2a2a18",marginTop:8}}>—</div>}</div>);})}
         </div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:12,marginBottom:14}}>
@@ -327,7 +361,8 @@ function PublicHomeScreen({mealPlan,shopList,setShopList,bills,expenses,onLogin,
         {dueSoon.length>0&&<div style={S.card}><div style={S.h2}>Due This Week</div>{dueSoon.map(b=>{const dl=Math.ceil((new Date(b.dueDate+"T12:00:00")-today)/(864e5)),paid=b.bradPaid&&b.maryBethPaid;return(<div key={b.id} style={{...S.row,padding:"6px 0",borderBottom:`1px solid #1a1a0f`}}><div><div style={{fontSize:13,color:"#e8e0c8"}}>{b.name}</div><div style={{fontSize:11,color:"#555"}}>{dl===0?"Today":dl===1?"Tomorrow":`${dl} days`}</div></div><div style={{textAlign:"right"}}><div style={{fontFamily:"monospace",color:GOLD,fontSize:12,fontWeight:"bold"}}>{fmt(b.amount/2)} ea</div><div style={{fontSize:10,color:paid?"#4CAF50":"#FF9800"}}>{paid?"Paid":"Pending"}</div></div></div>);})}
         </div>}
       </div>
-      <div style={S.card}><div style={{textAlign:"center",marginBottom:14}}><div style={{fontSize:11,color:"#555",fontFamily:"monospace",letterSpacing:"0.2em"}}>SIGN IN AS</div></div><div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>{USERS.map(u=><button key={u.key} onClick={()=>onLogin(u.key)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"14px 20px",background:`${u.color}12`,border:`2px solid ${u.color}44`,borderRadius:14,cursor:"pointer",color:"#e8e0c8",fontFamily:"Georgia,serif",minWidth:90}}><span style={{fontSize:32}}>{u.emoji}</span><span style={{fontSize:13,color:u.color,fontWeight:"bold"}}>{u.label}</span></button>)}</div></div>
+      <div style={S.card}><div style={{textAlign:"center",marginBottom:14}}><div style={{fontSize:11,color:"#555",fontFamily:"monospace",letterSpacing:"0.2em"}}>SIGN IN AS</div></div><div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>{USERS.map(u=><button key={u.key} onClick={()=>onLogin(u.key)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"14px 20px",background:`${u.color}12`,border:`2px solid ${u.color}44`,borderRadius:14,cursor:"pointer",color:"#e8e0c8",fontFamily:"Georgia,serif",minWidth:90}}><span style={{fontSize:32}}>{u.emoji}</span><span style={{fontSize:13,color:u.color,fontWeight:"bold"}}>{u.label}</span></button>)}</div>
+      {onTv&&<div style={{textAlign:"center",marginTop:16}}><button onClick={onTv} style={{...S.btnGhost,fontSize:12}}>📺 TV Display Mode</button></div>}</div>
     </div>
   </div>);
 }
@@ -340,7 +375,7 @@ function DayPills({selected,onToggle,S}){
 }
 
 export {
-  Ring, Bar, PinPad, ShoppingListView, LoginModal, WeatherWidget, BillsBanner,
+  Ring, Bar, PinPad, ShoppingListView, LoginModal, WeatherStrip, BillsBanner,
   PinnedAnnouncements, WeeklyChoreBoard, PersonalHomeScreen, UserHeader,
   ThemePicker, PublicHomeScreen, DayPills,
 };

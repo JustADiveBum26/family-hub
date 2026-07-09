@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { store } from "./store";
 import { DAYS, MEAL_TYPES, GOLD, fmt, makeS } from "./constants";
-import { ShoppingListView, UserHeader, ThemePicker, PersonalHomeScreen, BillsBanner } from "./shared";
+import { ShoppingListView, UserHeader, ThemePicker, PersonalHomeScreen, BillsBanner, WeatherStrip } from "./shared";
 import { ChoresTab, KidChoreView, MessageBoard, SettingsTab, AdminPanel, BillsTab, MealDetailModal, MealsTab, BradynLedger } from "./family";
 import { AccountsTab, DebtsTab, BudgetTab, GoalsTab, StatementsTab, ScenariosTab, PslfTab, DashboardTab } from "./finance";
 import { CalendarTab } from "./calendar";
@@ -45,6 +45,7 @@ function BradynDashboard({mealPlan,shopList,setShopList,shopRequests,setShopRequ
       <div style={{display:"flex",gap:8,alignItems:"center"}}>{TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{...bS.btnGhost,borderBottom:tab===t.id?`2px solid ${C.accent}`:"2px solid transparent",borderRadius:0,color:tab===t.id?C.accent:C.sub,padding:"6px 10px",fontSize:12}}>{t.icon} {t.label}</button>)}<button onClick={()=>setShowShopView(true)} style={{...bS.btnGhost,fontSize:12,padding:"6px 10px"}}>🛒</button><button onClick={onLogout} style={{...bS.btnGhost,fontSize:12}}>Sign Out ↩</button></div>
     </div>
     <div style={{maxWidth:900,margin:"0 auto",padding:16}}>
+      <div style={{marginBottom:12}}><WeatherStrip/></div>
       {tab==="home"&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:14}}>
         <div>
           <div style={bS.card}><div style={bS.h2}>This Week's Meals</div>{DAYS.map(d=>{const m=mealPlan[d]||{},has=m.Breakfast||m.Lunch||m.Dinner;return(<div key={d} style={{display:"flex",gap:10,padding:"7px 0",borderBottom:`1px solid ${C.bg}`,alignItems:"flex-start"}}><div style={{width:64,flexShrink:0}}><div style={{fontSize:10,color:C.accent,fontFamily:"monospace"}}>{d.slice(0,3).toUpperCase()}</div></div><div style={{flex:1}}>{MEAL_TYPES.map(mt=>m[mt]&&<div key={mt} style={{display:"flex",gap:6,marginBottom:2}}><span style={{fontSize:10,color:C.sub,minWidth:50,fontFamily:"monospace"}}>{mt}</span><span style={{fontSize:12,color:C.text}}>{m[mt]}</span></div>)}{!has&&<span style={{fontSize:11,color:C.border}}>Nothing planned</span>}</div></div>);})}</div>
@@ -112,6 +113,7 @@ function ParkerTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMea
       <div style={{display:"flex",gap:6,alignItems:"center"}}>{TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{...pBtnG,color:tab===t.id?"#b44fef":"#7a6aaa",borderColor:tab===t.id?"rgba(180,79,239,0.6)":"rgba(180,79,239,0.2)"}}>{t.label}</button>)}<button onClick={onLogout} style={pBtnG}>Sign Out ↩</button></div>
     </div>
     <div style={{maxWidth:800,margin:"0 auto",padding:16}}>
+      <div style={{marginBottom:12}}><WeatherStrip/></div>
       {tab==="home"&&<div>
         <div style={pS.card}>
           <div style={pS.h2}>🍽 This Week's Meals</div>
@@ -170,6 +172,7 @@ function RyderTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMeal
       <div style={{display:"flex",gap:6,alignItems:"center"}}>{TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{background:"transparent",border:`1px solid ${tab===t.id?"rgba(255,107,53,0.6)":"rgba(255,107,53,0.2)"}`,borderRadius:6,padding:"8px 14px",color:tab===t.id?"#ff6b35":"#887766",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:15}}>{t.label}</button>)}<button onClick={onLogout} style={{background:"transparent",border:"1px solid rgba(255,107,53,0.2)",borderRadius:6,padding:"8px 14px",color:"#887766",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:15}}>Sign Out ↩</button></div>
     </div>
     <div style={{maxWidth:800,margin:"0 auto",padding:16}}>
+      <div style={{marginBottom:12}}><WeatherStrip/></div>
       {tab==="home"&&<>
         {flash&&<div style={{textAlign:"center",padding:"14px 0",marginBottom:10}}><div style={{fontSize:48,marginBottom:4}}>{flash==="meal"?"🎉":"✅"}</div><div style={{fontSize:18,color:flash==="meal"?"#ff6b35":"#4cdf7a",fontWeight:"bold"}}>{flash==="meal"?"Sent to Mom & Dad!":"Added to the list!"}</div></div>}
         <div style={{textAlign:"center",marginBottom:16}}><div style={{fontSize:44,marginBottom:2}}>🌟</div><div style={{fontSize:30,fontWeight:"bold",color:"#ff6b35"}}>Hey Ryder!</div></div>
@@ -211,7 +214,7 @@ function RyderTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMeal
 
 // ── BRAD DASHBOARD ────────────────────────────────────────────────────────────
 function BradDashboard(props){
-  const {onLogout,auth,setAuth,netWorth,accounts,setAccounts,debts,setDebts,expenses,setExpenses,goals,setGoals,transactions,setTransactions,pslf,setPslf,scenario,setScenario,reviewTxns,setReviewTxns,uploadLoading,handleUpload,confirmTxns,fileRef,saveAll,profile,setProfile,mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,totalAssets,totalDebtAmt,totalCC,combinedLiquid,cushion,dti,mortgageRate,monthlyMortgage,loanAmt,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger,events,setEvents}=props;
+  const {onLogout,auth,setAuth,netWorth,accounts,setAccounts,debts,setDebts,expenses,setExpenses,goals,setGoals,transactions,setTransactions,pslf,setPslf,scenario,setScenario,reviewTxns,setReviewTxns,uploadLoading,handleUpload,confirmTxns,fileRef,saveAll,profile,setProfile,mealPlan,nextWeekPlan,mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,totalAssets,totalDebtAmt,totalCC,combinedLiquid,cushion,dti,mortgageRate,monthlyMortgage,loanAmt,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger,events,setEvents}=props;
   const [tab,setTab]=useState("home");
   const [showShopView,setShowShopView]=useState(false);
   const [userTheme,setUserTheme]=useState(appSettings?.userThemes?.brad||"dark");
@@ -243,9 +246,9 @@ function BradDashboard(props){
     </UserHeader>
     <div style={{maxWidth:1400,margin:"0 auto",padding:"16px 16px"}}>
       {tab!=="home"&&bills&&<BillsBanner bills={bills} S={S}/> }
-      {tab==="home"&&<PersonalHomeScreen currentUser="brad" mealPlan={mealPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} events={events} S={S}/> }
+      {tab==="home"&&<PersonalHomeScreen currentUser="brad" mealPlan={mealPlan} nextWeekPlan={nextWeekPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} events={events} S={S}/> }
       {tab==="cal"&&<CalendarTab events={events} setEvents={setEvents} currentUser="brad" canEdit={true} S={S}/>}
-      {tab==="meals"&&<MealsTab mealPlan={mealPlan} setMealPlan={setMealPlan} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} shopSettings={shopSettings} profile={profile} S={S}/>}
+      {tab==="meals"&&<MealsTab mealPlans={mealPlans} setMealPlans={setMealPlans} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} shopSettings={shopSettings} profile={profile} S={S}/>}
       {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} appSettings={appSettings} S={S} currentUser="brad"/>}
       {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="brad" S={S}/>}
       {tab==="bills"&&<BillsTab bills={bills} setBills={setBills} billHistory={billHistory} setBillHistory={setBillHistory} profile={profile} payAccounts={payAccounts} S={S}/>}
@@ -265,7 +268,7 @@ function BradDashboard(props){
 }
 
 // ── MARY BETH DASHBOARD ───────────────────────────────────────────────────────
-function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,profile,setProfile,expenses,debts,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,events,setEvents,onLogout}){
+function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,nextWeekPlan,mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,profile,setProfile,expenses,debts,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,events,setEvents,onLogout}){
   const [tab,setTab]=useState("home");
   const [showShopView,setShowShopView]=useState(false);
   const [userTheme,setUserTheme]=useState(appSettings?.userThemes?.maryBeth||"dark");
@@ -288,9 +291,9 @@ function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,s
     </UserHeader>
     <div style={{maxWidth:1300,margin:"0 auto",padding:"16px 16px"}}>
       {tab!=="home"&&bills&&<BillsBanner bills={bills} S={S}/> }
-      {tab==="home"&&<PersonalHomeScreen currentUser="maryBeth" mealPlan={mealPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} events={events} S={S}/> }
+      {tab==="home"&&<PersonalHomeScreen currentUser="maryBeth" mealPlan={mealPlan} nextWeekPlan={nextWeekPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} events={events} S={S}/> }
       {tab==="cal"&&<CalendarTab events={events} setEvents={setEvents} currentUser="maryBeth" canEdit={true} S={S}/>}
-      {tab==="meals"&&<MealsTab mealPlan={mealPlan} setMealPlan={setMealPlan} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} shopSettings={shopSettings} profile={profile} S={S}/>}
+      {tab==="meals"&&<MealsTab mealPlans={mealPlans} setMealPlans={setMealPlans} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} shopSettings={shopSettings} profile={profile} S={S}/>}
       {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} appSettings={appSettings} S={S} currentUser="maryBeth"/>}
       {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="maryBeth" S={S}/>}
       {tab==="bills"&&<BillsTab bills={bills} setBills={setBills} billHistory={billHistory} setBillHistory={setBillHistory} profile={profile} payAccounts={payAccounts} S={S}/>}

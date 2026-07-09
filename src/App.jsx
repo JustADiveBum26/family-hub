@@ -1,9 +1,10 @@
 // ── Main App: state, Firestore load, auth/session, routing ───────────────────
 import { useState, useEffect, useRef, useCallback } from "react";
 import { store } from "./store";
-import { D, DAYS, CATS, S, GOLD, TIMEOUT_MS, scoreToRate, calcMortgage } from "./constants";
+import { D, DAYS, CATS, S, GOLD, TIMEOUT_MS, scoreToRate, calcMortgage, weekKeyOf, weekKeyOffset, normalizeWeek } from "./constants";
 import { LoginModal, PublicHomeScreen } from "./shared";
 import { BradDashboard, MaryBethDashboard, BradynDashboard, ParkerTab, RyderTab } from "./dashboards";
+import { TVDisplay } from "./tv";
 
 // ── MAIN APP ──────────────────────────────────────────────────────────────────
 export default function App(){
@@ -16,7 +17,8 @@ export default function App(){
   const [pslf,setPslf]=useState(D.pslf);
   const [bills,setBills]=useState(D.bills);
   const [billHistory,setBillHistory]=useState(D.billHistory);
-  const [mealPlan,setMealPlan]=useState(D.mealPlan);
+  const [mealPlans,setMealPlans]=useState({});
+  const [tvMode,setTvMode]=useState(typeof window!=="undefined"&&window.location.hash==="#tv");
   const [shopList,setShopList]=useState(D.shopList);
   const [mealSuggestions,setMealSuggestions]=useState(D.mealSuggestions);
   const [shopRequests,setShopRequests]=useState(D.shopRequests);
@@ -39,36 +41,44 @@ export default function App(){
   const lastActivity=useRef(Date.now());
   const timerRef=useRef(null);
 
-  useEffect(()=>{
-    (async()=>{
-      const [p,a,d,e,g,t,ps,bl,mp,sl,ms,sr,au,ch,mg,bh,as,md,ss,pa,bn,evts]=await Promise.all([
-        store.load("fp2:profile",D.profile),store.load("fp2:accounts",D.accounts),
-        store.load("fp2:debts",D.debts),store.load("fp2:expenses",D.expenses),
-        store.load("fp2:goals",D.goals),store.load("fp2:transactions",D.transactions),
-        store.load("fp2:pslf",D.pslf),store.load("fp2:bills",D.bills),
-        store.load("fp2:mealPlan",D.mealPlan),store.load("fp2:shopList",D.shopList),
-        store.load("fp2:mealSuggestions",D.mealSuggestions),store.load("fp2:shopRequests",D.shopRequests),
-        store.load("fp2:auth",D.auth),store.load("fp2:chores",D.chores),
-        store.load("fp2:messages",D.messages),store.load("fp2:billHistory",D.billHistory),
-        store.load("fp2:appSettings",D.appSettings),store.load("fp2:mealDetails",{}),
-        store.load("fp2:shopSettings",D.shopSettings),store.load("fp2:payAccounts",D.payAccounts),
-        store.load("fp2:bradynLedger",[]),
-        store.load("fp2:events",[]),
-      ]);
-      setProfile(p);setAccounts(a);setDebts(d);setExpenses(e);setGoals(g);setTransactions(t);setPslf(ps);
-      setBills(bl);setBillHistory(bh||[]);
-      const safeMp=Object.fromEntries(DAYS.map(dy=>[dy,{Breakfast:mp[dy]?.Breakfast||"",Lunch:mp[dy]?.Lunch||"",Dinner:mp[dy]?.Dinner||""}]));
-      setMealPlan(safeMp);setShopList(sl);setMealSuggestions(ms);setShopRequests(sr);
-      setAuth(au||D.auth);setChores(ch||[]);setMessages(mg||[]);
-      setMealDetails(md||{});
-      setAppSettings({...D.appSettings,...(as||{})});
-      setShopSettings({...D.shopSettings,...(ss||{})});
-      setPayAccounts({...D.payAccounts,...(pa||{})});
-      setBradynLedger(bn||[]);
-      setEvents(evts||[]);
-      setLoaded(true);
-    })();
+  const loadAll=useCallback(async()=>{
+    const [p,a,d,e,g,t,ps,bl,mp,sl,ms,sr,au,ch,mg,bh,as,md,ss,pa,bn,evts,mps]=await Promise.all([
+      store.load("fp2:profile",D.profile),store.load("fp2:accounts",D.accounts),
+      store.load("fp2:debts",D.debts),store.load("fp2:expenses",D.expenses),
+      store.load("fp2:goals",D.goals),store.load("fp2:transactions",D.transactions),
+      store.load("fp2:pslf",D.pslf),store.load("fp2:bills",D.bills),
+      store.load("fp2:mealPlan",D.mealPlan),store.load("fp2:shopList",D.shopList),
+      store.load("fp2:mealSuggestions",D.mealSuggestions),store.load("fp2:shopRequests",D.shopRequests),
+      store.load("fp2:auth",D.auth),store.load("fp2:chores",D.chores),
+      store.load("fp2:messages",D.messages),store.load("fp2:billHistory",D.billHistory),
+      store.load("fp2:appSettings",D.appSettings),store.load("fp2:mealDetails",{}),
+      store.load("fp2:shopSettings",D.shopSettings),store.load("fp2:payAccounts",D.payAccounts),
+      store.load("fp2:bradynLedger",[]),
+      store.load("fp2:events",[]),
+      store.load("fp2:mealPlans",null),
+    ]);
+    setProfile(p);setAccounts(a);setDebts(d);setExpenses(e);setGoals(g);setTransactions(t);setPslf(ps);
+    setBills(bl);setBillHistory(bh||[]);
+    // Meal plans are keyed by week (Monday's date). First run after upgrading
+    // migrates the old single-week plan into the current week.
+    if(mps&&Object.keys(mps).length>0){
+      setMealPlans(mps);
+    }else{
+      const seeded={[weekKeyOf()]:normalizeWeek(mp)};
+      setMealPlans(seeded);
+      store.save("fp2:mealPlans",seeded);
+    }
+    setShopList(sl);setMealSuggestions(ms);setShopRequests(sr);
+    setAuth(au||D.auth);setChores(ch||[]);setMessages(mg||[]);
+    setMealDetails(md||{});
+    setAppSettings({...D.appSettings,...(as||{})});
+    setShopSettings({...D.shopSettings,...(ss||{})});
+    setPayAccounts({...D.payAccounts,...(pa||{})});
+    setBradynLedger(bn||[]);
+    setEvents(evts||[]);
+    setLoaded(true);
   },[]);
+  useEffect(()=>{loadAll();},[loadAll]);
 
   const resetActivity=useCallback(()=>{lastActivity.current=Date.now();},[]);
   useEffect(()=>{
@@ -123,11 +133,20 @@ export default function App(){
 
   if(!loaded)return <div style={{...S.page,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:GOLD}}>Loading Family Hub...</div>;
 
-  const sharedProps={mealPlan,setMealPlan,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,profile,setProfile,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger,events,setEvents};
+  // Derived views of the week-keyed meal plans: this week for every existing
+  // screen, next week so Sunday's "tomorrow" crosses the week boundary.
+  const curWk=weekKeyOf();
+  const mealPlan=normalizeWeek(mealPlans[curWk]);
+  const nextWeekPlan=normalizeWeek(mealPlans[weekKeyOffset(curWk,1)]);
+
+  const sharedProps={mealPlan,nextWeekPlan,mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,profile,setProfile,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger,events,setEvents};
+  const enterTv=()=>{setTvMode(true);try{window.history.replaceState(null,"","#tv");}catch(e){}};
+  const exitTv=()=>{setTvMode(false);try{window.history.replaceState(null,"",window.location.pathname);}catch(e){}};
 
   return(<div style={S.page}>
     {loginTarget&&<LoginModal user={loginTarget} auth={auth} onSuccess={pwd=>handleLoginSuccess(loginTarget,pwd)} onClose={()=>setLoginTarget(null)}/>}
-    {!currentUser&&<PublicHomeScreen mealPlan={mealPlan} shopList={shopList} setShopList={setShopList} bills={bills} expenses={expenses} onLogin={handleLogin} appSettings={appSettings} messages={messages} shopSettings={shopSettings} events={events}/>}
+    {!currentUser&&tvMode&&<TVDisplay mealPlan={mealPlan} nextWeekPlan={nextWeekPlan} events={events} shopList={shopList} bills={bills} messages={messages} chores={chores} appSettings={appSettings} onExit={exitTv} onRefresh={loadAll}/>}
+    {!currentUser&&!tvMode&&<PublicHomeScreen mealPlan={mealPlan} shopList={shopList} setShopList={setShopList} bills={bills} expenses={expenses} onLogin={handleLogin} appSettings={appSettings} messages={messages} shopSettings={shopSettings} events={events} onTv={enterTv}/>}
     {currentUser==="brad"&&<BradDashboard {...sharedProps} accounts={accounts} setAccounts={setAccounts} debts={debts} setDebts={setDebts} expenses={expenses} setExpenses={setExpenses} goals={goals} setGoals={setGoals} transactions={transactions} setTransactions={setTransactions} pslf={pslf} setPslf={setPslf} scenario={scenario} setScenario={setScenario} reviewTxns={reviewTxns} setReviewTxns={setReviewTxns} uploadLoading={uploadLoading} handleUpload={handleUpload} confirmTxns={confirmTxns} fileRef={fileRef} saveAll={saveAll} auth={auth} setAuth={setAuth} totalAssets={totalAssets} totalDebtAmt={totalDebtAmt} netWorth={netWorth} totalCC={totalCC} combinedLiquid={combinedLiquid} cushion={cushion} dti={dti} mortgageRate={mortgageRate} monthlyMortgage={monthlyMortgage} loanAmt={loanAmt} surplus={surplus} takeHome={takeHome} totalExpenses={totalExpenses} slPayment={slPayment} downNeeded={downNeeded} closing={closing} homePrice={homePrice} onLogout={handleLogout}/>}
     {currentUser==="maryBeth"&&<MaryBethDashboard {...sharedProps} expenses={expenses} debts={debts} onLogout={handleLogout} setChores={setChores}/>}
     {currentUser==="bradyn"&&<BradynDashboard mealPlan={mealPlan} shopList={shopList} setShopList={setShopList} shopRequests={shopRequests} setShopRequests={setShopRequests} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} mealDetails={mealDetails} setMealDetails={setMealDetails} chores={chores} setChores={setChores} messages={messages} setMessages={setMessages} appSettings={appSettings} shopSettings={shopSettings} bradynLedger={bradynLedger} setBradynLedger={setBradynLedger} events={events} setEvents={setEvents} onLogout={handleLogout}/>}
