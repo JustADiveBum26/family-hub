@@ -39,6 +39,15 @@ const store = {
       return fb;
     } catch(e) { return fb; }
   },
+  // Full export for backups: every fp2:* field, JSON-parsed into one object.
+  dump: async () => {
+    const ref = doc(db, "appdata", FAMILY_DOC);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return {};
+    return Object.fromEntries(Object.entries(snap.data()).map(([k,v]) => {
+      try { return [k, JSON.parse(v)]; } catch(e) { return [k, v]; }
+    }));
+  },
 };
 
 export { store, db, FAMILY_DOC };

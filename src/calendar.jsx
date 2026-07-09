@@ -144,7 +144,7 @@ function EventRow({ev,S,showDate,canEdit,onEdit,onDelete,onDeleteSeries}){
 
 // ── ADD / EDIT FORM ───────────────────────────────────────────────────────────
 function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
-  const blank={title:"",owners:["family"],category:"other",date:defaultDate||todayKey(),endDate:"",time:"",endTime:"",notes:"",repeatWeekly:false,repeatUntil:""};
+  const blank={title:"",owners:["family"],category:"other",date:defaultDate||todayKey(),endDate:"",time:"",endTime:"",notes:"",countdown:false,repeatWeekly:false,repeatUntil:""};
   const [f,setF]=useState(initial?{...blank,...initial,owners:(initial.owners&&initial.owners.length)?initial.owners:[initial.owner||"family"],repeatWeekly:false,repeatUntil:""}:blank);
   const [err,setErr]=useState("");
   const set=(k,v)=>{setF(x=>({...x,[k]:v}));setErr("");};
@@ -184,6 +184,12 @@ function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
       <div><div style={S.label}>End time (optional)</div><input style={S.input} type="time" value={f.endTime} onChange={e=>set("endTime",e.target.value)}/></div>
       <div style={{gridColumn:"1/-1"}}><div style={S.label}>Notes</div><input style={S.input} placeholder="Anything the family should know..." value={f.notes} onChange={e=>set("notes",e.target.value)}/></div>
     </div>
+    <div style={{marginBottom:10}}>
+      <label style={{display:"flex",gap:6,alignItems:"center",fontSize:13,color:S.T.text,cursor:"pointer"}}>
+        <input type="checkbox" checked={!!f.countdown} onChange={e=>set("countdown",e.target.checked)} style={{accentColor:S.T.accent,width:16,height:16}}/>
+        ⏳ Show as countdown — big "days to go" tile on home screens and the TV
+      </label>
+    </div>
     {!initial&&<div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:10}}>
       <label style={{display:"flex",gap:6,alignItems:"center",fontSize:13,color:S.T.text,cursor:"pointer"}}>
         <input type="checkbox" checked={f.repeatWeekly} onChange={e=>set("repeatWeekly",e.target.checked)} style={{accentColor:S.T.accent,width:16,height:16}}/>
@@ -199,6 +205,24 @@ function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
       <button style={S.btn()} onClick={submit}>{initial?"Save Changes":"Add Event"}</button>
       <button style={S.btnGhost} onClick={onCancel}>Cancel</button>
     </div>
+  </div>);
+}
+
+// ── COUNTDOWN TILES — events flagged "countdown" show big days-to-go numbers ──
+function CountdownStrip({events,S,big}){
+  const today=todayKey();
+  const items=(events||[]).filter(ev=>ev.countdown&&(ev.endDate||ev.date)>=today).sort((a,b)=>a.date<b.date?-1:1).slice(0,4);
+  if(items.length===0)return null;
+  return(<div style={{display:"flex",gap:big?14:10,flexWrap:"wrap",marginBottom:14}}>
+    {items.map(ev=>{
+      const days=Math.max(0,Math.round((parseKey(ev.date)-parseKey(today))/864e5));
+      const o=ownerOf(ev),c=catOf(ev);
+      return(<div key={ev.id} style={{flex:`1 1 ${big?"210px":"150px"}`,background:o.color+"14",border:`1px solid ${o.color}44`,borderRadius:12,padding:big?"14px 18px":"9px 12px",textAlign:"center"}}>
+        <div style={{fontSize:big?16:11,color:S.T.sub,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.emoji} {ev.title}</div>
+        <div style={{fontSize:big?42:24,fontWeight:"bold",color:o.color,lineHeight:1.15}}>{days===0?"TODAY!":days}</div>
+        {days>0&&<div style={{fontSize:big?13:10,color:S.T.sub}}>{days===1?"day to go":"days to go"} · {fmtDayShort(ev.date)}</div>}
+      </div>);
+    })}
   </div>);
 }
 
@@ -220,7 +244,7 @@ function CalendarTab({events,setEvents,currentUser,canEdit,S}){
   const [editing,setEditing]=useState(null);
   const save=u=>{setEvents(u);store.save("fp2:events",u);};
   const addEvent=f=>{
-    const base={title:f.title.trim(),owners:f.owners,owner:f.owners[0],category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),createdBy:currentUser||""};
+    const base={title:f.title.trim(),owners:f.owners,owner:f.owners[0],category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),countdown:!!f.countdown,createdBy:currentUser||""};
     let added=[];
     if(f.repeatWeekly&&f.repeatUntil){
       const seriesId=Date.now();
@@ -237,7 +261,7 @@ function CalendarTab({events,setEvents,currentUser,canEdit,S}){
     setSelected(f.date);
   };
   const updateEvent=f=>{
-    save((events||[]).map(ev=>ev.id===editing.id?{...ev,title:f.title.trim(),owners:f.owners,owner:f.owners[0],category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim()}:ev));
+    save((events||[]).map(ev=>ev.id===editing.id?{...ev,title:f.title.trim(),owners:f.owners,owner:f.owners[0],category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),countdown:!!f.countdown}:ev));
     setEditing(null);
   };
   const del=id=>save((events||[]).filter(ev=>ev.id!==id));
@@ -261,4 +285,4 @@ function CalendarTab({events,setEvents,currentUser,canEdit,S}){
   </div>);
 }
 
-export { MonthCalendar, UpcomingEvents, EventRow, CalendarTab, eventsOnDay, upcomingEvents, todayKey, fmtDayLong };
+export { MonthCalendar, UpcomingEvents, EventRow, CalendarTab, CountdownStrip, eventsOnDay, upcomingEvents, todayKey, fmtDayLong };

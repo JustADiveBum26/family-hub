@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { store } from "./store";
 import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek } from "./constants";
 import { DayPills } from "./shared";
+import { CARRIERS, configureSms, gatewayFor, queueSms, notifyParents, mailtoLink } from "./sms";
 
 // ── CHORES TAB ────────────────────────────────────────────────────────────────
 function ChoresTab({chores,setChores,appSettings,S,currentUser}){
@@ -167,6 +168,43 @@ function KidChoreView({chores,setChores,userKey,userName,userColor,appSettings,S
     {myChores.length===0&&<div style={{...S.card,textAlign:"center",padding:32,color:S.T.sub}}>No tasks assigned yet!</div>}
   </div>);
 }
+// ── SMS COMPOSER — parents text family phones from the Board tab ──────────────
+function SmsComposer({S}){
+  const textable=USERS.filter(u=>gatewayFor(u.key));
+  const [sel,setSel]=useState([]);
+  const [txt,setTxt]=useState("");
+  const [status,setStatus]=useState("");
+  if(textable.length===0)return null;
+  const TEMPLATES=["🍽 Dinner is ready!","🏠 Time to come home","📢 Check the Family Hub board","🛒 Going to the store — need anything?"];
+  const toggle=k=>setSel(s=>s.includes(k)?s.filter(x=>x!==k):[...s,k]);
+  const send=async()=>{
+    if(sel.length===0||!txt.trim())return;
+    setStatus("Sending...");
+    const r=await queueSms(sel,txt.trim());
+    setStatus(r.ok?`✓ Queued to ${r.sent} phone${r.sent!==1?"s":""}`:`Failed: ${r.reason}`);
+    if(r.ok)setTxt("");
+    setTimeout(()=>setStatus(""),5000);
+  };
+  const openMail=()=>{const link=mailtoLink(sel.length?sel:textable.map(u=>u.key),txt.trim());if(link)window.location.href=link;};
+  return(<div style={S.card}>
+    <div style={S.h2}>📱 Send a Text</div>
+    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+      {textable.map(u=>{const on=sel.includes(u.key);return(
+        <button key={u.key} onClick={()=>toggle(u.key)} style={{padding:"7px 12px",borderRadius:10,fontSize:13,fontFamily:"Georgia,serif",cursor:"pointer",background:on?u.color+"33":"transparent",border:`2px solid ${on?u.color:S.T.border}`,color:on?u.color:S.T.sub,fontWeight:on?"bold":"normal"}}>{u.emoji} {u.label}{on?" ✓":""}</button>
+      );})}
+    </div>
+    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+      {TEMPLATES.map(t=><button key={t} onClick={()=>setTxt(t)} style={{...S.btnGhost,padding:"4px 10px",fontSize:11}}>{t}</button>)}
+    </div>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+      <input style={{...S.input,flex:1,minWidth:180}} placeholder="Message (keep it short — it's a text)" value={txt} maxLength={280} onChange={e=>setTxt(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}/>
+      <button style={S.btn()} onClick={send} disabled={sel.length===0||!txt.trim()}>Send Text</button>
+      <button style={{...S.btnGhost,fontSize:12}} onClick={openMail} disabled={!txt.trim()}>Open in Mail app</button>
+    </div>
+    {status&&<div style={{fontSize:12,color:status.startsWith("✓")?"#4CAF50":"#FF9800",marginTop:6}}>{status}</div>}
+  </div>);
+}
+
 // ── MESSAGE BOARD ─────────────────────────────────────────────────────────────
 function MessageBoard({messages,setMessages,currentUser,S}){
   const isParent=currentUser==="brad"||currentUser==="maryBeth";
@@ -177,6 +215,7 @@ function MessageBoard({messages,setMessages,currentUser,S}){
     const u=USERS.find(x=>x.key===currentUser);
     const msg={id:Date.now(),author:currentUser,authorLabel:u.label,authorEmoji:u.emoji,text:text.trim(),date:new Date().toLocaleDateString(),time:new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),approved:isParent,pinned:false};
     save([msg,...messages]);setText("");
+    if(!isParent)notifyParents("boardPosts",`📢 ${u.label} posted to the board: "${msg.text.slice(0,120)}" — needs approval`);
   };
   const approve=id=>save(messages.map(m=>m.id===id?{...m,approved:true}:m));
   const pin=id=>save(messages.map(m=>m.id===id?{...m,pinned:!m.pinned}:m));
@@ -186,6 +225,7 @@ function MessageBoard({messages,setMessages,currentUser,S}){
   const pinned=approved.filter(m=>m.pinned);
   const rest=approved.filter(m=>!m.pinned);
   return(<div>
+    {isParent&&<SmsComposer S={S}/>}
     {isParent&&pending.length>0&&<div style={{...S.alert(S.T.accent),marginBottom:14}}>
       <div style={{color:S.T.accent,fontWeight:"bold",marginBottom:8}}>Pending Approval ({pending.length})</div>
       {pending.map(m=><div key={m.id} style={{...S.row,padding:"8px 0",borderBottom:`1px solid ${S.T.border}`,flexWrap:"wrap",gap:8}}>
@@ -224,7 +264,7 @@ function MessageBoard({messages,setMessages,currentUser,S}){
 }
 
 // ── SETTINGS TAB ─────────────────────────────────────────────────────────────
-function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings,setShopSettings,payAccounts,setPayAccounts,S,currentUser}){
+function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings,setShopSettings,payAccounts,setPayAccounts,smsSettings,setSmsSettings,S,currentUser}){
   const [local,setLocal]=useState({...profile});
   const [saved,setSaved]=useState(false);
   const saveProfile=()=>{setProfile(local);store.save("fp2:profile",local);setSaved(true);setTimeout(()=>setSaved(false),2000);};
@@ -237,6 +277,29 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
   const [newBradAcct,setNewBradAcct]=useState("");
   const [newMBAcct,setNewMBAcct]=useState("");
   const isParent=currentUser==="brad"||currentUser==="maryBeth";
+  const sms=smsSettings||{enabled:false,numbers:{},notify:{}};
+  const saveSms=u=>{setSmsSettings(u);store.save("fp2:smsSettings",u);configureSms(u);};
+  const [testStatus,setTestStatus]=useState("");
+  const sendTest=async()=>{
+    setTestStatus("Sending...");
+    const r=await queueSms([currentUser],"Test text from Family Hub 🎉");
+    setTestStatus(r.ok?`✓ Queued to ${r.sent} number — arrives if the Trigger Email extension is set up.`:`Not sent: ${r.reason}`);
+    setTimeout(()=>setTestStatus(""),6000);
+  };
+  const [backupBusy,setBackupBusy]=useState(false);
+  const downloadBackup=async()=>{
+    setBackupBusy(true);
+    try{
+      const data=await store.dump();
+      const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+      const a=document.createElement("a");
+      a.href=URL.createObjectURL(blob);
+      a.download=`family-hub-backup-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }catch(e){console.error("Backup failed:",e);}
+    setBackupBusy(false);
+  };
   return(<div>
     {false&&<div style={S.card}>
       <div style={S.h2}>Profile</div>
@@ -295,6 +358,40 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{(payAccounts.brad||[]).map(a=><span key={a} style={{...S.tag("#2196F3"),opacity:0.7}}>{a}</span>)}</div>
       </div>}
     </div>
+    {isParent&&<div style={S.card}>
+      <div style={{...S.h2,...S.row}}><span>📱 Text Message Alerts</span>
+        <button onClick={()=>saveSms({...sms,enabled:!sms.enabled})} style={{...S.btn(sms.enabled?"#4CAF50":S.T.border),padding:"7px 16px",fontSize:12}}>{sms.enabled?"ON":"OFF"}</button>
+      </div>
+      <div style={{fontSize:12,color:S.T.sub,marginBottom:12}}>Texts go out through each carrier's free email-to-text gateway (AT&T = number@txt.att.net). Automatic delivery needs the free "Trigger Email" extension installed on the family-hub Firebase project — ask Brad for the setup steps. The Board tab's composer also has an "Open in Mail app" button that works with no setup.</div>
+      {USERS.map(u=>{
+        const n=sms.numbers?.[u.key]||{phone:"",carrier:"att"};
+        const ok=!!gatewayFor(u.key);
+        return(<div key={u.key} style={{display:"flex",gap:8,alignItems:"center",padding:"7px 0",borderBottom:`1px solid ${S.T.border}`,flexWrap:"wrap"}}>
+          <span style={{minWidth:105,fontSize:13,color:S.T.text}}>{u.emoji} {u.label}</span>
+          <input style={{...S.input,flex:1,minWidth:150}} placeholder="Phone e.g. 555-123-4567" value={n.phone} onChange={e=>saveSms({...sms,numbers:{...sms.numbers,[u.key]:{...n,phone:e.target.value}}})}/>
+          <select style={{...S.select,width:140}} value={n.carrier||"att"} onChange={e=>saveSms({...sms,numbers:{...sms.numbers,[u.key]:{...n,carrier:e.target.value}}})}>{CARRIERS.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}</select>
+          <span style={{...S.tag(ok?"#4CAF50":S.T.sub),fontSize:10}}>{ok?"READY":"NO NUMBER"}</span>
+        </div>);
+      })}
+      <div style={{marginTop:12}}>
+        <div style={{...S.label,marginBottom:6}}>Automatic alerts to Brad & Mary Beth</div>
+        {[{k:"kidRequests",l:"Kid meal suggestions & shopping requests"},{k:"boardPosts",l:"Board posts waiting for approval"},{k:"billPaid",l:"A bill gets fully paid"}].map(({k,l})=>(
+          <div key={k} style={{...S.row,padding:"7px 0",borderBottom:`1px solid ${S.T.border}`}}>
+            <span style={{fontSize:13,color:S.T.text}}>{l}</span>
+            <button onClick={()=>saveSms({...sms,notify:{...sms.notify,[k]:!sms.notify?.[k]}})} style={{...S.btn(sms.notify?.[k]?"#4CAF50":S.T.border),padding:"6px 14px",fontSize:11}}>{sms.notify?.[k]?"ON":"OFF"}</button>
+          </div>
+        ))}
+      </div>
+      <div style={{display:"flex",gap:10,alignItems:"center",marginTop:12,flexWrap:"wrap"}}>
+        <button style={{...S.btnGhost,fontSize:12}} onClick={sendTest} disabled={!gatewayFor(currentUser)}>Send me a test text</button>
+        {testStatus&&<span style={{fontSize:12,color:testStatus.startsWith("✓")?"#4CAF50":"#FF9800"}}>{testStatus}</span>}
+      </div>
+    </div>}
+    {isParent&&<div style={S.card}>
+      <div style={S.h2}>💾 Backup & Export</div>
+      <div style={{fontSize:12,color:S.T.sub,marginBottom:12}}>Downloads everything — bills, meals, calendar, chores, messages, settings — as one JSON file. Keep one before big changes.</div>
+      <button style={S.btn()} onClick={downloadBackup} disabled={backupBusy}>{backupBusy?"Preparing...":"⬇ Download Backup"}</button>
+    </div>}
     {isParent&&<div style={S.card}>
       <div style={S.h2}>Feature Toggles</div>
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -447,6 +544,7 @@ function BillsTab({bills,setBills,billHistory,setBillHistory,profile,payAccounts
       const isShared=!bill.owner||bill.owner==="shared";
       const amt=isShared?bill.amount/2:bill.amount;
       saveHistory([{id:Date.now(),billName:bill.name,person,amount:amt,date:new Date().toLocaleDateString(),billId:id},...billHistory]);
+      if(billPaid({...bill,[f]:true}))notifyParents("billPaid",`✅ ${bill.name} is fully paid — ${fmt(bill.amount)} (moved to History)`);
     }
   };
   const del=id=>save(bills.filter(b=>b.id!==id));
@@ -533,8 +631,9 @@ function BillsTab({bills,setBills,billHistory,setBillHistory,profile,payAccounts
 
 // ── MEALS TAB ─────────────────────────────────────────────────────────────────
 // ── MEAL DETAIL MODAL (top-level component — must NOT be inside MealsTab) ─────
-function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList,saveDetails,saveShop,onClearMeal,S}){
+function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList,saveDetails,saveShop,onClearMeal,onSaveFavorite,S}){
   const [newIngs,setNewIngs]=useState([{id:1,name:"",qty:"1"},{id:2,name:"",qty:"1"},{id:3,name:"",qty:"1"},{id:4,name:"",qty:"1"},{id:5,name:"",qty:"1"}]);
+  const [favSaved,setFavSaved]=useState(false);
   const blankIng=()=>({id:Date.now()+Math.random(),name:"",qty:"1"});
   const updateNewIng=(i,field,val)=>setNewIngs(rows=>rows.map((r,ri)=>ri===i?{...r,[field]:val}:r));
   const addNewIngRow=()=>setNewIngs(rows=>[...rows,blankIng()]);
@@ -575,6 +674,7 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           <button style={{...S.btn("#4CAF50"),padding:"6px 12px",fontSize:12}} onClick={()=>addAllIngsToShop(key)} disabled={detail.ingredients.length===0}>Add All to List</button>
+          {onSaveFavorite&&mealName&&<button style={{...S.btn(),padding:"6px 12px",fontSize:12}} onClick={()=>{onSaveFavorite(mealName,detail);setFavSaved(true);setTimeout(()=>setFavSaved(false),2000);}}>{favSaved?"✓ Saved!":"★ Save Favorite"}</button>}
           {onClearMeal&&detailSlot.day&&mealName&&<button style={{...S.btnDanger,padding:"6px 12px",fontSize:12}} onClick={()=>{onClearMeal(detailSlot.day,detailSlot.mt);close();}}>Clear Meal</button>}
           <button style={{...S.btnGhost,padding:"6px 12px",fontSize:12}} onClick={close}>Close</button>
         </div>
@@ -623,7 +723,7 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList
 }
 
 // ── MEALS TAB ─────────────────────────────────────────────────────────────────
-function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,mealDetails,setMealDetails,shopSettings,profile,S}){
+function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,mealDetails,setMealDetails,mealFavs,setMealFavs,shopSettings,profile,S}){
   // Week navigation: plans are stored per week (keyed by Monday's date), so the
   // family can plan next week and look back at past menus.
   const curWk=weekKeyOf();
@@ -654,6 +754,17 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
   const saveWeek=(wkKey,weekPlan)=>{const u={...mealPlans,[wkKey]:weekPlan};setMealPlans(u);store.save("fp2:mealPlans",u);};
   const saveMeals=u=>saveWeek(wk,u);
   const saveShop=u=>{setShopList(u);store.save("fp2:shopList",u);};
+  // Favorites: reusable meals with their ingredients/recipe attached.
+  const favs=mealFavs||[];
+  const saveFavs=u=>{setMealFavs(u);store.save("fp2:mealFavs",u);};
+  const saveFavorite=(name,detail)=>saveFavs([...favs.filter(x=>x.name.toLowerCase()!==name.toLowerCase()),{id:Date.now(),name,ingredients:detail?.ingredients||[],recipe:detail?.recipe||""}]);
+  const [favTarget,setFavTarget]=useState({day:"Monday",mt:"Dinner"});
+  const [copyConfirm,setCopyConfirm]=useState(false);
+  const placeFav=f=>{
+    saveMeals({...mealPlan,[favTarget.day]:{...mealPlan[favTarget.day],[favTarget.mt]:f.name}});
+    if((f.ingredients&&f.ingredients.length)||f.recipe)saveDetails({...mealDetails,[wk+"__"+favTarget.day+"__"+favTarget.mt]:{ingredients:f.ingredients||[],recipe:f.recipe||""}});
+  };
+  const copyLastWeek=()=>{saveWeek(wk,normalizeWeek(mealPlans[weekKeyOffset(wk,-1)]));setCopyConfirm(false);};
   const saveSugg=u=>{setMealSuggestions(u);store.save("fp2:mealSuggestions",u);};
   const saveReqs=u=>{setShopRequests(u);store.save("fp2:shopRequests",u);};
   const saveDetails=u=>{setMealDetails(u);store.save("fp2:mealDetails",u);};
@@ -702,7 +813,7 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
   const slotKey=(day,mt)=>{const wkKey=wk+"__"+day+"__"+mt;if(mealDetails[wkKey])return wkKey;const legacy=day+"__"+mt;return mealDetails[legacy]?legacy:wkKey;};
   const hasDetail=(day,mt)=>{const d=mealDetails[slotKey(day,mt)];return d&&(d.ingredients?.length>0||d.recipe?.trim());};
   return(<>
-    <MealDetailModal detailSlot={detailSlot} setDetailSlot={setDetailSlot} mealPlan={mealPlan} mealDetails={mealDetails} shopList={shopList} saveDetails={saveDetails} saveShop={saveShop} onClearMeal={clearCell} S={S}/>
+    <MealDetailModal detailSlot={detailSlot} setDetailSlot={setDetailSlot} mealPlan={mealPlan} mealDetails={mealDetails} shopList={shopList} saveDetails={saveDetails} saveShop={saveShop} onClearMeal={clearCell} onSaveFavorite={saveFavorite} S={S}/>
     {(pendS.length>0||pendR.length>0)&&<div style={{...S.alert(GOLD),marginBottom:14}}><span style={{color:GOLD,fontWeight:"bold"}}>★ {pendS.length+pendR.length} pending request{pendS.length+pendR.length!==1?"s":""} from the kids — </span><span style={{color:S.T.sub,fontSize:13}}>scroll down to review</span></div>}
     <div style={S.card}>
       <div style={{...S.row,flexWrap:"wrap",gap:8,marginBottom:10}}>
@@ -738,6 +849,35 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
           }
         </td>);})}</tr>)}</tbody>
       </table></div>
+    </div>
+    <div style={S.card}>
+      <div style={{...S.h2,...S.row,flexWrap:"wrap",gap:8}}>
+        <span>★ Meal Favorites</span>
+        {copyConfirm
+          ?<div style={{display:"flex",gap:6}}><button style={{...S.btn("#FF9800"),padding:"5px 12px",fontSize:12}} onClick={copyLastWeek}>Yes, overwrite {weekTitle.toLowerCase()}</button><button style={{...S.btnGhost,padding:"5px 10px",fontSize:12}} onClick={()=>setCopyConfirm(false)}>Cancel</button></div>
+          :<button style={{...S.btnGhost,fontSize:12}} onClick={()=>setCopyConfirm(true)}>⟳ Copy Last Week's Menu</button>}
+      </div>
+      {favs.length===0&&<div style={{fontSize:13,color:S.T.sub}}>No favorites yet — open any meal on the grid and tap <strong style={{color:S.T.text}}>★ Save Favorite</strong>. Its ingredients and recipe come along with it.</div>}
+      {favs.length>0&&<>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:10}}>
+          <span style={{fontSize:12,color:S.T.sub}}>Add to:</span>
+          <select style={{...S.select,width:130}} value={favTarget.day} onChange={e=>setFavTarget({...favTarget,day:e.target.value})}>{DAYS.map(d=><option key={d}>{d}</option>)}</select>
+          <select style={{...S.select,width:120}} value={favTarget.mt} onChange={e=>setFavTarget({...favTarget,mt:e.target.value})}>{MEAL_TYPES.map(m=><option key={m}>{m}</option>)}</select>
+          <span style={{fontSize:11,color:S.T.sub}}>({weekTitle.toLowerCase()})</span>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {[...favs].sort((a,b)=>a.name.localeCompare(b.name)).map(f=>(
+            <div key={f.id} style={{display:"flex",gap:6,alignItems:"center",background:S.T.bg,border:`1px solid ${S.T.border}`,borderRadius:10,padding:"7px 10px"}}>
+              <div>
+                <div style={{fontSize:13,color:S.T.text}}>{f.name}</div>
+                {(f.ingredients?.length>0||f.recipe)&&<div style={{fontSize:10,color:S.T.sub}}>{f.ingredients?.length||0} ingredients{f.recipe?" · recipe":""}</div>}
+              </div>
+              <button style={{...S.btn(),padding:"4px 10px",fontSize:11}} onClick={()=>placeFav(f)}>+ Add</button>
+              <button style={{...S.btnDanger,padding:"3px 7px",fontSize:11}} onClick={()=>saveFavs(favs.filter(x=>x.id!==f.id))}>✕</button>
+            </div>
+          ))}
+        </div>
+      </>}
     </div>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
       <div style={S.card}>

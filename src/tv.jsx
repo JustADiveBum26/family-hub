@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { DAYS, MEAL_TYPES, GOLD, BORDER, USERS, todayName, billPaid, weekKeyOf, dateOfWeekDay } from "./constants";
 import { WeatherStrip } from "./shared";
-import { MonthCalendar, EventRow, eventsOnDay, todayKey } from "./calendar";
+import { MonthCalendar, EventRow, CountdownStrip, eventsOnDay, todayKey } from "./calendar";
 
 const T={bg:"#0d0d08",card:"#141410",border:"#2a2a18",text:"#e8e0c8",sub:"#888",accent:GOLD};
 // Big-type style object shaped like makeS output so shared components render correctly.
@@ -23,7 +23,7 @@ const tvS={
   alert:c=>({background:c+"18",border:`1px solid ${c}44`,borderRadius:10,padding:"14px 18px",marginBottom:12}),
 };
 
-function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,appSettings,onExit,onRefresh}){
+function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,appSettings,onExit,onLogin,onRefresh}){
   const [now,setNow]=useState(new Date());
   // Kiosk behavior: tick the clock, and re-pull family data every 5 minutes so
   // the wall screen stays current without anyone touching it.
@@ -58,11 +58,12 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
         <div style={{fontSize:20,color:GOLD,marginTop:4}}>{now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</div>
       </div>
       <WeatherStrip big/>
-      <button onClick={onExit} style={{...tvS.btnGhost,position:"fixed",top:10,right:10,opacity:0.5,zIndex:10}}>✕</button>
+      <button onClick={onExit} style={{...tvS.btnGhost,position:"fixed",top:10,right:10,opacity:0.85,zIndex:10,fontSize:16,padding:"10px 18px"}}>✕ Exit</button>
     </div>
     {pinned.length>0&&<div style={{...tvS.alert(GOLD),display:"flex",gap:16,flexWrap:"wrap"}}>
       {pinned.map(m=><div key={m.id} style={{fontSize:18}}>📌 <strong style={{color:GOLD}}>{m.authorLabel}:</strong> {m.text}</div>)}
     </div>}
+    <CountdownStrip events={events} S={tvS} big/>
     <div style={{display:"grid",gridTemplateColumns:"minmax(0,58fr) minmax(0,42fr)",gap:16,alignItems:"start"}}>
       {/* Left: big month calendar */}
       <div>
@@ -118,6 +119,12 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
           </div>
         </div>}
       </div>
+    </div>
+    {/* Footer: sign in straight from the TV, or leave TV mode */}
+    <div style={{display:"flex",justifyContent:"center",gap:12,alignItems:"center",marginTop:18,paddingTop:16,borderTop:`1px solid ${T.border}`,flexWrap:"wrap"}}>
+      <span style={{fontSize:13,color:T.sub,fontFamily:"monospace",letterSpacing:"0.18em"}}>SIGN IN:</span>
+      {USERS.map(u=><button key={u.key} onClick={()=>onLogin&&onLogin(u.key)} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 20px",background:`${u.color}12`,border:`2px solid ${u.color}55`,borderRadius:12,cursor:"pointer",color:u.color,fontFamily:"Georgia,serif",fontSize:17,fontWeight:"bold"}}>{u.emoji} {u.label}</button>)}
+      <button onClick={onExit} style={{...tvS.btnGhost,padding:"10px 20px",fontSize:16}}>↩ Exit TV Mode</button>
     </div>
   </div>);
 }
