@@ -6,7 +6,6 @@ import { ShoppingListView, UserHeader, ThemePicker, PersonalHomeScreen, BillsBan
 import { ChoresTab, KidChoreView, MessageBoard, SettingsTab, AdminPanel, BillsTab, MealDetailModal, MealsTab, BradynLedger } from "./family";
 import { AccountsTab, DebtsTab, BudgetTab, GoalsTab, StatementsTab, ScenariosTab, PslfTab, DashboardTab } from "./finance";
 import { CalendarTab } from "./calendar";
-import { notifyParents } from "./sms";
 
 function BradynDashboard({mealPlan,shopList,setShopList,shopRequests,setShopRequests,mealSuggestions,setMealSuggestions,mealDetails,setMealDetails,chores,setChores,messages,setMessages,appSettings,shopSettings,bradynLedger,setBradynLedger,events,setEvents,onLogout}){
   const [tab,setTab]=useState("home");
@@ -31,7 +30,7 @@ function BradynDashboard({mealPlan,shopList,setShopList,shopRequests,setShopRequ
   const saveShop=u=>{setShopList(u);store.save("fp2:shopList",u);};
   const saveSugg=u=>{setMealSuggestions(u);store.save("fp2:mealSuggestions",u);};
   const saveDetails=u=>{setMealDetails(u);store.save("fp2:mealDetails",u);};
-  const sendSugg=()=>{if(!sugg.meal)return;saveSugg([...mealSuggestions,{...sugg,id:Date.now(),kidName:"Bradyn",status:"pending",date:new Date().toLocaleDateString()}]);notifyParents("kidRequests",`🍴 Bradyn suggested "${sugg.meal}" for ${sugg.mealType}${sugg.suggestDate?" on "+sugg.suggestDate:""}`);setSugg({meal:"",suggestDate:"",mealType:"Dinner",notes:""});setShowS(false);};
+  const sendSugg=()=>{if(!sugg.meal)return;saveSugg([...mealSuggestions,{...sugg,id:Date.now(),kidName:"Bradyn",status:"pending",date:new Date().toLocaleDateString()}]);setSugg({meal:"",suggestDate:"",mealType:"Dinner",notes:""});setShowS(false);};
   const addShopItem=()=>{if(!newItem.name)return;saveShop([...shopList,{...newItem,id:Date.now(),addedBy:"Bradyn",checked:false}]);setNewItem({name:"",qty:"1",category:"Grocery",store:"",notes:""});setShowAdd(false);};
   const cats=shopSettings?.categories||["Grocery","Dairy","Produce","Meat","Snacks","Beverages","Household","Personal Care","Other"];
   const stores=shopSettings?.stores||["Walmart","Kroger","Target","Costco","Aldi","Other"];
@@ -99,8 +98,8 @@ function ParkerTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMea
   const [item,setItem]=useState({name:"",qty:"",notes:""});
   const saveReqs=u=>{setShopRequests(u);store.save("fp2:shopRequests",u);};
   const saveSugg=u=>{setMealSuggestions(u);store.save("fp2:mealSuggestions",u);};
-  const sendSugg=()=>{if(!sugg.meal)return;saveSugg([...mealSuggestions,{...sugg,id:Date.now(),kidName:"Parker",status:"pending",date:new Date().toLocaleDateString()}]);notifyParents("kidRequests",`🍴 Parker suggested "${sugg.meal}" for ${sugg.dayPreference} ${sugg.mealType}`);setSugg({meal:"",dayPreference:"Friday",mealType:"Dinner",notes:""});setShowS(false);};
-  const sendItem=()=>{if(!item.name)return;saveReqs([...shopRequests,{...item,id:Date.now(),kidName:"Parker",item:item.name,status:"pending",date:new Date().toLocaleDateString()}]);notifyParents("kidRequests",`🛒 Parker requested "${item.name}"`);setItem({name:"",qty:"",notes:""});setShowR(false);};
+  const sendSugg=()=>{if(!sugg.meal)return;saveSugg([...mealSuggestions,{...sugg,id:Date.now(),kidName:"Parker",status:"pending",date:new Date().toLocaleDateString()}]);setSugg({meal:"",dayPreference:"Friday",mealType:"Dinner",notes:""});setShowS(false);};
+  const sendItem=()=>{if(!item.name)return;saveReqs([...shopRequests,{...item,id:Date.now(),kidName:"Parker",item:item.name,status:"pending",date:new Date().toLocaleDateString()}]);setItem({name:"",qty:"",notes:""});setShowR(false);};
   const todayName=DAYS[new Date().getDay()===0?6:new Date().getDay()-1];
   const pc="rgba(180,79,239,0.12)",pb="1px solid rgba(180,79,239,0.25)";
   const pInp={background:"rgba(255,255,255,0.08)",border:"1px solid rgba(180,79,239,0.4)",borderRadius:8,padding:"11px 14px",color:"#e8e0ff",fontFamily:"Georgia,serif",fontSize:16,width:"100%",boxSizing:"border-box",outline:"none",marginBottom:10};
@@ -160,8 +159,8 @@ function RyderTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMeal
   const [mealIn,setMealIn]=useState(""),[shopIn,setShopIn]=useState(""),[flash,setFlash]=useState(null);
   const saveReqs=u=>{setShopRequests(u);store.save("fp2:shopRequests",u);};
   const saveSugg=u=>{setMealSuggestions(u);store.save("fp2:mealSuggestions",u);};
-  const sendMeal=()=>{if(!mealIn)return;saveSugg([...mealSuggestions,{id:Date.now(),kidName:"Ryder",meal:mealIn,dayPreference:"Any day",mealType:"Dinner",notes:"",status:"pending",date:new Date().toLocaleDateString()}]);notifyParents("kidRequests",`🍴 Ryder wants "${mealIn}" for dinner`);setMealIn("");setScreen("home");setFlash("meal");setTimeout(()=>setFlash(null),2800);};
-  const sendShop=()=>{if(!shopIn)return;saveReqs([...shopRequests,{id:Date.now(),kidName:"Ryder",item:shopIn,qty:"",notes:"",status:"pending",date:new Date().toLocaleDateString()}]);notifyParents("kidRequests",`🛒 Ryder requested "${shopIn}"`);setShopIn("");setScreen("home");setFlash("shop");setTimeout(()=>setFlash(null),2800);};
+  const sendMeal=()=>{if(!mealIn)return;saveSugg([...mealSuggestions,{id:Date.now(),kidName:"Ryder",meal:mealIn,dayPreference:"Any day",mealType:"Dinner",notes:"",status:"pending",date:new Date().toLocaleDateString()}]);setMealIn("");setScreen("home");setFlash("meal");setTimeout(()=>setFlash(null),2800);};
+  const sendShop=()=>{if(!shopIn)return;saveReqs([...shopRequests,{id:Date.now(),kidName:"Ryder",item:shopIn,qty:"",notes:"",status:"pending",date:new Date().toLocaleDateString()}]);setShopIn("");setScreen("home");setFlash("shop");setTimeout(()=>setFlash(null),2800);};
   const todayName=DAYS[new Date().getDay()===0?6:new Date().getDay()-1];
   const tonightDinner=mealPlan[todayName]?.Dinner||"";
   const rS={page:{background:"linear-gradient(180deg,#0d1f0d,#1a0d0d)",minHeight:"100vh",fontFamily:"Georgia,serif",color:"#fff9f0",fontSize:17},card:{background:"rgba(255,107,53,0.08)",border:"1px solid rgba(255,107,53,0.2)",borderRadius:14,padding:24,marginBottom:16},cardSm:{background:"rgba(255,107,53,0.05)",border:"1px solid rgba(255,107,53,0.15)",borderRadius:10,padding:18,marginBottom:12},h2:{fontSize:18,color:"#ff6b35",fontWeight:"bold",marginBottom:16},btn:(c="#ff6b35")=>({background:c,border:"none",borderRadius:10,padding:"13px 22px",color:"#fff",fontSize:16,cursor:"pointer",fontWeight:"bold",fontFamily:"Georgia,serif",whiteSpace:"nowrap"}),btnGhost:{background:"transparent",border:"1px solid rgba(255,107,53,0.3)",borderRadius:8,padding:"10px 15px",color:"#887766",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:15},btnDanger:{background:"transparent",border:"1px solid #f4433644",borderRadius:6,padding:"7px 13px",color:"#f44336",fontFamily:"Georgia,serif",fontSize:15,cursor:"pointer"},label:{fontSize:12,color:"#887766",textTransform:"uppercase",letterSpacing:"0.15em",marginBottom:6,fontFamily:"monospace"},input:{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,107,53,0.4)",borderRadius:8,padding:"10px 14px",color:"#fff9f0",fontFamily:"Georgia,serif",fontSize:16,width:"100%",boxSizing:"border-box",outline:"none"},select:{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,107,53,0.4)",borderRadius:8,padding:"10px 14px",color:"#fff9f0",fontFamily:"Georgia,serif",fontSize:16,width:"100%",boxSizing:"border-box",outline:"none"},row:{display:"flex",justifyContent:"space-between",alignItems:"center"},tag:c=>({background:c+"22",color:c,border:`1px solid ${c}44`,borderRadius:4,padding:"4px 10px",fontSize:13,fontFamily:"monospace"}),alert:c=>({background:c+"18",border:`1px solid ${c}44`,borderRadius:8,padding:"14px 18px",marginBottom:14}),T:{accent:"#ff6b35",text:"#fff9f0",sub:"#887766",border:"rgba(255,107,53,0.2)",bg:"#0d1f0d"}};
@@ -215,7 +214,7 @@ function RyderTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMeal
 
 // ── BRAD DASHBOARD ────────────────────────────────────────────────────────────
 function BradDashboard(props){
-  const {onLogout,auth,setAuth,netWorth,accounts,setAccounts,debts,setDebts,expenses,setExpenses,goals,setGoals,transactions,setTransactions,pslf,setPslf,scenario,setScenario,reviewTxns,setReviewTxns,uploadLoading,handleUpload,confirmTxns,fileRef,saveAll,profile,setProfile,mealPlan,nextWeekPlan,mealPlans,setMealPlans,mealFavs,setMealFavs,smsSettings,setSmsSettings,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,totalAssets,totalDebtAmt,totalCC,combinedLiquid,cushion,dti,mortgageRate,monthlyMortgage,loanAmt,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger,events,setEvents}=props;
+  const {onLogout,auth,setAuth,netWorth,accounts,setAccounts,debts,setDebts,expenses,setExpenses,goals,setGoals,transactions,setTransactions,pslf,setPslf,scenario,setScenario,reviewTxns,setReviewTxns,uploadLoading,handleUpload,confirmTxns,fileRef,saveAll,profile,setProfile,mealPlan,nextWeekPlan,mealPlans,setMealPlans,mealFavs,setMealFavs,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,totalAssets,totalDebtAmt,totalCC,combinedLiquid,cushion,dti,mortgageRate,monthlyMortgage,loanAmt,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger,events,setEvents}=props;
   const [tab,setTab]=useState("home");
   const [showShopView,setShowShopView]=useState(false);
   const [userTheme,setUserTheme]=useState(appSettings?.userThemes?.brad||"dark");
@@ -262,14 +261,14 @@ function BradDashboard(props){
       {tab==="statements"&&<StatementsTab transactions={transactions} setTransactions={setTransactions} handleUpload={handleUpload} uploadLoading={uploadLoading} reviewTxns={reviewTxns} setReviewTxns={setReviewTxns} confirmTxns={confirmTxns} fileRef={fileRef} S={S}/>}
       {tab==="scenarios"&&<ScenariosTab scenario={scenario} setScenario={setScenario} debts={debts} profile={profile} combinedLiquid={combinedLiquid} totalCC={totalCC} surplus={surplus} mortgageRate={mortgageRate} loanAmt={loanAmt} homePrice={homePrice} slPayment={slPayment} S={S}/>}
       {tab==="pslf"&&<PslfTab pslf={pslf} setPslf={setPslf} debts={debts} S={S}/>}
-      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} shopSettings={shopSettings} setShopSettings={setShopSettings} payAccounts={payAccounts} setPayAccounts={setPayAccounts} smsSettings={smsSettings} setSmsSettings={setSmsSettings} S={S} currentUser="brad"/>}
+      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} shopSettings={shopSettings} setShopSettings={setShopSettings} payAccounts={payAccounts} setPayAccounts={setPayAccounts} S={S} currentUser="brad"/>}
       {tab==="admin"&&<AdminPanel auth={auth} setAuth={setAuth} S={S}/>}
     </div>
   </div>);
 }
 
 // ── MARY BETH DASHBOARD ───────────────────────────────────────────────────────
-function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,nextWeekPlan,mealPlans,setMealPlans,mealFavs,setMealFavs,smsSettings,setSmsSettings,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,profile,setProfile,expenses,debts,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,events,setEvents,onLogout}){
+function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,nextWeekPlan,mealPlans,setMealPlans,mealFavs,setMealFavs,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,profile,setProfile,expenses,debts,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,events,setEvents,onLogout}){
   const [tab,setTab]=useState("home");
   const [showShopView,setShowShopView]=useState(false);
   const [userTheme,setUserTheme]=useState(appSettings?.userThemes?.maryBeth||"dark");
@@ -298,7 +297,7 @@ function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,n
       {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} appSettings={appSettings} S={S} currentUser="maryBeth"/>}
       {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="maryBeth" S={S}/>}
       {tab==="bills"&&<BillsTab bills={bills} setBills={setBills} billHistory={billHistory} setBillHistory={setBillHistory} profile={profile} payAccounts={payAccounts} S={S}/>}
-      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} shopSettings={shopSettings} setShopSettings={setShopSettings} payAccounts={payAccounts} setPayAccounts={setPayAccounts} smsSettings={smsSettings} setSmsSettings={setSmsSettings} S={S} currentUser="maryBeth"/>}
+      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} shopSettings={shopSettings} setShopSettings={setShopSettings} payAccounts={payAccounts} setPayAccounts={setPayAccounts} S={S} currentUser="maryBeth"/>}
     </div>
   </div>);
 }
