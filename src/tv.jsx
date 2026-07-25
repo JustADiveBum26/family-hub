@@ -78,7 +78,7 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
       </div>
       {/* Right: Today leads (prominent), Menu + Shopping condensed below, tasks last */}
       <div style={{display:"flex",flexDirection:"column",minHeight:0,gap:8}}>
-        <div style={{...tvS.card,marginBottom:0,flex:"1 1 45%",minHeight:0,overflowY:"auto",padding:14}}>
+        <div style={{...tvS.card,marginBottom:0,flex:"0 1 auto",maxHeight:"38vh",minHeight:0,overflowY:"auto",padding:14}}>
           <div style={{...tvS.h2,fontSize:15,marginBottom:6,paddingBottom:6}}>Today{tomorrowEvents.length>0?" / Tomorrow":""}</div>
           {todayEvents.length===0&&<div style={{fontSize:13,color:T.sub}}>Nothing scheduled today</div>}
           {todayEvents.map(ev=><EventRow key={ev.id} ev={ev} S={tvS}/>)}
@@ -87,7 +87,7 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
             {tomorrowEvents.map(ev=><EventRow key={ev.id} ev={ev} S={tvS}/>)}
           </>}
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,flex:"1 1 40%",minHeight:0}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,flex:"1 1 auto",minHeight:0}}>
           <div style={{...tvS.card,marginBottom:0,display:"flex",flexDirection:"column",minHeight:0,padding:12}}>
             <div style={{...tvS.h2,fontSize:13,marginBottom:5,paddingBottom:5}}>🍽 Menu This Week</div>
             <div style={{overflowY:"auto",minHeight:0,flex:1}}>
