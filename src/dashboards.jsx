@@ -214,7 +214,7 @@ function RyderTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMeal
 
 // ── BRAD DASHBOARD ────────────────────────────────────────────────────────────
 function BradDashboard(props){
-  const {onLogout,auth,setAuth,netWorth,accounts,setAccounts,debts,setDebts,expenses,setExpenses,goals,setGoals,transactions,setTransactions,pslf,setPslf,scenario,setScenario,reviewTxns,setReviewTxns,uploadLoading,handleUpload,confirmTxns,fileRef,saveAll,profile,setProfile,mealPlan,nextWeekPlan,mealPlans,setMealPlans,mealFavs,setMealFavs,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,totalAssets,totalDebtAmt,totalCC,combinedLiquid,cushion,dti,mortgageRate,monthlyMortgage,loanAmt,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger,events,setEvents,todos,setTodos}=props;
+  const {onLogout,auth,setAuth,netWorth,accounts,setAccounts,debts,setDebts,expenses,setExpenses,goals,setGoals,transactions,setTransactions,pslf,setPslf,scenario,setScenario,reviewTxns,setReviewTxns,uploadLoading,handleUpload,confirmTxns,fileRef,saveAll,profile,setProfile,mealPlan,nextWeekPlan,mealPlans,setMealPlans,mealFavs,setMealFavs,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,totalAssets,totalDebtAmt,totalCC,combinedLiquid,cushion,dti,mortgageRate,monthlyMortgage,loanAmt,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger,events,setEvents,todos,setTodos,shopStaples,setShopStaples}=props;
   const [tab,setTab]=useState("home");
   const [showShopView,setShowShopView]=useState(false);
   const [userTheme,setUserTheme]=useState(appSettings?.userThemes?.brad||"dark");
@@ -250,7 +250,7 @@ function BradDashboard(props){
       {tab!=="home"&&bills&&<BillsBanner bills={bills} S={S}/> }
       {tab==="home"&&<PersonalHomeScreen currentUser="brad" mealPlan={mealPlan} nextWeekPlan={nextWeekPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} events={events} S={S}/> }
       {tab==="cal"&&<CalendarTab events={events} setEvents={setEvents} currentUser="brad" canEdit={true} S={S}/>}
-      {tab==="meals"&&<MealsTab mealPlans={mealPlans} setMealPlans={setMealPlans} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} mealFavs={mealFavs} setMealFavs={setMealFavs} shopSettings={shopSettings} profile={profile} S={S}/>}
+      {tab==="meals"&&<MealsTab mealPlans={mealPlans} setMealPlans={setMealPlans} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} mealFavs={mealFavs} setMealFavs={setMealFavs} shopStaples={shopStaples} setShopStaples={setShopStaples} shopSettings={shopSettings} profile={profile} S={S}/>}
       {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} appSettings={appSettings} S={S} currentUser="brad"/>}
       {tab==="todo"&&todoOn&&<TodoTab items={todos?.brad} onSave={saveTodos} S={S}/>}
       {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="brad" S={S}/>}
@@ -271,7 +271,7 @@ function BradDashboard(props){
 }
 
 // ── MARY BETH DASHBOARD ───────────────────────────────────────────────────────
-function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,nextWeekPlan,mealPlans,setMealPlans,mealFavs,setMealFavs,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,profile,setProfile,expenses,debts,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,events,setEvents,todos,setTodos,onLogout}){
+function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,nextWeekPlan,mealPlans,setMealPlans,mealFavs,setMealFavs,shopStaples,setShopStaples,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,profile,setProfile,expenses,debts,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,events,setEvents,todos,setTodos,onLogout}){
   const [tab,setTab]=useState("home");
   const [showShopView,setShowShopView]=useState(false);
   const [userTheme,setUserTheme]=useState(appSettings?.userThemes?.maryBeth||"dark");
@@ -298,7 +298,7 @@ function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,n
       {tab!=="home"&&bills&&<BillsBanner bills={bills} S={S}/> }
       {tab==="home"&&<PersonalHomeScreen currentUser="maryBeth" mealPlan={mealPlan} nextWeekPlan={nextWeekPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} events={events} S={S}/> }
       {tab==="cal"&&<CalendarTab events={events} setEvents={setEvents} currentUser="maryBeth" canEdit={true} S={S}/>}
-      {tab==="meals"&&<MealsTab mealPlans={mealPlans} setMealPlans={setMealPlans} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} mealFavs={mealFavs} setMealFavs={setMealFavs} shopSettings={shopSettings} profile={profile} S={S}/>}
+      {tab==="meals"&&<MealsTab mealPlans={mealPlans} setMealPlans={setMealPlans} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} mealFavs={mealFavs} setMealFavs={setMealFavs} shopStaples={shopStaples} setShopStaples={setShopStaples} shopSettings={shopSettings} profile={profile} S={S}/>}
       {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} appSettings={appSettings} S={S} currentUser="maryBeth"/>}
       {tab==="todo"&&todoOn&&<TodoTab items={todos?.maryBeth} onSave={saveTodos} S={S}/>}
       {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="maryBeth" S={S}/>}

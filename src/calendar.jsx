@@ -25,7 +25,10 @@ const todayKey=()=>dateKey(new Date());
 const evOwners=ev=>{const keys=(ev.owners&&ev.owners.length)?ev.owners:[ev.owner||"family"];return keys.map(k=>OWNERS.find(o=>o.key===k)).filter(Boolean);};
 const ownerOf=ev=>evOwners(ev)[0]||OWNERS[0];
 const catOf=ev=>EVENT_CATS.find(c=>c.key===(ev.category||"other"))||EVENT_CATS[EVENT_CATS.length-1];
-const spansDay=(ev,key)=>ev.date<=key&&key<=(ev.endDate||ev.date);
+const monthDay=k=>k.slice(5);
+// Yearly-recurring events (birthdays, anniversaries) match on month+day alone,
+// regardless of year — no need to re-add them every year.
+const spansDay=(ev,key)=>ev.repeatYearly?monthDay(ev.date)===monthDay(key):(ev.date<=key&&key<=(ev.endDate||ev.date));
 const fmtTime=t=>{if(!t)return"";const[h,m]=t.split(":").map(Number);const ap=h>=12?"PM":"AM";const h12=h%12===0?12:h%12;return m?`${h12}:${pad2(m)} ${ap}`:`${h12} ${ap}`;};
 const fmtDayLong=key=>parseKey(key).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
 const fmtDayShort=key=>parseKey(key).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
@@ -33,11 +36,23 @@ const fmtDayShort=key=>parseKey(key).toLocaleDateString("en-US",{weekday:"short"
 const eventsOnDay=(events,key)=>(events||[]).filter(ev=>spansDay(ev,key))
   .sort((a,b)=>(a.time||"")<(b.time||"")?-1:(a.time||"")>(b.time||"")?1:0);
 
+// For a yearly-recurring event, find its next occurrence on/after `fromKey`
+// (this year if it hasn't happened yet, otherwise next year).
+const nextOccurrence=(ev,fromKey)=>{
+  const from=parseKey(fromKey),orig=parseKey(ev.date);
+  let next=new Date(from.getFullYear(),orig.getMonth(),orig.getDate(),12);
+  if(dateKey(next)<fromKey)next=new Date(from.getFullYear()+1,orig.getMonth(),orig.getDate(),12);
+  return dateKey(next);
+};
+
 // Events starting (or still running) within the next `days` days, soonest first.
+// Yearly events are normalized to their next occurrence first so the usual
+// date-range filter/sort just works.
 const upcomingEvents=(events,days=7)=>{
   const start=todayKey();
   const end=dateKey(new Date(Date.now()+days*864e5));
   return(events||[])
+    .map(ev=>ev.repeatYearly?{...ev,date:nextOccurrence(ev,start),endDate:""}:ev)
     .filter(ev=>(ev.endDate||ev.date)>=start&&ev.date<=end)
     .sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.time||"")<(b.time||"")?-1:1);
 };
@@ -131,6 +146,7 @@ function EventRow({ev,S,showDate,canEdit,onEdit,onDelete,onDeleteSeries}){
         {showDate&&<span>{fmtDayShort(ev.date)}{multi?" → "+fmtDayShort(ev.endDate):""}</span>}
         {ev.time&&<span>{fmtTime(ev.time)}{ev.endTime?" – "+fmtTime(ev.endTime):""}</span>}
         {!showDate&&multi&&<span>thru {fmtDayShort(ev.endDate)}</span>}
+        {ev.repeatYearly&&<span>🎂 yearly</span>}
       </div>
       {ev.notes&&<div style={{fontSize:11,color:S.T.sub,marginTop:2,fontStyle:"italic"}}>{ev.notes}</div>}
     </div>
@@ -144,7 +160,7 @@ function EventRow({ev,S,showDate,canEdit,onEdit,onDelete,onDeleteSeries}){
 
 // ── ADD / EDIT FORM ───────────────────────────────────────────────────────────
 function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
-  const blank={title:"",owners:["family"],category:"other",date:defaultDate||todayKey(),endDate:"",time:"",endTime:"",notes:"",countdown:false,repeatWeekly:false,repeatUntil:""};
+  const blank={title:"",owners:["family"],category:"other",date:defaultDate||todayKey(),endDate:"",time:"",endTime:"",notes:"",countdown:false,repeatWeekly:false,repeatUntil:"",repeatYearly:false};
   const [f,setF]=useState(initial?{...blank,...initial,owners:(initial.owners&&initial.owners.length)?initial.owners:[initial.owner||"family"],repeatWeekly:false,repeatUntil:""}:blank);
   const [err,setErr]=useState("");
   const set=(k,v)=>{setF(x=>({...x,[k]:v}));setErr("");};
@@ -190,7 +206,13 @@ function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
         ⏳ Show as countdown — big "days to go" tile on home screens and the TV
       </label>
     </div>
-    {!initial&&<div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:10}}>
+    <div style={{marginBottom:10}}>
+      <label style={{display:"flex",gap:6,alignItems:"center",fontSize:13,color:S.T.text,cursor:"pointer"}}>
+        <input type="checkbox" checked={!!f.repeatYearly} onChange={e=>{const on=e.target.checked;setF(x=>({...x,repeatYearly:on,repeatWeekly:on?false:x.repeatWeekly}));setErr("");}} style={{accentColor:S.T.accent,width:16,height:16}}/>
+        🎂 Repeats every year — birthdays, anniversaries. No need to re-add it annually.
+      </label>
+    </div>
+    {!initial&&!f.repeatYearly&&<div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:10}}>
       <label style={{display:"flex",gap:6,alignItems:"center",fontSize:13,color:S.T.text,cursor:"pointer"}}>
         <input type="checkbox" checked={f.repeatWeekly} onChange={e=>set("repeatWeekly",e.target.checked)} style={{accentColor:S.T.accent,width:16,height:16}}/>
         Repeats weekly
@@ -211,7 +233,9 @@ function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
 // ── COUNTDOWN TILES — events flagged "countdown" show big days-to-go numbers ──
 function CountdownStrip({events,S,big}){
   const today=todayKey();
-  const items=(events||[]).filter(ev=>ev.countdown&&(ev.endDate||ev.date)>=today).sort((a,b)=>a.date<b.date?-1:1).slice(0,4);
+  const items=(events||[])
+    .map(ev=>ev.repeatYearly?{...ev,date:nextOccurrence(ev,today),endDate:""}:ev)
+    .filter(ev=>ev.countdown&&(ev.endDate||ev.date)>=today).sort((a,b)=>a.date<b.date?-1:1).slice(0,4);
   if(items.length===0)return null;
   return(<div style={{display:"flex",gap:big?14:10,flexWrap:"wrap",marginBottom:14}}>
     {items.map(ev=>{
@@ -244,7 +268,7 @@ function CalendarTab({events,setEvents,currentUser,canEdit,S}){
   const [editing,setEditing]=useState(null);
   const save=u=>{setEvents(u);store.save("fp2:events",u);};
   const addEvent=f=>{
-    const base={title:f.title.trim(),owners:f.owners,owner:f.owners[0],category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),countdown:!!f.countdown,createdBy:currentUser||""};
+    const base={title:f.title.trim(),owners:f.owners,owner:f.owners[0],category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),countdown:!!f.countdown,repeatYearly:!!f.repeatYearly,createdBy:currentUser||""};
     let added=[];
     if(f.repeatWeekly&&f.repeatUntil){
       const seriesId=Date.now();
@@ -261,7 +285,7 @@ function CalendarTab({events,setEvents,currentUser,canEdit,S}){
     setSelected(f.date);
   };
   const updateEvent=f=>{
-    save((events||[]).map(ev=>ev.id===editing.id?{...ev,title:f.title.trim(),owners:f.owners,owner:f.owners[0],category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),countdown:!!f.countdown}:ev));
+    save((events||[]).map(ev=>ev.id===editing.id?{...ev,title:f.title.trim(),owners:f.owners,owner:f.owners[0],category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),countdown:!!f.countdown,repeatYearly:!!f.repeatYearly}:ev));
     setEditing(null);
   };
   const del=id=>save((events||[]).filter(ev=>ev.id!==id));

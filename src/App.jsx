@@ -33,6 +33,7 @@ export default function App(){
   const [bradynLedger,setBradynLedger]=useState([]);
   const [events,setEvents]=useState([]);
   const [mealFavs,setMealFavs]=useState([]);
+  const [shopStaples,setShopStaples]=useState([]);
   const [todos,setTodos]=useState(D.todos);
   const [loginTarget,setLoginTarget]=useState(null);
   const [loaded,setLoaded]=useState(false);
@@ -44,7 +45,7 @@ export default function App(){
   const timerRef=useRef(null);
 
   const loadAll=useCallback(async()=>{
-    const [p,a,d,e,g,t,ps,bl,mp,sl,ms,sr,au,ch,mg,bh,as,md,ss,pa,bn,evts,mps,mf,wloc,td]=await Promise.all([
+    const [p,a,d,e,g,t,ps,bl,mp,sl,ms,sr,au,ch,mg,bh,as,md,ss,pa,bn,evts,mps,mf,wloc,td,stp]=await Promise.all([
       store.load("fp2:profile",D.profile),store.load("fp2:accounts",D.accounts),
       store.load("fp2:debts",D.debts),store.load("fp2:expenses",D.expenses),
       store.load("fp2:goals",D.goals),store.load("fp2:transactions",D.transactions),
@@ -61,6 +62,7 @@ export default function App(){
       store.load("fp2:mealFavs",[]),
       store.load("fp2:weatherLoc",null),
       store.load("fp2:todos",D.todos),
+      store.load("fp2:shopStaples",[]),
     ]);
     setProfile(p);setAccounts(a);setDebts(d);setExpenses(e);setGoals(g);setTransactions(t);setPslf(ps);
     setBills(bl);setBillHistory(bh||[]);
@@ -82,6 +84,7 @@ export default function App(){
     setBradynLedger(bn||[]);
     setEvents(evts||[]);
     setMealFavs(mf||[]);
+    setShopStaples(stp||[]);
     setTodos({...D.todos,...(td||{})});
     if(wloc)configureWeather(wloc);
     setLoaded(true);
@@ -147,7 +150,7 @@ export default function App(){
   const mealPlan=normalizeWeek(mealPlans[curWk]);
   const nextWeekPlan=normalizeWeek(mealPlans[weekKeyOffset(curWk,1)]);
 
-  const sharedProps={mealPlan,nextWeekPlan,mealPlans,setMealPlans,mealFavs,setMealFavs,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,profile,setProfile,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger,events,setEvents,todos,setTodos};
+  const sharedProps={mealPlan,nextWeekPlan,mealPlans,setMealPlans,mealFavs,setMealFavs,shopStaples,setShopStaples,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,profile,setProfile,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger,events,setEvents,todos,setTodos};
   const enterTv=()=>{setTvMode(true);try{window.history.replaceState(null,"","#tv");}catch(e){}};
   const exitTv=()=>{setTvMode(false);try{window.history.replaceState(null,"",window.location.pathname);}catch(e){}};
 

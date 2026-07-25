@@ -687,7 +687,7 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList
 }
 
 // ── MEALS TAB ─────────────────────────────────────────────────────────────────
-function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,mealDetails,setMealDetails,mealFavs,setMealFavs,shopSettings,profile,S}){
+function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,mealDetails,setMealDetails,mealFavs,setMealFavs,shopStaples,setShopStaples,shopSettings,profile,S}){
   // Week navigation: plans are stored per week (keyed by Monday's date), so the
   // family can plan next week and look back at past menus.
   const curWk=weekKeyOf();
@@ -729,6 +729,26 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
     if((f.ingredients&&f.ingredients.length)||f.recipe)saveDetails({...mealDetails,[wk+"__"+favTarget.day+"__"+favTarget.mt]:{ingredients:f.ingredients||[],recipe:f.recipe||""}});
   };
   const copyLastWeek=()=>{saveWeek(wk,normalizeWeek(mealPlans[weekKeyOffset(wk,-1)]));setCopyConfirm(false);};
+  // Staples: things bought every week (milk, eggs...) that can be added with one tap.
+  const staples=shopStaples||[];
+  const saveStaples=u=>{setShopStaples(u);store.save("fp2:shopStaples",u);};
+  const [newStaple,setNewStaple]=useState({name:"",category:cats[0]||"Grocery",store:""});
+  const onStapleList=name=>shopList.some(i=>!i.checked&&i.name.toLowerCase()===name.toLowerCase());
+  const addStaple=()=>{
+    if(!newStaple.name.trim())return;
+    saveStaples([...staples,{id:Date.now(),name:newStaple.name.trim(),category:newStaple.category,store:newStaple.store}]);
+    setNewStaple({name:"",category:cats[0]||"Grocery",store:""});
+  };
+  const removeStaple=id=>saveStaples(staples.filter(s=>s.id!==id));
+  const addStapleToList=s=>{
+    if(onStapleList(s.name))return;
+    saveShop([...shopList,{id:Date.now()+Math.random(),name:s.name,qty:"1",category:s.category,store:s.store||"",addedBy:"Staples",checked:false,notes:""}]);
+  };
+  const addAllStaples=()=>{
+    const toAdd=staples.filter(s=>!onStapleList(s.name));
+    if(!toAdd.length)return;
+    saveShop([...shopList,...toAdd.map(s=>({id:Date.now()+Math.random(),name:s.name,qty:"1",category:s.category,store:s.store||"",addedBy:"Staples",checked:false,notes:""}))]);
+  };
   const saveSugg=u=>{setMealSuggestions(u);store.save("fp2:mealSuggestions",u);};
   const saveReqs=u=>{setShopRequests(u);store.save("fp2:shopRequests",u);};
   const saveDetails=u=>{setMealDetails(u);store.save("fp2:mealDetails",u);};
@@ -842,6 +862,32 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
           ))}
         </div>
       </>}
+    </div>
+    <div style={S.card}>
+      <div style={{...S.h2,...S.row,flexWrap:"wrap",gap:8}}>
+        <span>⭐ Shopping Staples</span>
+        {staples.length>0&&<button style={{...S.btn("#4CAF50"),padding:"5px 12px",fontSize:12}} onClick={addAllStaples}>+ Add All to List</button>}
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+        <input style={{...S.input,flex:1,minWidth:120}} placeholder="e.g. Milk" value={newStaple.name} onChange={e=>setNewStaple({...newStaple,name:e.target.value})} onKeyDown={e=>e.key==="Enter"&&addStaple()}/>
+        <select style={{...S.select,width:130}} value={newStaple.category} onChange={e=>setNewStaple({...newStaple,category:e.target.value})}>{cats.map(c=><option key={c}>{c}</option>)}</select>
+        <select style={{...S.select,width:130}} value={newStaple.store} onChange={e=>setNewStaple({...newStaple,store:e.target.value})}><option value="">Any store</option>{stores.map(s=><option key={s}>{s}</option>)}</select>
+        <button style={S.btn()} onClick={addStaple}>+ Save Staple</button>
+      </div>
+      {staples.length===0&&<div style={{fontSize:13,color:S.T.sub}}>No staples saved yet — add the things you buy every week (milk, eggs, bread...) so you can add them all to the list with one tap.</div>}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        {[...staples].sort((a,b)=>a.name.localeCompare(b.name)).map(s=>{
+          const onList=onStapleList(s.name);
+          return(<div key={s.id} style={{display:"flex",gap:6,alignItems:"center",background:S.T.bg,border:`1px solid ${S.T.border}`,borderRadius:10,padding:"7px 10px"}}>
+            <div>
+              <div style={{fontSize:13,color:S.T.text}}>{s.name}</div>
+              <div style={{fontSize:10,color:S.T.sub}}>{s.category}{s.store?" · "+s.store:""}</div>
+            </div>
+            <button style={{...S.btn(onList?"#4CAF50":S.T.accent),padding:"4px 10px",fontSize:11,opacity:onList?0.6:1}} onClick={()=>addStapleToList(s)}>{onList?"On List":"+ Add"}</button>
+            <button style={{...S.btnDanger,padding:"3px 7px",fontSize:11}} onClick={()=>removeStaple(s.id)}>✕</button>
+          </div>);
+        })}
+      </div>
     </div>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
       <div style={S.card}>
