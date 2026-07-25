@@ -223,6 +223,39 @@ function MessageBoard({messages,setMessages,currentUser,S}){
   </div>);
 }
 
+// ── TO-DO TAB (personal, per-user list — separate from the shared Tasks/chores board) ─
+function TodoTab({items,onSave,S}){
+  const [text,setText]=useState("");
+  const list=items||[];
+  const add=()=>{if(!text.trim())return;onSave([...list,{id:Date.now(),text:text.trim(),done:false}]);setText("");};
+  const toggle=id=>onSave(list.map(i=>i.id===id?{...i,done:!i.done}:i));
+  const del=id=>onSave(list.filter(i=>i.id!==id));
+  const clearDone=()=>onSave(list.filter(i=>!i.done));
+  const pending=list.filter(i=>!i.done),done=list.filter(i=>i.done);
+  return(<div style={S.card}>
+    <div style={S.h2}>✅ My To-Do List</div>
+    <div style={{display:"flex",gap:8,marginBottom:14}}>
+      <input style={{...S.input,flex:1}} placeholder="Add a task..." value={text} onChange={e=>setText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&add()}/>
+      <button style={S.btn()} onClick={add}>+ Add</button>
+    </div>
+    {pending.length===0&&done.length===0&&<div style={{fontSize:13,color:S.T.sub,textAlign:"center",padding:"12px 0"}}>Nothing on your list yet.</div>}
+    {pending.map(i=><div key={i.id} style={{display:"flex",gap:10,padding:"8px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"center"}}>
+      <input type="checkbox" checked={false} onChange={()=>toggle(i.id)} style={{width:18,height:18,cursor:"pointer",flexShrink:0}}/>
+      <div style={{flex:1,fontSize:14,color:S.T.text}}>{i.text}</div>
+      <button onClick={()=>del(i.id)} style={S.btnDanger}>X</button>
+    </div>)}
+    {done.length>0&&<>
+      <div style={{...S.label,marginTop:16}}>Done ({done.length})</div>
+      {done.map(i=><div key={i.id} style={{display:"flex",gap:10,padding:"6px 0",alignItems:"center",opacity:0.55}}>
+        <input type="checkbox" checked={true} onChange={()=>toggle(i.id)} style={{width:18,height:18,cursor:"pointer",flexShrink:0}}/>
+        <div style={{flex:1,fontSize:13,color:S.T.text,textDecoration:"line-through"}}>{i.text}</div>
+        <button onClick={()=>del(i.id)} style={S.btnDanger}>X</button>
+      </div>)}
+      <button style={{...S.btnGhost,marginTop:10,fontSize:12}} onClick={clearDone}>Clear completed</button>
+    </>}
+  </div>);
+}
+
 // ── SETTINGS TAB ─────────────────────────────────────────────────────────────
 function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings,setShopSettings,payAccounts,setPayAccounts,S,currentUser}){
   const [local,setLocal]=useState({...profile});
@@ -325,6 +358,10 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
           <div><div style={{fontSize:14,color:S.T.text}}>{label}</div><div style={{fontSize:12,color:S.T.sub}}>Show task list for {label.split("'")[0]}</div></div>
           <button onClick={()=>toggleAdultChore(key)} style={{...S.btn(appSettings.showAdultChores?.[key]?"#4CAF50":S.T.border),padding:"7px 16px",fontSize:12}}>{appSettings.showAdultChores?.[key]?"ON":"OFF"}</button>
         </div>)}
+        {(currentUser==="brad"||currentUser==="maryBeth")&&<div style={{...S.row,padding:"10px 0"}}>
+          <div><div style={{fontSize:14,color:S.T.text}}>My To-Do List</div><div style={{fontSize:12,color:S.T.sub}}>Show a personal to-do list tab on your own dashboard</div></div>
+          <button onClick={()=>saveSettings({...appSettings,todoEnabled:{...appSettings.todoEnabled,[currentUser]:!(appSettings.todoEnabled?.[currentUser]!==false)}})} style={{...S.btn(appSettings.todoEnabled?.[currentUser]!==false?"#4CAF50":S.T.border),padding:"7px 16px",fontSize:12}}>{appSettings.todoEnabled?.[currentUser]!==false?"ON":"OFF"}</button>
+        </div>}
       </div>
     </div>}
   </div>);
@@ -552,9 +589,11 @@ function BillsTab({bills,setBills,billHistory,setBillHistory,profile,payAccounts
 
 // ── MEALS TAB ─────────────────────────────────────────────────────────────────
 // ── MEAL DETAIL MODAL (top-level component — must NOT be inside MealsTab) ─────
-function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList,saveDetails,saveShop,onClearMeal,onSaveFavorite,S}){
+function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList,saveDetails,saveShop,onClearMeal,onSaveFavorite,shopSettings,S}){
   const [newIngs,setNewIngs]=useState([{id:1,name:"",qty:"1"},{id:2,name:"",qty:"1"},{id:3,name:"",qty:"1"},{id:4,name:"",qty:"1"},{id:5,name:"",qty:"1"}]);
   const [favSaved,setFavSaved]=useState(false);
+  const stores=shopSettings?.stores||["Walmart","Kroger","Target","Costco","Aldi","Other"];
+  const [ingStore,setIngStore]=useState("");
   const blankIng=()=>({id:Date.now()+Math.random(),name:"",qty:"1"});
   const updateNewIng=(i,field,val)=>setNewIngs(rows=>rows.map((r,ri)=>ri===i?{...r,[field]:val}:r));
   const addNewIngRow=()=>setNewIngs(rows=>[...rows,blankIng()]);
@@ -566,7 +605,7 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList
   const delIngredient=(key,id)=>{const d=getDetail(key);updateDetail(key,{ingredients:d.ingredients.filter(i=>i.id!==id)});};
   const addIngToShop=(ing)=>{
     if(!shopList.find(i=>i.name.toLowerCase()===ing.name.toLowerCase()&&!i.checked)){
-      saveShop([...shopList,{id:Date.now(),name:ing.name,qty:ing.qty||"1",category:"Grocery",addedBy:"Meal Plan",checked:false,notes:""}]);
+      saveShop([...shopList,{id:Date.now(),name:ing.name,qty:ing.qty||"1",category:"Grocery",store:ingStore,addedBy:"Meal Plan",checked:false,notes:""}]);
     }
   };
   const addAllIngsToShop=(key)=>{const d=getDetail(key);d.ingredients.forEach(ing=>addIngToShop(ing));};
@@ -593,7 +632,11 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList
           <div style={{fontSize:10,color:S.T.sub,fontFamily:"monospace",letterSpacing:"0.15em"}}>{headerTop}</div>
           <div style={{fontSize:18,color:S.T.text,fontWeight:"bold"}}>{mealName||"No meal set"}</div>
         </div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <select style={{...S.select,padding:"6px 8px",fontSize:12}} value={ingStore} onChange={e=>setIngStore(e.target.value)} title="Store for items added from this recipe">
+            <option value="">Any store</option>
+            {stores.map(s=><option key={s}>{s}</option>)}
+          </select>
           <button style={{...S.btn("#4CAF50"),padding:"6px 12px",fontSize:12}} onClick={()=>addAllIngsToShop(key)} disabled={detail.ingredients.length===0}>Add All to List</button>
           {onSaveFavorite&&mealName&&<button style={{...S.btn(),padding:"6px 12px",fontSize:12}} onClick={()=>{onSaveFavorite(mealName,detail);setFavSaved(true);setTimeout(()=>setFavSaved(false),2000);}}>{favSaved?"✓ Saved!":"★ Save Favorite"}</button>}
           {onClearMeal&&detailSlot.day&&mealName&&<button style={{...S.btnDanger,padding:"6px 12px",fontSize:12}} onClick={()=>{onClearMeal(detailSlot.day,detailSlot.mt);close();}}>Clear Meal</button>}
@@ -734,7 +777,7 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
   const slotKey=(day,mt)=>{const wkKey=wk+"__"+day+"__"+mt;if(mealDetails[wkKey])return wkKey;const legacy=day+"__"+mt;return mealDetails[legacy]?legacy:wkKey;};
   const hasDetail=(day,mt)=>{const d=mealDetails[slotKey(day,mt)];return d&&(d.ingredients?.length>0||d.recipe?.trim());};
   return(<>
-    <MealDetailModal detailSlot={detailSlot} setDetailSlot={setDetailSlot} mealPlan={mealPlan} mealDetails={mealDetails} shopList={shopList} saveDetails={saveDetails} saveShop={saveShop} onClearMeal={clearCell} onSaveFavorite={saveFavorite} S={S}/>
+    <MealDetailModal detailSlot={detailSlot} setDetailSlot={setDetailSlot} mealPlan={mealPlan} mealDetails={mealDetails} shopList={shopList} saveDetails={saveDetails} saveShop={saveShop} onClearMeal={clearCell} onSaveFavorite={saveFavorite} shopSettings={shopSettings} S={S}/>
     {(pendS.length>0||pendR.length>0)&&<div style={{...S.alert(GOLD),marginBottom:14}}><span style={{color:GOLD,fontWeight:"bold"}}>★ {pendS.length+pendR.length} pending request{pendS.length+pendR.length!==1?"s":""} from the kids — </span><span style={{color:S.T.sub,fontSize:13}}>scroll down to review</span></div>}
     <div style={S.card}>
       <div style={{...S.row,flexWrap:"wrap",gap:8,marginBottom:10}}>
@@ -1033,5 +1076,5 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
 
 export {
   ChoresTab, KidChoreView, MessageBoard, SettingsTab, AdminPanel, BillCard,
-  SecHead, BillsTab, MealDetailModal, MealsTab, BradynLedger,
+  SecHead, BillsTab, MealDetailModal, MealsTab, BradynLedger, TodoTab,
 };

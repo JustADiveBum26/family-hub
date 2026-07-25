@@ -40,7 +40,8 @@ const D={
   bills:[],mealPlan:blankMealPlan(),shopList:[],mealSuggestions:[],shopRequests:[],
   auth:{brad:null,maryBeth:null,bradyn:null,parker:null,ryder:null},
   chores:[],messages:[],billHistory:[],
-  appSettings:{showPoints:false,showAdultChores:{brad:false,maryBeth:false,bradyn:false},userThemes:{}},
+  appSettings:{showPoints:false,showAdultChores:{brad:false,maryBeth:false,bradyn:false},userThemes:{},todoEnabled:{brad:true,maryBeth:true}},
+  todos:{brad:[],maryBeth:[]},
   shopSettings:{
     categories:["Grocery","Dairy","Produce","Meat","Snacks","Beverages","Household","Personal Care","Other"],
     stores:["Walmart","Kroger","Target","Costco","Aldi","Other"],
