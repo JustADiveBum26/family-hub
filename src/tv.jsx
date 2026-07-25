@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { DAYS, MEAL_TYPES, GOLD, BORDER, USERS, todayName, billPaid, weekKeyOf, dateOfWeekDay } from "./constants";
 import { WeatherStrip } from "./shared";
-import { MonthCalendar, EventRow, CountdownStrip, eventsOnDay, todayKey } from "./calendar";
+import { MonthCalendar, EventRow, CountdownStrip, eventsOnDay, todayKey, fmtDayLong } from "./calendar";
 
 const T={bg:"#0d0d08",card:"#141410",border:"#2a2a18",text:"#e8e0c8",sub:"#888",accent:GOLD};
 // Big-type style object shaped like makeS output so shared components render correctly.
@@ -25,6 +25,10 @@ const tvS={
 
 function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,appSettings,onExit,onLogin,onRefresh}){
   const [now,setNow]=useState(new Date());
+  // Tap/click any day on the calendar to see its full event details — hover
+  // doesn't work here since most TVs have no pointer, and touchscreens have
+  // no hover state at all.
+  const [selDay,setSelDay]=useState(null);
   // Kiosk behavior: tick the clock, and re-pull family data every 5 minutes so
   // the wall screen stays current without anyone touching it.
   useEffect(()=>{const id=setInterval(()=>setNow(new Date()),15000);return()=>clearInterval(id);},[]);
@@ -69,7 +73,7 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
       {/* Left: wider month calendar */}
       <div style={{display:"flex",flexDirection:"column",minHeight:0}}>
         <div style={{...tvS.card,flex:"1 1 auto",minHeight:0,overflowY:"auto",padding:14,marginBottom:dueSoon.length>0?6:0}}>
-          <MonthCalendar events={events} S={tvS} selectedKey={tKey}/>
+          <MonthCalendar events={events} S={tvS} selectedKey={selDay||tKey} onSelectDay={setSelDay}/>
         </div>
         {dueSoon.length>0&&<div style={{...tvS.alert("#FF9800"),display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",padding:"7px 12px",marginBottom:0,flexShrink:0}}>
           <span style={{color:"#FF9800",fontWeight:"bold",fontSize:12}}>Bills:</span>
@@ -124,6 +128,17 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
         </div>}
       </div>
     </div>
+    {/* Day detail popup: tap any day on the calendar to see everything on it */}
+    {selDay&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setSelDay(null)}>
+      <div style={{...tvS.card,maxWidth:520,width:"100%",maxHeight:"80vh",overflowY:"auto",marginBottom:0}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div style={{...tvS.h2,marginBottom:0,paddingBottom:0,border:"none",fontSize:20}}>{selDay===tKey?"Today — ":""}{fmtDayLong(selDay)}</div>
+          <button onClick={()=>setSelDay(null)} style={{...tvS.btnGhost,padding:"7px 14px",fontSize:13}}>✕ Close</button>
+        </div>
+        {eventsOnDay(events,selDay).length===0&&<div style={{fontSize:15,color:T.sub}}>Nothing scheduled.</div>}
+        {eventsOnDay(events,selDay).map(ev=><EventRow key={ev.id} ev={ev} S={tvS}/>)}
+      </div>
+    </div>}
     {/* Footer: sign in straight from the TV, or leave TV mode — always visible, never needs scrolling */}
     <div style={{display:"flex",justifyContent:"center",gap:8,alignItems:"center",marginTop:8,paddingTop:8,borderTop:`1px solid ${T.border}`,flexWrap:"wrap",flexShrink:0}}>
       <span style={{fontSize:10,color:T.sub,fontFamily:"monospace",letterSpacing:"0.15em"}}>SIGN IN:</span>
