@@ -65,10 +65,10 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
     </div>}
     <div style={{flexShrink:0}}><CountdownStrip events={events} S={tvS}/></div>
     {/* Main: fills whatever height is left — never pushes the sign-in row off-screen */}
-    <div style={{display:"grid",gridTemplateColumns:"minmax(0,44fr) minmax(0,56fr)",gap:14,flex:"1 1 auto",minHeight:0}}>
-      {/* Left: smaller month calendar */}
+    <div style={{display:"grid",gridTemplateColumns:"minmax(0,54fr) minmax(0,46fr)",gap:14,flex:"1 1 auto",minHeight:0}}>
+      {/* Left: wider month calendar */}
       <div style={{display:"flex",flexDirection:"column",minHeight:0}}>
-        <div style={{...tvS.card,flex:"1 1 auto",minHeight:0,overflowY:"auto",padding:12,marginBottom:dueSoon.length>0?6:0}}>
+        <div style={{...tvS.card,flex:"1 1 auto",minHeight:0,overflowY:"auto",padding:14,marginBottom:dueSoon.length>0?6:0}}>
           <MonthCalendar events={events} S={tvS} selectedKey={tKey}/>
         </div>
         {dueSoon.length>0&&<div style={{...tvS.alert("#FF9800"),display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",padding:"7px 12px",marginBottom:0,flexShrink:0}}>
@@ -76,42 +76,41 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
           {dueSoon.map(b=>{const dl=Math.ceil((new Date(b.dueDate+"T12:00:00")-now)/(864e5));return <span key={b.id} style={{...tvS.tag("#FF9800"),fontSize:11,padding:"3px 8px"}}>{b.name} — {dl===0?"Today":dl===1?"Tmrw":dl+"d"}</span>;})}
         </div>}
       </div>
-      {/* Right: this week's menu leads, condensed today/shopping/tasks below */}
+      {/* Right: Today leads (prominent), Menu + Shopping condensed below, tasks last */}
       <div style={{display:"flex",flexDirection:"column",minHeight:0,gap:8}}>
         <div style={{...tvS.card,marginBottom:0,flex:"1 1 45%",minHeight:0,overflowY:"auto",padding:14}}>
-          <div style={{...tvS.h2,fontSize:15,marginBottom:6,paddingBottom:6}}>🍽 Menu This Week</div>
-          {DAYS.map((d,di)=>{
-            const isToday=d===tn;
-            // On Sunday, show tomorrow (next week's Monday) dinner in Monday's row.
-            const src=(tomorrowIsNextWeek&&d===tomorrowDayName?nextWeekPlan:mealPlan)||{};
-            const dinner=(src[d]||{}).Dinner;
-            return(<div key={d} style={{display:"flex",gap:10,padding:"4px 0",borderBottom:`1px solid #1a1a0f`,alignItems:"baseline",background:isToday?GOLD+"11":"transparent"}}>
-              <span style={{fontSize:11,color:isToday?GOLD:T.sub,fontFamily:"monospace",minWidth:58,fontWeight:isToday?"bold":"normal"}}>{d.slice(0,3).toUpperCase()} {dateOfWeekDay(weekKeyOf(),di).getDate()}</span>
-              <span style={{fontSize:13,color:dinner?T.text:"#333",fontStyle:dinner?"normal":"italic"}}>{dinner||"—"}</span>
-            </div>);
-          })}
+          <div style={{...tvS.h2,fontSize:15,marginBottom:6,paddingBottom:6}}>Today{tomorrowEvents.length>0?" / Tomorrow":""}</div>
+          {todayEvents.length===0&&<div style={{fontSize:13,color:T.sub}}>Nothing scheduled today</div>}
+          {todayEvents.map(ev=><EventRow key={ev.id} ev={ev} S={tvS}/>)}
+          {tomorrowEvents.length>0&&<>
+            <div style={{...tvS.label,marginTop:10}}>Tomorrow</div>
+            {tomorrowEvents.map(ev=><EventRow key={ev.id} ev={ev} S={tvS}/>)}
+          </>}
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,flex:"1 1 40%",minHeight:0}}>
           <div style={{...tvS.card,marginBottom:0,display:"flex",flexDirection:"column",minHeight:0,padding:12}}>
-            <div style={{...tvS.h2,fontSize:13,marginBottom:5,paddingBottom:5}}>Today{tomorrowEvents.length>0?" / Tmrw":""}</div>
+            <div style={{...tvS.h2,fontSize:13,marginBottom:5,paddingBottom:5}}>🍽 Menu This Week</div>
             <div style={{overflowY:"auto",minHeight:0,flex:1}}>
-              {todayEvents.length===0&&<div style={{fontSize:12,color:T.sub}}>Nothing today</div>}
-              {todayEvents.map(ev=><EventRow key={ev.id} ev={ev} S={tvS}/>)}
-              {tomorrowEvents.length>0&&<>
-                <div style={{...tvS.label,fontSize:9,marginTop:6}}>Tomorrow</div>
-                {tomorrowEvents.map(ev=><EventRow key={ev.id} ev={ev} S={tvS}/>)}
-              </>}
+              {DAYS.map((d,di)=>{
+                const isToday=d===tn;
+                // On Sunday, show tomorrow (next week's Monday) dinner in Monday's row.
+                const src=(tomorrowIsNextWeek&&d===tomorrowDayName?nextWeekPlan:mealPlan)||{};
+                const dinner=(src[d]||{}).Dinner;
+                return(<div key={d} style={{display:"flex",gap:8,padding:"3px 0",borderBottom:`1px solid #1a1a0f`,alignItems:"baseline",background:isToday?GOLD+"11":"transparent"}}>
+                  <span style={{fontSize:10,color:isToday?GOLD:T.sub,fontFamily:"monospace",minWidth:50,fontWeight:isToday?"bold":"normal"}}>{d.slice(0,3).toUpperCase()} {dateOfWeekDay(weekKeyOf(),di).getDate()}</span>
+                  <span style={{fontSize:12,color:dinner?T.text:"#333",fontStyle:dinner?"normal":"italic"}}>{dinner||"—"}</span>
+                </div>);
+              })}
             </div>
           </div>
           <div style={{...tvS.card,marginBottom:0,display:"flex",flexDirection:"column",minHeight:0,padding:12}}>
             <div style={{...tvS.h2,fontSize:13,marginBottom:5,paddingBottom:5}}>🛒 Shopping ({unchecked.length})</div>
             <div style={{overflowY:"auto",minHeight:0,flex:1}}>
               {unchecked.length===0&&<div style={{fontSize:12,color:T.sub}}>List is empty!</div>}
-              {unchecked.slice(0,8).map(i=><div key={i.id} style={{display:"flex",gap:8,padding:"3px 0",borderBottom:"1px solid #1a1a0f",alignItems:"center"}}>
+              {unchecked.map(i=><div key={i.id} style={{display:"flex",gap:8,padding:"3px 0",borderBottom:"1px solid #1a1a0f",alignItems:"center"}}>
                 <div style={{width:6,height:6,borderRadius:"50%",background:GOLD,flexShrink:0}}/>
                 <span style={{fontSize:12,color:T.text}}>{i.qty&&i.qty!=="1"?i.qty+"× ":""}{i.name}</span>
               </div>)}
-              {unchecked.length>8&&<div style={{fontSize:10,color:T.sub,marginTop:4}}>+{unchecked.length-8} more</div>}
             </div>
           </div>
         </div>
