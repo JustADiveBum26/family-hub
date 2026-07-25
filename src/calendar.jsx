@@ -14,7 +14,7 @@ const EVENT_CATS=[
   {key:"trip",label:"Trip",emoji:"✈️"},
   {key:"other",label:"Other",emoji:"📌"},
 ];
-const WEEK_HEAD=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const WEEK_HEAD=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
 const pad2=n=>String(n).padStart(2,"0");
 const dateKey=d=>`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
@@ -71,14 +71,14 @@ function useIsNarrow(bp=700){
 }
 
 // ── MONTH GRID ────────────────────────────────────────────────────────────────
-function MonthCalendar({events,S,selectedKey,onSelectDay}){
+function MonthCalendar({events,S,selectedKey,onSelectDay,initialMonth}){
   const narrow=useIsNarrow();
   const today=todayKey();
-  const [cur,setCur]=useState(()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),1);});
+  const [cur,setCur]=useState(()=>{const d=initialMonth?parseKey(initialMonth):new Date();return new Date(d.getFullYear(),d.getMonth(),1);});
   const monthLabel=cur.toLocaleDateString("en-US",{month:"long",year:"numeric"});
   const goMonth=off=>setCur(new Date(cur.getFullYear(),cur.getMonth()+off,1));
   const goToday=()=>{const d=new Date();setCur(new Date(d.getFullYear(),d.getMonth(),1));onSelectDay&&onSelectDay(today);};
-  const offset=(cur.getDay()+6)%7;
+  const offset=cur.getDay();
   const daysInMonth=new Date(cur.getFullYear(),cur.getMonth()+1,0).getDate();
   const cells=[];
   const totalCells=Math.ceil((offset+daysInMonth)/7)*7;
@@ -130,6 +130,24 @@ function MonthCalendar({events,S,selectedKey,onSelectDay}){
     <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:10}}>
       {OWNERS.map(o=><div key={o.key} style={{display:"flex",gap:4,alignItems:"center"}}><div style={{width:8,height:8,borderRadius:"50%",background:o.color}}/><span style={{fontSize:10,color:S.T.sub}}>{o.label}</span></div>)}
     </div>
+  </div>);
+}
+
+// ── DATE FIELD — click to pick a date off a real calendar instead of typing ────
+function DateField({S,label,value,onChange,placeholder="Pick a date"}){
+  const [open,setOpen]=useState(false);
+  return(<div style={{position:"relative"}}>
+    {label&&<div style={S.label}>{label}</div>}
+    <button type="button" onClick={()=>setOpen(o=>!o)} style={{...S.input,textAlign:"left",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+      <span style={{color:value?S.T.text:S.T.sub}}>{value?fmtDayShort(value):placeholder}</span>
+      <span>📅</span>
+    </button>
+    {open&&<>
+      <div style={{position:"fixed",inset:0,zIndex:60}} onClick={()=>setOpen(false)}/>
+      <div style={{position:"absolute",zIndex:61,top:"100%",left:0,marginTop:4,background:S.T.card,border:`1px solid ${S.T.border}`,borderRadius:10,padding:12,boxShadow:"0 8px 24px rgba(0,0,0,0.4)",minWidth:280}} onClick={e=>e.stopPropagation()}>
+        <MonthCalendar events={[]} S={S} selectedKey={value} initialMonth={value||undefined} onSelectDay={k=>{onChange(k);setOpen(false);}}/>
+      </div>
+    </>}
   </div>);
 }
 
@@ -194,8 +212,8 @@ function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
         </div>
       </div>
       <div><div style={S.label}>Type</div><select style={S.select} value={f.category} onChange={e=>set("category",e.target.value)}>{EVENT_CATS.map(c=><option key={c.key} value={c.key}>{c.emoji} {c.label}</option>)}</select></div>
-      <div><div style={S.label}>Date *</div><input style={S.input} type="date" value={f.date} onChange={e=>set("date",e.target.value)}/></div>
-      <div><div style={S.label}>End date (optional)</div><input style={S.input} type="date" value={f.endDate} onChange={e=>set("endDate",e.target.value)}/></div>
+      <DateField S={S} label="Date *" value={f.date} onChange={v=>set("date",v)}/>
+      <DateField S={S} label="End date (optional)" value={f.endDate} onChange={v=>set("endDate",v)} placeholder="No end date"/>
       <div><div style={S.label}>Start time (optional)</div><input style={S.input} type="time" value={f.time} onChange={e=>set("time",e.target.value)}/></div>
       <div><div style={S.label}>End time (optional)</div><input style={S.input} type="time" value={f.endTime} onChange={e=>set("endTime",e.target.value)}/></div>
       <div style={{gridColumn:"1/-1"}}><div style={S.label}>Notes</div><input style={S.input} placeholder="Anything the family should know..." value={f.notes} onChange={e=>set("notes",e.target.value)}/></div>
@@ -219,7 +237,7 @@ function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
       </label>
       {f.repeatWeekly&&<div style={{display:"flex",gap:6,alignItems:"center"}}>
         <span style={{fontSize:12,color:S.T.sub}}>until</span>
-        <input style={{...S.input,width:150,padding:"6px 10px"}} type="date" value={f.repeatUntil} onChange={e=>set("repeatUntil",e.target.value)}/>
+        <div style={{width:180}}><DateField S={S} value={f.repeatUntil} onChange={v=>set("repeatUntil",v)} placeholder="Pick end date"/></div>
       </div>}
     </div>}
     {err&&<div style={{color:"#f44336",fontSize:12,marginBottom:8}}>{err}</div>}
