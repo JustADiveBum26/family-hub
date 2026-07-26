@@ -5,7 +5,7 @@ import { DAYS, MEAL_TYPES, GOLD, fmt, makeS } from "./constants";
 import { ShoppingListView, UserHeader, ThemePicker, PersonalHomeScreen, BillsBanner, WeatherStrip } from "./shared";
 import { ChoresTab, KidChoreView, MessageBoard, SettingsTab, AdminPanel, BillsTab, MealDetailModal, MealsTab, BradynLedger, TodoTab } from "./family";
 import { AccountsTab, DebtsTab, BudgetTab, GoalsTab, StatementsTab, ScenariosTab, PslfTab, DashboardTab } from "./finance";
-import { CalendarTab } from "./calendar";
+import { CalendarTab, WeeklyCelebrations } from "./calendar";
 
 function BradynDashboard({mealPlan,shopList,setShopList,shopRequests,setShopRequests,mealSuggestions,setMealSuggestions,mealDetails,setMealDetails,chores,setChores,messages,setMessages,appSettings,shopSettings,bradynLedger,setBradynLedger,events,setEvents,onLogout}){
   const [tab,setTab]=useState("home");
@@ -46,7 +46,9 @@ function BradynDashboard({mealPlan,shopList,setShopList,shopRequests,setShopRequ
     </div>
     <div style={{maxWidth:900,margin:"0 auto",padding:16}}>
       <div style={{marginBottom:12}}><WeatherStrip/></div>
-      {tab==="home"&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:14}}>
+      {tab==="home"&&<>
+      <WeeklyCelebrations events={events} S={bS}/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:14}}>
         <div>
           <div style={bS.card}><div style={bS.h2}>This Week's Meals</div>{DAYS.map(d=>{const m=mealPlan[d]||{},has=m.Breakfast||m.Lunch||m.Dinner;return(<div key={d} style={{display:"flex",gap:10,padding:"7px 0",borderBottom:`1px solid ${C.bg}`,alignItems:"flex-start"}}><div style={{width:64,flexShrink:0}}><div style={{fontSize:10,color:C.accent,fontFamily:"monospace"}}>{d.slice(0,3).toUpperCase()}</div></div><div style={{flex:1}}>{MEAL_TYPES.map(mt=>m[mt]&&<div key={mt} style={{display:"flex",gap:6,marginBottom:2}}><span style={{fontSize:10,color:C.sub,minWidth:50,fontFamily:"monospace"}}>{mt}</span><span style={{fontSize:12,color:C.text}}>{m[mt]}</span></div>)}{!has&&<span style={{fontSize:11,color:C.border}}>Nothing planned</span>}</div></div>);})}</div>
           <div style={bS.card}><div style={bS.h2}>Shopping List</div>{shopList.filter(i=>!i.checked).slice(0,8).map(i=><div key={i.id} style={{display:"flex",gap:8,padding:"5px 0",borderBottom:`1px solid ${C.bg}`,alignItems:"center"}}><span style={{fontSize:13,color:C.text,flex:1}}>{i.qty&&i.qty!=="1"?`${i.qty}× `:""}{i.name}</span>{i.addedBy&&i.addedBy!=="Parents"&&<span style={{fontSize:10,color:C.sub}}>{i.addedBy}</span>}</div>)}{shopList.filter(i=>!i.checked).length===0&&<div style={{fontSize:13,color:C.sub}}>Nothing on the list.</div>}</div>
@@ -82,7 +84,8 @@ function BradynDashboard({mealPlan,shopList,setShopList,shopRequests,setShopRequ
             {addMode==="bulk"&&<><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr style={{borderBottom:`1px solid ${C.border}`}}><th style={{...bS.label,textAlign:"left",padding:"4px 4px",fontWeight:"normal"}}>Item *</th><th style={{...bS.label,textAlign:"left",padding:"4px 4px",fontWeight:"normal",width:56}}>Qty</th><th style={{...bS.label,textAlign:"left",padding:"4px 4px",fontWeight:"normal",width:110}}>Category</th><th style={{...bS.label,textAlign:"left",padding:"4px 4px",fontWeight:"normal",width:110}}>Store</th><th style={{width:26}}></th></tr></thead><tbody>{(bulkRows||[]).map((row,i)=><tr key={row.id}><td style={{padding:"3px 3px 3px 0"}}><input style={{...bS.input,padding:"5px 7px"}} placeholder="Item name" value={row.name} onChange={e=>updateBulkRow(i,"name",e.target.value)}/></td><td style={{padding:"3px 3px"}}><input style={{...bS.input,padding:"5px 7px"}} value={row.qty} onChange={e=>updateBulkRow(i,"qty",e.target.value)}/></td><td style={{padding:"3px 3px"}}><select style={{...bS.select,padding:"5px 7px"}} value={row.category} onChange={e=>updateBulkRow(i,"category",e.target.value)}>{cats.map(c=><option key={c}>{c}</option>)}</select></td><td style={{padding:"3px 3px"}}><select style={{...bS.select,padding:"5px 7px"}} value={row.store} onChange={e=>updateBulkRow(i,"store",e.target.value)}><option value="">Any</option>{stores.map(s=><option key={s}>{s}</option>)}</select></td><td style={{padding:"3px 0 3px 3px"}}><button onClick={()=>removeBulkRow(i)} style={{...bS.btnDanger,padding:"4px 6px"}}>×</button></td></tr>)}</tbody></table></div><div style={{display:"flex",gap:8,marginTop:8,justifyContent:"space-between",alignItems:"center"}}><button style={{...bS.btnGhost,fontSize:11,padding:"5px 10px"}} onClick={addBulkRow}>+ Add Row</button><div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:11,color:C.sub}}>{(bulkRows||[]).filter(r=>r.name.trim()).length} items ready</span><button style={{...bS.btn("#4CAF50"),padding:"7px 16px",fontSize:12}} onClick={addBulkItems}>Add All to List</button></div></div></>}
           </div>}
         </div>
-      </div>}
+      </div>
+      </>}
       {tab==="cal"&&<CalendarTab events={events} setEvents={setEvents} currentUser="bradyn" canEdit={true} S={bS}/>}
       {tab==="chores"&&<KidChoreView chores={chores} setChores={setChores} userKey="bradyn" userName="Bradyn" userColor="#00d4ff" appSettings={appSettings} S={bS}/>}
       {tab==="ledger"&&<BradynLedger ledger={bradynLedger||[]} setLedger={setBradynLedger} currentUser="bradyn" S={bS}/>}
@@ -115,6 +118,7 @@ function ParkerTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMea
     <div style={{maxWidth:800,margin:"0 auto",padding:16}}>
       <div style={{marginBottom:12}}><WeatherStrip/></div>
       {tab==="home"&&<div>
+        <WeeklyCelebrations events={events} S={pS}/>
         <div style={pS.card}>
           <div style={pS.h2}>🍽 This Week's Meals</div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -176,6 +180,7 @@ function RyderTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMeal
       {tab==="home"&&<>
         {flash&&<div style={{textAlign:"center",padding:"14px 0",marginBottom:10}}><div style={{fontSize:48,marginBottom:4}}>{flash==="meal"?"🎉":"✅"}</div><div style={{fontSize:18,color:flash==="meal"?"#ff6b35":"#4cdf7a",fontWeight:"bold"}}>{flash==="meal"?"Sent to Mom & Dad!":"Added to the list!"}</div></div>}
         <div style={{textAlign:"center",marginBottom:16}}><div style={{fontSize:44,marginBottom:2}}>🌟</div><div style={{fontSize:30,fontWeight:"bold",color:"#ff6b35"}}>Hey Ryder!</div></div>
+        <WeeklyCelebrations events={events} S={rS}/>
         <div style={rS.card}>
           <div style={rS.h2}>🍽 This Week's Meals</div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>

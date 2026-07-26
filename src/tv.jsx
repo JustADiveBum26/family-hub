@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { DAYS, MEAL_TYPES, GOLD, BORDER, USERS, todayName, billPaid, weekKeyOf, dateOfWeekDay } from "./constants";
 import { WeatherStrip } from "./shared";
-import { MonthCalendar, EventRow, CountdownStrip, eventsOnDay, todayKey, fmtDayLong } from "./calendar";
+import { MonthCalendar, EventRow, CountdownStrip, WeeklyCelebrations, eventsOnDay, todayKey, fmtDayLong } from "./calendar";
 
 const T={bg:"#0d0d08",card:"#141410",border:"#2a2a18",text:"#e8e0c8",sub:"#888",accent:GOLD};
 // Big-type style object shaped like makeS output so shared components render correctly.
@@ -67,6 +67,7 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
     {pinned.length>0&&<div style={{...tvS.alert(GOLD),display:"flex",gap:12,flexWrap:"wrap",padding:"8px 14px",marginBottom:6,flexShrink:0}}>
       {pinned.map(m=><div key={m.id} style={{fontSize:13}}>📌 <strong style={{color:GOLD}}>{m.authorLabel}:</strong> {m.text}</div>)}
     </div>}
+    <div style={{flexShrink:0}}><WeeklyCelebrations events={events} S={tvS}/></div>
     <div style={{flexShrink:0}}><CountdownStrip events={events} S={tvS}/></div>
     {/* Main: fills whatever height is left — never pushes the sign-in row off-screen */}
     <div style={{display:"grid",gridTemplateColumns:"minmax(0,54fr) minmax(0,46fr)",gap:14,flex:"1 1 auto",minHeight:0}}>
@@ -85,10 +86,10 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
         <div style={{...tvS.card,marginBottom:0,flex:"0 1 auto",maxHeight:"38vh",minHeight:0,overflowY:"auto",padding:14}}>
           <div style={{...tvS.h2,fontSize:15,marginBottom:6,paddingBottom:6}}>Today{tomorrowEvents.length>0?" / Tomorrow":""}</div>
           {todayEvents.length===0&&<div style={{fontSize:13,color:T.sub}}>Nothing scheduled today</div>}
-          {todayEvents.map(ev=><EventRow key={ev.id} ev={ev} S={tvS}/>)}
+          {todayEvents.map(ev=><EventRow key={ev.id} ev={ev} S={tvS} occKey={tKey}/>)}
           {tomorrowEvents.length>0&&<>
             <div style={{...tvS.label,marginTop:10}}>Tomorrow</div>
-            {tomorrowEvents.map(ev=><EventRow key={ev.id} ev={ev} S={tvS}/>)}
+            {tomorrowEvents.map(ev=><EventRow key={ev.id} ev={ev} S={tvS} occKey={tomorrowKey}/>)}
           </>}
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,flex:"1 1 auto",minHeight:0}}>
@@ -136,7 +137,7 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
           <button onClick={()=>setSelDay(null)} style={{...tvS.btnGhost,padding:"7px 14px",fontSize:13}}>✕ Close</button>
         </div>
         {eventsOnDay(events,selDay).length===0&&<div style={{fontSize:15,color:T.sub}}>Nothing scheduled.</div>}
-        {eventsOnDay(events,selDay).map(ev=><EventRow key={ev.id} ev={ev} S={tvS}/>)}
+        {eventsOnDay(events,selDay).map(ev=><EventRow key={ev.id} ev={ev} S={tvS} occKey={selDay}/>)}
       </div>
     </div>}
     {/* Footer: sign in straight from the TV, or leave TV mode — always visible, never needs scrolling */}

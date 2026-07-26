@@ -11,7 +11,8 @@ const OWNERS=[{key:"family",label:"Family",emoji:"👨‍👩‍👦‍👦",col
 // list resolves to.
 const UNASSIGNED={key:"unassigned",label:"Not specific to us",emoji:"🎉",color:"#8a8a8a"};
 const EVENT_CATS=[
-  {key:"birthday",label:"Birthday/Anniversary",emoji:"🎂"},
+  {key:"birthday",label:"Birthday",emoji:"🎂"},
+  {key:"anniversary",label:"Anniversary",emoji:"💍"},
   {key:"work",label:"Work",emoji:"💼"},
   {key:"school",label:"School",emoji:"🎒"},
   {key:"sports",label:"Sports",emoji:"🏈"},
@@ -43,6 +44,18 @@ const spansDay=(ev,key)=>ev.repeatYearly?monthDay(ev.date)===monthDay(key):(ev.d
 const fmtTime=t=>{if(!t)return"";const[h,m]=t.split(":").map(Number);const ap=h>=12?"PM":"AM";const h12=h%12===0?12:h%12;return m?`${h12}:${pad2(m)} ${ap}`:`${h12} ${ap}`;};
 const fmtDayLong=key=>parseKey(key).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
 const fmtDayShort=key=>parseKey(key).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+const ordinal=n=>{const s=["th","st","nd","rd"],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);};
+// Given the specific calendar day an event is showing on (occKey — matters for
+// yearly-recurring events, whose stored `date` keeps its original year), compute
+// "Turns 10" / "10th Anniversary" from the saved origin year. Returns null if no
+// origin year was given, or the math doesn't make sense yet (event is in the future).
+const ageOrNth=(ev,occKey)=>{
+  if(!ev.originYear||!occKey)return null;
+  const occYear=parseInt(occKey.slice(0,4),10);
+  const n=occYear-ev.originYear;
+  if(n<0)return null;
+  return ev.category==="anniversary"?ordinal(n)+" Anniversary":"Turns "+n;
+};
 
 const eventsOnDay=(events,key)=>(events||[]).filter(ev=>spansDay(ev,key))
   .sort((a,b)=>(a.time||"")<(b.time||"")?-1:(a.time||"")>(b.time||"")?1:0);
@@ -163,9 +176,10 @@ function DateField({S,label,value,onChange,placeholder="Pick a date"}){
 }
 
 // ── EVENT ROW (used in day detail + upcoming lists) ───────────────────────────
-function EventRow({ev,S,showDate,canEdit,onEdit,onDelete,onDeleteSeries}){
+function EventRow({ev,S,showDate,canEdit,onEdit,onDelete,onDeleteSeries,occKey}){
   const os=evOwners(ev),o=os[0]||OWNERS[0],c=catOf(ev);
   const multi=ev.endDate&&ev.endDate!==ev.date;
+  const ageLabel=ageOrNth(ev,occKey||ev.date);
   return(<div style={{display:"flex",gap:10,padding:"9px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"flex-start"}}>
     <div style={{width:4,alignSelf:"stretch",borderRadius:2,background:os.length>1?`linear-gradient(${os.map(x=>x.color).join(",")})`:o.color,flexShrink:0}}/>
     {ev.photo&&<img src={ev.photo} alt="" style={{width:40,height:40,borderRadius:8,objectFit:"cover",flexShrink:0}}/>}
@@ -176,6 +190,7 @@ function EventRow({ev,S,showDate,canEdit,onEdit,onDelete,onDeleteSeries}){
         {showDate&&<span>{fmtDayShort(ev.date)}{multi?" → "+fmtDayShort(ev.endDate):""}</span>}
         {ev.time&&<span>{fmtTime(ev.time)}{ev.endTime?" – "+fmtTime(ev.endTime):""}</span>}
         {!showDate&&multi&&<span>thru {fmtDayShort(ev.endDate)}</span>}
+        {ageLabel&&<span style={{color:S.T.accent,fontWeight:"bold"}}>{ageLabel}</span>}
         {ev.repeatYearly&&<span>🎂 yearly</span>}
       </div>
       {ev.notes&&<div style={{fontSize:11,color:S.T.sub,marginTop:2,fontStyle:"italic"}}>{ev.notes}</div>}
@@ -215,7 +230,7 @@ function resizeImageFile(file,maxDim=360,quality=0.6){
 
 // ── ADD / EDIT FORM ───────────────────────────────────────────────────────────
 function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
-  const blank={title:"",owners:["family"],category:"other",date:defaultDate||todayKey(),endDate:"",time:"",endTime:"",notes:"",photo:"",countdown:false,repeatWeekly:false,repeatUntil:"",repeatYearly:false};
+  const blank={title:"",owners:["family"],category:"other",date:defaultDate||todayKey(),endDate:"",time:"",endTime:"",notes:"",photo:"",originYear:"",countdown:false,repeatWeekly:false,repeatUntil:"",repeatYearly:false};
   const [f,setF]=useState(initial?{...blank,...initial,owners:(initial.owners&&initial.owners.length)?initial.owners:(initial.owner?[initial.owner]:[]),repeatWeekly:false,repeatUntil:""}:blank);
   const [err,setErr]=useState("");
   const [photoBusy,setPhotoBusy]=useState(false);
@@ -259,7 +274,12 @@ function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
           );})}
         </div>
       </div>
-      <div><div style={S.label}>Type</div><select style={S.select} value={f.category} onChange={e=>{const cat=e.target.value;setF(x=>({...x,category:cat,repeatYearly:cat==="birthday"?true:x.repeatYearly}));setErr("");}}>{EVENT_CATS.map(c=><option key={c.key} value={c.key}>{c.emoji} {c.label}</option>)}</select></div>
+      <div><div style={S.label}>Type</div><select style={S.select} value={f.category} onChange={e=>{const cat=e.target.value;setF(x=>({...x,category:cat,repeatYearly:(cat==="birthday"||cat==="anniversary")?true:x.repeatYearly}));setErr("");}}>{EVENT_CATS.map(c=><option key={c.key} value={c.key}>{c.emoji} {c.label}</option>)}</select></div>
+      {(f.category==="birthday"||f.category==="anniversary")&&<div>
+        <div style={S.label}>{f.category==="birthday"?"Year of Birth (optional)":"Year of Anniversary (optional)"}</div>
+        <input style={S.input} type="number" placeholder="e.g. 1990" min="1900" max={new Date().getFullYear()} value={f.originYear} onChange={e=>set("originYear",e.target.value)}/>
+        <div style={{fontSize:10,color:S.T.sub,marginTop:3}}>{f.category==="birthday"?"Shows the age turning each year":"Shows which anniversary it is each year"}</div>
+      </div>}
       <DateField S={S} label="Date *" value={f.date} onChange={v=>set("date",v)}/>
       <DateField S={S} label="End date (optional)" value={f.endDate} onChange={v=>set("endDate",v)} placeholder="No end date"/>
       <div><div style={S.label}>Start time (optional)</div><input style={S.input} type="time" value={f.time} onChange={e=>set("time",e.target.value)}/></div>
@@ -328,6 +348,43 @@ function CountdownStrip({events,S,big}){
   </div>);
 }
 
+// ── THIS WEEK'S BIRTHDAYS & ANNIVERSARIES — prominent homepage banner ─────────
+// Sunday–Saturday, matching the calendar's week. Picks up both yearly-recurring
+// birthdays/anniversaries (matched by month/day regardless of year) and any
+// one-off event someone tagged with those categories.
+function WeeklyCelebrations({events,S,big}){
+  const now=new Date();
+  const start=new Date(now);start.setDate(now.getDate()-now.getDay());
+  const days=Array.from({length:7},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return dateKey(d);});
+  const today=todayKey();
+  const items=[];
+  days.forEach(dayKey=>{
+    eventsOnDay(events,dayKey).filter(ev=>ev.category==="birthday"||ev.category==="anniversary").forEach(ev=>items.push({ev,dayKey}));
+  });
+  if(items.length===0)return null;
+  items.sort((a,b)=>a.dayKey<b.dayKey?-1:1);
+  return(<div style={{marginBottom:big?16:14}}>
+    <div style={{fontSize:big?15:12,color:S.T.sub,fontFamily:"monospace",letterSpacing:"0.12em",marginBottom:8}}>🎉 THIS WEEK</div>
+    <div style={{display:"flex",gap:big?14:10,flexWrap:"wrap"}}>
+      {items.map(({ev,dayKey})=>{
+        const c=catOf(ev);
+        const label=ageOrNth(ev,dayKey);
+        const isToday=dayKey===today;
+        const accent=c.key==="anniversary"?"#E91E63":"#FF9800";
+        const ringColor=isToday?GOLD:accent;
+        return(<div key={ev.id+dayKey} style={{flex:`1 1 ${big?"200px":"160px"}`,background:ringColor+"14",border:`1px solid ${ringColor}55`,borderRadius:12,padding:big?"14px 16px":"10px 12px",textAlign:"center"}}>
+          {ev.photo
+            ?<img src={ev.photo} alt="" style={{width:big?52:36,height:big?52:36,borderRadius:"50%",objectFit:"cover",margin:"0 auto 6px",display:"block",border:`2px solid ${ringColor}`}}/>
+            :<div style={{fontSize:big?28:20,marginBottom:4}}>{c.emoji}</div>}
+          <div style={{fontSize:big?14:12,color:S.T.text,fontWeight:"bold"}}>{ev.title}</div>
+          {label&&<div style={{fontSize:big?13:11,color:accent,fontWeight:"bold",marginTop:2}}>{label}</div>}
+          <div style={{fontSize:big?11:10,color:isToday?GOLD:S.T.sub,fontFamily:"monospace",marginTop:4,fontWeight:isToday?"bold":"normal"}}>{isToday?"TODAY":fmtDayShort(dayKey).split(",")[0]}</div>
+        </div>);
+      })}
+    </div>
+  </div>);
+}
+
 // ── UPCOMING EVENTS LIST (small widget for home screens) ──────────────────────
 function UpcomingEvents({events,S,days=7,title="Coming Up"}){
   const up=upcomingEvents(events,days);
@@ -346,7 +403,7 @@ function CalendarTab({events,setEvents,currentUser,canEdit,S}){
   const [editing,setEditing]=useState(null);
   const save=u=>{setEvents(u);store.save("fp2:events",u);};
   const addEvent=f=>{
-    const base={title:f.title.trim(),owners:f.owners,owner:f.owners[0]||"",category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),photo:f.photo||"",countdown:!!f.countdown,repeatYearly:!!f.repeatYearly,createdBy:currentUser||""};
+    const base={title:f.title.trim(),owners:f.owners,owner:f.owners[0]||"",category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),photo:f.photo||"",originYear:f.originYear?+f.originYear:null,countdown:!!f.countdown,repeatYearly:!!f.repeatYearly,createdBy:currentUser||""};
     let added=[];
     if(f.repeatWeekly&&f.repeatUntil){
       const seriesId=Date.now();
@@ -363,7 +420,7 @@ function CalendarTab({events,setEvents,currentUser,canEdit,S}){
     setSelected(f.date);
   };
   const updateEvent=f=>{
-    save((events||[]).map(ev=>ev.id===editing.id?{...ev,title:f.title.trim(),owners:f.owners,owner:f.owners[0]||"",category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),photo:f.photo||"",countdown:!!f.countdown,repeatYearly:!!f.repeatYearly}:ev));
+    save((events||[]).map(ev=>ev.id===editing.id?{...ev,title:f.title.trim(),owners:f.owners,owner:f.owners[0]||"",category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),photo:f.photo||"",originYear:f.originYear?+f.originYear:null,countdown:!!f.countdown,repeatYearly:!!f.repeatYearly}:ev));
     setEditing(null);
   };
   const del=id=>save((events||[]).filter(ev=>ev.id!==id));
@@ -381,10 +438,10 @@ function CalendarTab({events,setEvents,currentUser,canEdit,S}){
     <div style={S.card}>
       <div style={S.h2}>{selected===todayKey()?"Today — ":""}{fmtDayLong(selected)}</div>
       {dayEvents.length===0&&<div style={{fontSize:13,color:S.T.sub,padding:"6px 0"}}>Nothing on the calendar{canEdit?" — tap Add Event to put something here.":"."}</div>}
-      {dayEvents.map(ev=><EventRow key={ev.id} ev={ev} S={S} canEdit={canEdit} onEdit={e=>{setEditing(e);setShowForm(false);}} onDelete={del} onDeleteSeries={delSeries}/>)}
+      {dayEvents.map(ev=><EventRow key={ev.id} ev={ev} S={S} occKey={selected} canEdit={canEdit} onEdit={e=>{setEditing(e);setShowForm(false);}} onDelete={del} onDeleteSeries={delSeries}/>)}
     </div>
     <UpcomingEvents events={events} S={S} days={14} title="Next 2 Weeks"/>
   </div>);
 }
 
-export { MonthCalendar, UpcomingEvents, EventRow, CalendarTab, CountdownStrip, eventsOnDay, upcomingEvents, todayKey, fmtDayLong };
+export { MonthCalendar, UpcomingEvents, EventRow, CalendarTab, CountdownStrip, WeeklyCelebrations, eventsOnDay, upcomingEvents, todayKey, fmtDayLong };

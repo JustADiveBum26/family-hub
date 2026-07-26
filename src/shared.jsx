@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { store } from "./store";
 import { DAYS, DSHORT, MEAL_TYPES, GOLD, BORDER, THEMES, USERS, fmt, todayName, billPaid, weekKeyOf, dateOfWeekDay, S } from "./constants";
-import { MonthCalendar, UpcomingEvents, EventRow, CountdownStrip, eventsOnDay, todayKey, fmtDayLong } from "./calendar";
+import { MonthCalendar, UpcomingEvents, EventRow, CountdownStrip, WeeklyCelebrations, eventsOnDay, todayKey, fmtDayLong } from "./calendar";
 
 function Ring({pct:p=0,size=80,stroke=8,color=GOLD,label,sub}){const r=(size-stroke)/2,circ=2*Math.PI*r,filled=circ*Math.min(p/100,1);return(<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}><div style={{position:"relative",width:size,height:size}}><svg width={size} height={size} style={{transform:"rotate(-90deg)"}}><circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#1a1a0f" strokeWidth={stroke}/><circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={`${filled} ${circ}`} style={{transition:"stroke-dasharray 0.6s"}}/></svg>{label&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:"bold",color}}>{label}</div>}</div>{sub&&<div style={{fontSize:10,color:"#888",textAlign:"center",maxWidth:80}}>{sub}</div>}</div>);}
 function Bar({value,max,color=GOLD,height=6}){return <div style={{background:"#1a1a0f",borderRadius:4,height,overflow:"hidden"}}><div style={{width:`${Math.min(value/Math.max(max,1)*100,100)}%`,height:"100%",background:color,borderRadius:4,transition:"width 0.5s"}}/></div>;}
@@ -304,6 +304,7 @@ function PersonalHomeScreen({currentUser,mealPlan,nextWeekPlan,bills,chores,setC
   const todayMeals=mealPlan[tn]||{},tomorrowMeals=(DAYS.indexOf(tn)===6?(nextWeekPlan||{})[tomorrowName]:mealPlan[tomorrowName])||{};
   return(<div style={{padding:"0 0 16px"}}>
     <PinnedAnnouncements messages={messages} S={S}/>
+    <WeeklyCelebrations events={events} S={S}/>
     <CountdownStrip events={events} S={S}/>
     <UpcomingEvents events={events} S={S} days={7} title="📅 Coming Up This Week"/>
     <WeeklyChoreBoard chores={chores||[]} setChores={setChores} appSettings={appSettings} S={S}/>
@@ -391,6 +392,7 @@ function PublicHomeScreen({mealPlan,shopList,setShopList,bills,expenses,onLogin,
     <div style={{maxWidth:1300,margin:"0 auto",padding:"16px 16px"}}>
       {showShopView&&<ShoppingListView shopList={shopList} setShopList={setShopList} shopSettings={shopSettings} onClose={()=>setShowShopView(false)}/>}
       <PinnedAnnouncements messages={messages||[]} S={S}/>
+      <WeeklyCelebrations events={events} S={S}/>
       {dueSoon.length>0&&<BillsBanner bills={bills} S={S}/>}
       <CountdownStrip events={events} S={S}/>
       <div style={S.card}>
