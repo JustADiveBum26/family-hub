@@ -5,7 +5,13 @@ import { store } from "./store";
 import { USERS, GOLD } from "./constants";
 
 const OWNERS=[{key:"family",label:"Family",emoji:"👨‍👩‍👦‍👦",color:GOLD},...USERS];
+// Fallback when an event isn't tagged to anyone — a grandparent's birthday isn't
+// really "for the family" as a unit, so leaving the owner picker empty shouldn't
+// silently become "Family". Not selectable directly; it's what an empty owners
+// list resolves to.
+const UNASSIGNED={key:"unassigned",label:"Not specific to us",emoji:"🎉",color:"#8a8a8a"};
 const EVENT_CATS=[
+  {key:"birthday",label:"Birthday/Anniversary",emoji:"🎂"},
   {key:"work",label:"Work",emoji:"💼"},
   {key:"school",label:"School",emoji:"🎒"},
   {key:"sports",label:"Sports",emoji:"🏈"},
@@ -22,7 +28,12 @@ const parseKey=k=>new Date(k+"T12:00:00");
 const todayKey=()=>dateKey(new Date());
 // Events can be tagged with several people (owners: ["brad","parker"]). Older
 // events only have a single `owner` string — both shapes are supported.
-const evOwners=ev=>{const keys=(ev.owners&&ev.owners.length)?ev.owners:[ev.owner||"family"];return keys.map(k=>OWNERS.find(o=>o.key===k)).filter(Boolean);};
+const evOwners=ev=>{
+  const keys=(ev.owners&&ev.owners.length)?ev.owners:(ev.owner?[ev.owner]:null);
+  if(!keys)return[UNASSIGNED];
+  const found=keys.map(k=>OWNERS.find(o=>o.key===k)).filter(Boolean);
+  return found.length?found:[UNASSIGNED];
+};
 const ownerOf=ev=>evOwners(ev)[0]||OWNERS[0];
 const catOf=ev=>EVENT_CATS.find(c=>c.key===(ev.category||"other"))||EVENT_CATS[EVENT_CATS.length-1];
 const monthDay=k=>k.slice(5);
@@ -157,6 +168,7 @@ function EventRow({ev,S,showDate,canEdit,onEdit,onDelete,onDeleteSeries}){
   const multi=ev.endDate&&ev.endDate!==ev.date;
   return(<div style={{display:"flex",gap:10,padding:"9px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"flex-start"}}>
     <div style={{width:4,alignSelf:"stretch",borderRadius:2,background:os.length>1?`linear-gradient(${os.map(x=>x.color).join(",")})`:o.color,flexShrink:0}}/>
+    {ev.photo&&<img src={ev.photo} alt="" style={{width:40,height:40,borderRadius:8,objectFit:"cover",flexShrink:0}}/>}
     <div style={{flex:1,minWidth:0}}>
       <div style={{fontSize:14,color:S.T.text,fontWeight:"bold"}}>{c.emoji} {ev.title}</div>
       <div style={{fontSize:11,color:S.T.sub,marginTop:2,display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -176,21 +188,56 @@ function EventRow({ev,S,showDate,canEdit,onEdit,onDelete,onDeleteSeries}){
   </div>);
 }
 
+// Photos are stored inline as compressed data URLs (the whole app lives in one
+// Firestore document, so keeping each photo small — a thumbnail, really — avoids
+// ever bumping into Firestore's 1MB per-document limit).
+function resizeImageFile(file,maxDim=360,quality=0.6){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        let{width,height}=img;
+        if(width>height){if(width>maxDim){height=Math.round(height*maxDim/width);width=maxDim;}}
+        else if(height>maxDim){width=Math.round(width*maxDim/height);height=maxDim;}
+        const canvas=document.createElement("canvas");
+        canvas.width=width;canvas.height=height;
+        canvas.getContext("2d").drawImage(img,0,0,width,height);
+        resolve(canvas.toDataURL("image/jpeg",quality));
+      };
+      img.onerror=reject;
+      img.src=reader.result;
+    };
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 // ── ADD / EDIT FORM ───────────────────────────────────────────────────────────
 function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
-  const blank={title:"",owners:["family"],category:"other",date:defaultDate||todayKey(),endDate:"",time:"",endTime:"",notes:"",countdown:false,repeatWeekly:false,repeatUntil:"",repeatYearly:false};
-  const [f,setF]=useState(initial?{...blank,...initial,owners:(initial.owners&&initial.owners.length)?initial.owners:[initial.owner||"family"],repeatWeekly:false,repeatUntil:""}:blank);
+  const blank={title:"",owners:["family"],category:"other",date:defaultDate||todayKey(),endDate:"",time:"",endTime:"",notes:"",photo:"",countdown:false,repeatWeekly:false,repeatUntil:"",repeatYearly:false};
+  const [f,setF]=useState(initial?{...blank,...initial,owners:(initial.owners&&initial.owners.length)?initial.owners:(initial.owner?[initial.owner]:[]),repeatWeekly:false,repeatUntil:""}:blank);
   const [err,setErr]=useState("");
+  const [photoBusy,setPhotoBusy]=useState(false);
   const set=(k,v)=>{setF(x=>({...x,[k]:v}));setErr("");};
-  // "Family" means everyone and can't be combined; picking people drops it.
+  // "Family" means everyone; tapping it again clears it — not every event has to
+  // be tied to someone (a grandparent's birthday isn't really "for the family").
   const toggleOwner=key=>{
     setF(x=>{
-      if(key==="family")return{...x,owners:["family"]};
+      if(key==="family")return{...x,owners:x.owners.includes("family")?[]:["family"]};
       let next=x.owners.filter(k=>k!=="family");
       next=next.includes(key)?next.filter(k=>k!==key):[...next,key];
-      return{...x,owners:next.length?next:["family"]};
+      return{...x,owners:next};
     });
     setErr("");
+  };
+  const handlePhotoFile=async e=>{
+    const file=e.target.files?.[0];
+    if(!file)return;
+    setPhotoBusy(true);
+    try{const dataUrl=await resizeImageFile(file);set("photo",dataUrl);}
+    catch(err){setErr("Could not load that image.");}
+    setPhotoBusy(false);
   };
   const submit=()=>{
     if(!f.title.trim()){setErr("Give the event a name.");return;}
@@ -204,19 +251,31 @@ function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:10}}>
       <div style={{gridColumn:"1/-1"}}><div style={S.label}>What *</div><input style={S.input} placeholder="e.g. Brad works 3–11, Parker's game..." value={f.title} onChange={e=>set("title",e.target.value)}/></div>
       <div style={{gridColumn:"1/-1"}}>
-        <div style={S.label}>Who is this for? (tap all that apply)</div>
+        <div style={S.label}>Who is this for? (optional — tap to select, tap again to clear)</div>
+        <div style={{fontSize:11,color:S.T.sub,marginBottom:6}}>Leave blank if it's not really about one of us — a grandparent's birthday, a family friend's anniversary, etc.</div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
           {OWNERS.map(o=>{const on=f.owners.includes(o.key);return(
             <button key={o.key} onClick={()=>toggleOwner(o.key)} style={{padding:"7px 12px",borderRadius:10,fontSize:13,fontFamily:"Georgia,serif",cursor:"pointer",background:on?o.color+"33":"transparent",border:`2px solid ${on?o.color:S.T.border}`,color:on?o.color:S.T.sub,fontWeight:on?"bold":"normal",WebkitTapHighlightColor:"transparent"}}>{o.emoji} {o.label}{on?" ✓":""}</button>
           );})}
         </div>
       </div>
-      <div><div style={S.label}>Type</div><select style={S.select} value={f.category} onChange={e=>set("category",e.target.value)}>{EVENT_CATS.map(c=><option key={c.key} value={c.key}>{c.emoji} {c.label}</option>)}</select></div>
+      <div><div style={S.label}>Type</div><select style={S.select} value={f.category} onChange={e=>{const cat=e.target.value;setF(x=>({...x,category:cat,repeatYearly:cat==="birthday"?true:x.repeatYearly}));setErr("");}}>{EVENT_CATS.map(c=><option key={c.key} value={c.key}>{c.emoji} {c.label}</option>)}</select></div>
       <DateField S={S} label="Date *" value={f.date} onChange={v=>set("date",v)}/>
       <DateField S={S} label="End date (optional)" value={f.endDate} onChange={v=>set("endDate",v)} placeholder="No end date"/>
       <div><div style={S.label}>Start time (optional)</div><input style={S.input} type="time" value={f.time} onChange={e=>set("time",e.target.value)}/></div>
       <div><div style={S.label}>End time (optional)</div><input style={S.input} type="time" value={f.endTime} onChange={e=>set("endTime",e.target.value)}/></div>
       <div style={{gridColumn:"1/-1"}}><div style={S.label}>Notes</div><input style={S.input} placeholder="Anything the family should know..." value={f.notes} onChange={e=>set("notes",e.target.value)}/></div>
+      <div style={{gridColumn:"1/-1"}}>
+        <div style={S.label}>Photo (optional)</div>
+        {f.photo
+          ?<div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+            <img src={f.photo} alt="" style={{width:56,height:56,borderRadius:8,objectFit:"cover",border:`1px solid ${S.T.border}`}}/>
+            <label style={{...S.btnGhost,cursor:"pointer",padding:"7px 14px",fontSize:12}}>{photoBusy?"Loading...":"Change"}<input type="file" accept="image/*" onChange={handlePhotoFile} style={{display:"none"}}/></label>
+            <button style={S.btnDanger} onClick={()=>set("photo","")}>✕ Remove</button>
+          </div>
+          :<label style={{...S.btnGhost,cursor:"pointer",padding:"8px 16px",fontSize:13,display:"inline-block"}}>{photoBusy?"Loading...":"📷 Add a Photo"}<input type="file" accept="image/*" onChange={handlePhotoFile} style={{display:"none"}}/></label>
+        }
+      </div>
     </div>
     <div style={{marginBottom:10}}>
       <label style={{display:"flex",gap:6,alignItems:"center",fontSize:13,color:S.T.text,cursor:"pointer"}}>
@@ -260,7 +319,8 @@ function CountdownStrip({events,S,big}){
       const days=Math.max(0,Math.round((parseKey(ev.date)-parseKey(today))/864e5));
       const o=ownerOf(ev),c=catOf(ev);
       return(<div key={ev.id} style={{flex:`1 1 ${big?"210px":"150px"}`,background:o.color+"14",border:`1px solid ${o.color}44`,borderRadius:12,padding:big?"14px 18px":"9px 12px",textAlign:"center"}}>
-        <div style={{fontSize:big?16:11,color:S.T.sub,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.emoji} {ev.title}</div>
+        {ev.photo&&<img src={ev.photo} alt="" style={{width:big?56:36,height:big?56:36,borderRadius:"50%",objectFit:"cover",margin:"0 auto 6px",display:"block",border:`2px solid ${o.color}`}}/>}
+        <div style={{fontSize:big?16:11,color:S.T.sub,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{!ev.photo&&c.emoji+" "}{ev.title}</div>
         <div style={{fontSize:big?42:24,fontWeight:"bold",color:o.color,lineHeight:1.15}}>{days===0?"TODAY!":days}</div>
         {days>0&&<div style={{fontSize:big?13:10,color:S.T.sub}}>{days===1?"day to go":"days to go"} · {fmtDayShort(ev.date)}</div>}
       </div>);
@@ -286,7 +346,7 @@ function CalendarTab({events,setEvents,currentUser,canEdit,S}){
   const [editing,setEditing]=useState(null);
   const save=u=>{setEvents(u);store.save("fp2:events",u);};
   const addEvent=f=>{
-    const base={title:f.title.trim(),owners:f.owners,owner:f.owners[0],category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),countdown:!!f.countdown,repeatYearly:!!f.repeatYearly,createdBy:currentUser||""};
+    const base={title:f.title.trim(),owners:f.owners,owner:f.owners[0]||"",category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),photo:f.photo||"",countdown:!!f.countdown,repeatYearly:!!f.repeatYearly,createdBy:currentUser||""};
     let added=[];
     if(f.repeatWeekly&&f.repeatUntil){
       const seriesId=Date.now();
@@ -303,7 +363,7 @@ function CalendarTab({events,setEvents,currentUser,canEdit,S}){
     setSelected(f.date);
   };
   const updateEvent=f=>{
-    save((events||[]).map(ev=>ev.id===editing.id?{...ev,title:f.title.trim(),owners:f.owners,owner:f.owners[0],category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),countdown:!!f.countdown,repeatYearly:!!f.repeatYearly}:ev));
+    save((events||[]).map(ev=>ev.id===editing.id?{...ev,title:f.title.trim(),owners:f.owners,owner:f.owners[0]||"",category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),photo:f.photo||"",countdown:!!f.countdown,repeatYearly:!!f.repeatYearly}:ev));
     setEditing(null);
   };
   const del=id=>save((events||[]).filter(ev=>ev.id!==id));
