@@ -47,14 +47,25 @@ const fmtDayShort=key=>parseKey(key).toLocaleDateString("en-US",{weekday:"short"
 const ordinal=n=>{const s=["th","st","nd","rd"],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);};
 // Given the specific calendar day an event is showing on (occKey — matters for
 // yearly-recurring events, whose stored `date` keeps its original year), compute
-// "Turns 10" / "10th Anniversary" from the saved origin year. Returns null if no
-// origin year was given, or the math doesn't make sense yet (event is in the future).
-const ageOrNth=(ev,occKey)=>{
+// just the ordinal ("39th"). Returns null if no origin year was given, or the
+// math doesn't make sense yet (event is in the future).
+const ordinalAge=(ev,occKey)=>{
   if(!ev.originYear||!occKey)return null;
   const occYear=parseInt(occKey.slice(0,4),10);
   const n=occYear-ev.originYear;
   if(n<0)return null;
-  return ev.category==="anniversary"?ordinal(n)+" Anniversary":"Turns "+n;
+  return ordinal(n);
+};
+// For Birthday/Anniversary events, the "What" field is just a name ("Mary Beth",
+// "Brad & Mary Beth") — the displayed title is generated fresh every time from
+// the name + current age/anniversary number, so it never goes stale year to year
+// (nothing is baked into storage). Every other category shows its title as typed.
+const displayTitle=(ev,occKey)=>{
+  if(ev.category!=="birthday"&&ev.category!=="anniversary")return ev.title;
+  const noun=ev.category==="anniversary"?"Anniversary":"Birthday";
+  const ord=ordinalAge(ev,occKey||ev.date);
+  const name=ev.title||"Someone";
+  return ord?`${name}'s ${ord} ${noun}`:`${name}'s ${noun}`;
 };
 
 const eventsOnDay=(events,key)=>(events||[]).filter(ev=>spansDay(ev,key))
@@ -143,7 +154,7 @@ function MonthCalendar({events,S,selectedKey,onSelectDay,initialMonth}){
               {dayEvents.slice(0,maxChips).map(ev=>{const os=evOwners(ev),o=os[0];return(
                 <div key={ev.id} style={{background:o.color+"22",border:`1px solid ${o.color}55`,borderRadius:4,padding:"1px 4px",marginBottom:2,fontSize:10,color:S.T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
                   {os.length>1&&os.slice(0,4).map(o2=><span key={o2.key} style={{display:"inline-block",width:6,height:6,borderRadius:"50%",background:o2.color,marginRight:2,verticalAlign:"middle"}}/>)}
-                  {ev.time&&ev.date===c.key?<span style={{color:o.color,fontFamily:"monospace"}}>{fmtTime(ev.time)} </span>:null}{catOf(ev).emoji} {ev.title}
+                  {ev.time&&ev.date===c.key?<span style={{color:o.color,fontFamily:"monospace"}}>{fmtTime(ev.time)} </span>:null}{catOf(ev).emoji} {displayTitle(ev,c.key)}
                 </div>);})}
               {dayEvents.length>maxChips&&<div style={{fontSize:9,color:S.T.sub}}>+{dayEvents.length-maxChips} more</div>}
             </>
@@ -179,18 +190,16 @@ function DateField({S,label,value,onChange,placeholder="Pick a date"}){
 function EventRow({ev,S,showDate,canEdit,onEdit,onDelete,onDeleteSeries,occKey}){
   const os=evOwners(ev),o=os[0]||OWNERS[0],c=catOf(ev);
   const multi=ev.endDate&&ev.endDate!==ev.date;
-  const ageLabel=ageOrNth(ev,occKey||ev.date);
   return(<div style={{display:"flex",gap:10,padding:"9px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"flex-start"}}>
     <div style={{width:4,alignSelf:"stretch",borderRadius:2,background:os.length>1?`linear-gradient(${os.map(x=>x.color).join(",")})`:o.color,flexShrink:0}}/>
     {ev.photo&&<img src={ev.photo} alt="" style={{width:40,height:40,borderRadius:8,objectFit:"cover",flexShrink:0}}/>}
     <div style={{flex:1,minWidth:0}}>
-      <div style={{fontSize:14,color:S.T.text,fontWeight:"bold"}}>{c.emoji} {ev.title}</div>
+      <div style={{fontSize:14,color:S.T.text,fontWeight:"bold"}}>{c.emoji} {displayTitle(ev,occKey)}</div>
       <div style={{fontSize:11,color:S.T.sub,marginTop:2,display:"flex",gap:8,flexWrap:"wrap"}}>
         {os.map(x=><span key={x.key} style={{color:x.color}}>{x.emoji} {x.label}</span>)}
         {showDate&&<span>{fmtDayShort(ev.date)}{multi?" → "+fmtDayShort(ev.endDate):""}</span>}
         {ev.time&&<span>{fmtTime(ev.time)}{ev.endTime?" – "+fmtTime(ev.endTime):""}</span>}
         {!showDate&&multi&&<span>thru {fmtDayShort(ev.endDate)}</span>}
-        {ageLabel&&<span style={{color:S.T.accent,fontWeight:"bold"}}>{ageLabel}</span>}
         {ev.repeatYearly&&<span>🎂 yearly</span>}
       </div>
       {ev.notes&&<div style={{fontSize:11,color:S.T.sub,marginTop:2,fontStyle:"italic"}}>{ev.notes}</div>}
@@ -264,7 +273,11 @@ function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
   return(<div style={{...S.cardSm,border:`1px solid ${S.T.accent}55`}}>
     <div style={{fontSize:14,color:S.T.accent,fontWeight:"bold",marginBottom:10}}>{initial?"Edit Event":"Add to Family Calendar"}</div>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:10}}>
-      <div style={{gridColumn:"1/-1"}}><div style={S.label}>What *</div><input style={S.input} placeholder="e.g. Brad works 3–11, Parker's game..." value={f.title} onChange={e=>set("title",e.target.value)}/></div>
+      <div style={{gridColumn:"1/-1"}}>
+        <div style={S.label}>{f.category==="birthday"?"Whose birthday? *":f.category==="anniversary"?"Whose/what anniversary? *":"What *"}</div>
+        <input style={S.input} placeholder={f.category==="birthday"?"e.g. Mary Beth":f.category==="anniversary"?"e.g. Brad & Mary Beth, or Our Wedding":"e.g. Brad works 3–11, Parker's game..."} value={f.title} onChange={e=>set("title",e.target.value)}/>
+        {(f.category==="birthday"||f.category==="anniversary")&&<div style={{fontSize:10,color:S.T.sub,marginTop:3}}>Just the name — "{f.category==="birthday"?"Birthday":"Anniversary"}" and the age/year get added automatically.</div>}
+      </div>
       <div style={{gridColumn:"1/-1"}}>
         <div style={S.label}>Who is this for? (optional — tap to select, tap again to clear)</div>
         <div style={{fontSize:11,color:S.T.sub,marginBottom:6}}>Leave blank if it's not really about one of us — a grandparent's birthday, a family friend's anniversary, etc.</div>
@@ -279,6 +292,9 @@ function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
         <div style={S.label}>{f.category==="birthday"?"Year of Birth (optional)":"Year of Anniversary (optional)"}</div>
         <input style={S.input} type="number" placeholder="e.g. 1990" min="1900" max={new Date().getFullYear()} value={f.originYear} onChange={e=>set("originYear",e.target.value)}/>
         <div style={{fontSize:10,color:S.T.sub,marginTop:3}}>{f.category==="birthday"?"Shows the age turning each year":"Shows which anniversary it is each year"}</div>
+      </div>}
+      {(f.category==="birthday"||f.category==="anniversary")&&f.title.trim()&&<div style={{gridColumn:"1/-1",fontSize:12,color:S.T.accent}}>
+        Will show as: <strong>{displayTitle({title:f.title.trim(),category:f.category,originYear:f.originYear?+f.originYear:null},f.date)}</strong>
       </div>}
       <DateField S={S} label="Date *" value={f.date} onChange={v=>set("date",v)}/>
       <DateField S={S} label="End date (optional)" value={f.endDate} onChange={v=>set("endDate",v)} placeholder="No end date"/>
@@ -340,7 +356,7 @@ function CountdownStrip({events,S,big}){
       const o=ownerOf(ev),c=catOf(ev);
       return(<div key={ev.id} style={{flex:`1 1 ${big?"210px":"150px"}`,background:o.color+"14",border:`1px solid ${o.color}44`,borderRadius:12,padding:big?"14px 18px":"9px 12px",textAlign:"center"}}>
         {ev.photo&&<img src={ev.photo} alt="" style={{width:big?56:36,height:big?56:36,borderRadius:"50%",objectFit:"cover",margin:"0 auto 6px",display:"block",border:`2px solid ${o.color}`}}/>}
-        <div style={{fontSize:big?16:11,color:S.T.sub,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{!ev.photo&&c.emoji+" "}{ev.title}</div>
+        <div style={{fontSize:big?16:11,color:S.T.sub,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{!ev.photo&&c.emoji+" "}{displayTitle(ev,ev.date)}</div>
         <div style={{fontSize:big?42:24,fontWeight:"bold",color:o.color,lineHeight:1.15}}>{days===0?"TODAY!":days}</div>
         {days>0&&<div style={{fontSize:big?13:10,color:S.T.sub}}>{days===1?"day to go":"days to go"} · {fmtDayShort(ev.date)}</div>}
       </div>);
@@ -368,7 +384,6 @@ function WeeklyCelebrations({events,S,big}){
     <div style={{display:"flex",gap:big?14:10,flexWrap:"wrap"}}>
       {items.map(({ev,dayKey})=>{
         const c=catOf(ev);
-        const label=ageOrNth(ev,dayKey);
         const isToday=dayKey===today;
         const accent=c.key==="anniversary"?"#E91E63":"#FF9800";
         const ringColor=isToday?GOLD:accent;
@@ -376,8 +391,7 @@ function WeeklyCelebrations({events,S,big}){
           {ev.photo
             ?<img src={ev.photo} alt="" style={{width:big?52:36,height:big?52:36,borderRadius:"50%",objectFit:"cover",margin:"0 auto 6px",display:"block",border:`2px solid ${ringColor}`}}/>
             :<div style={{fontSize:big?28:20,marginBottom:4}}>{c.emoji}</div>}
-          <div style={{fontSize:big?14:12,color:S.T.text,fontWeight:"bold"}}>{ev.title}</div>
-          {label&&<div style={{fontSize:big?13:11,color:accent,fontWeight:"bold",marginTop:2}}>{label}</div>}
+          <div style={{fontSize:big?14:12,color:S.T.text,fontWeight:"bold"}}>{displayTitle(ev,dayKey)}</div>
           <div style={{fontSize:big?11:10,color:isToday?GOLD:S.T.sub,fontFamily:"monospace",marginTop:4,fontWeight:isToday?"bold":"normal"}}>{isToday?"TODAY":fmtDayShort(dayKey).split(",")[0]}</div>
         </div>);
       })}
