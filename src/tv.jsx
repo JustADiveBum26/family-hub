@@ -33,6 +33,19 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
   // the wall screen stays current without anyone touching it.
   useEffect(()=>{const id=setInterval(()=>setNow(new Date()),15000);return()=>clearInterval(id);},[]);
   useEffect(()=>{if(!onRefresh)return;const id=setInterval(()=>{onRefresh();},5*60*1000);return()=>clearInterval(id);},[onRefresh]);
+  // Fire TV's built-in browser forces a visible address bar and reports it
+  // inconsistently through `100vh` (and doesn't support `100dvh` on older
+  // units), so the page renders taller than what's actually visible and the
+  // sign-in row gets clipped. Measuring window.innerHeight directly sidesteps
+  // that — it always reflects the real visible area.
+  const [vh,setVh]=useState(typeof window!=="undefined"?window.innerHeight:800);
+  useEffect(()=>{
+    const update=()=>setVh(window.innerHeight);
+    update();
+    window.addEventListener("resize",update);
+    window.addEventListener("orientationchange",update);
+    return()=>{window.removeEventListener("resize",update);window.removeEventListener("orientationchange",update);};
+  },[]);
   const tn=todayName();
   const tKey=todayKey();
   const tomorrowKey=(()=>{const d=new Date(now);d.setDate(d.getDate()+1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;})();
@@ -50,7 +63,50 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
   const todayChores=(chores||[]).filter(c=>showFor(c.assignee)&&c.days&&c.days.includes(tn)&&!(c.donedays||{})[tn]);
   const tomorrowIsNextWeek=DAYS.indexOf(tn)===6;
   const tomorrowDayName=DAYS[(DAYS.indexOf(tn)+1)%7];
-  return(<div style={{background:T.bg,height:"100vh",fontFamily:"Georgia,serif",color:T.text,padding:"12px 18px",boxSizing:"border-box",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+  // Right-hand panel rotates through Today/Tomorrow, Meal Plan, Shopping, and
+  // Tasks so each gets a full-size view instead of being crammed into a
+  // quarter of the screen — a lot easier to read from across the room.
+  const panels=[
+    {key:"today",label:`Today${tomorrowEvents.length>0?" / Tomorrow":""}`,body:(<>
+      {todayEvents.length===0&&<div style={{fontSize:14,color:T.sub}}>Nothing scheduled today</div>}
+      {todayEvents.map(ev=><EventRow key={ev.id} ev={ev} S={tvS} occKey={tKey}/>)}
+      {tomorrowEvents.length>0&&<>
+        <div style={{...tvS.label,marginTop:10}}>Tomorrow</div>
+        {tomorrowEvents.map(ev=><EventRow key={ev.id} ev={ev} S={tvS} occKey={tomorrowKey}/>)}
+      </>}
+    </>)},
+    {key:"meal",label:"🍽 Menu This Week",body:(<>
+      {DAYS.map((d,di)=>{
+        const isToday=d===tn;
+        const src=(tomorrowIsNextWeek&&d===tomorrowDayName?nextWeekPlan:mealPlan)||{};
+        const dinner=(src[d]||{}).Dinner;
+        return(<div key={d} style={{display:"flex",gap:10,padding:"6px 0",borderBottom:`1px solid #1a1a0f`,alignItems:"baseline",background:isToday?GOLD+"11":"transparent"}}>
+          <span style={{fontSize:13,color:isToday?GOLD:T.sub,fontFamily:"monospace",minWidth:60,fontWeight:isToday?"bold":"normal"}}>{d.slice(0,3).toUpperCase()} {dateOfWeekDay(weekKeyOf(),di).getDate()}</span>
+          <span style={{fontSize:15,color:dinner?T.text:"#333",fontStyle:dinner?"normal":"italic"}}>{dinner||"—"}</span>
+        </div>);
+      })}
+    </>)},
+    {key:"shopping",label:`🛒 Shopping (${unchecked.length})`,body:(<>
+      {unchecked.length===0&&<div style={{fontSize:14,color:T.sub}}>List is empty!</div>}
+      {unchecked.map(i=><div key={i.id} style={{display:"flex",gap:10,padding:"5px 0",borderBottom:"1px solid #1a1a0f",alignItems:"center"}}>
+        <div style={{width:7,height:7,borderRadius:"50%",background:GOLD,flexShrink:0}}/>
+        <span style={{fontSize:14,color:T.text}}>{i.qty&&i.qty!=="1"?i.qty+"× ":""}{i.name}</span>
+      </div>)}
+    </>)},
+    ...(todayChores.length>0?[{key:"tasks",label:"✅ Today's Tasks",body:(<div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+      {todayChores.map(c=>{const u=USERS.find(x=>x.key===c.assignee);return(
+        <span key={c.id} style={{...tvS.tag(u?.color||GOLD),fontSize:13,padding:"6px 12px"}}>{u?.emoji} {u?.label}: {c.task}</span>
+      );})}
+    </div>)}]:[]),
+  ];
+  const [panelIdx,setPanelIdx]=useState(0);
+  useEffect(()=>{
+    if(panels.length<=1)return;
+    const id=setInterval(()=>setPanelIdx(i=>(i+1)%panels.length),9000);
+    return()=>clearInterval(id);
+  },[panels.length]);
+  const activePanel=panels[panelIdx%panels.length];
+  return(<div style={{background:T.bg,height:vh,fontFamily:"Georgia,serif",color:T.text,padding:"12px 18px",boxSizing:"border-box",display:"flex",flexDirection:"column",overflow:"hidden"}}>
     {/* Header: identity, clock, weather — always stays at the top */}
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap",marginBottom:8,flexShrink:0}}>
       <div>
@@ -71,7 +127,7 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
     <div style={{flexShrink:0}}><CountdownStrip events={events} S={tvS}/></div>
     {/* Main: fills whatever height is left — never pushes the sign-in row off-screen */}
     <div style={{display:"grid",gridTemplateColumns:"minmax(0,54fr) minmax(0,46fr)",gap:14,flex:"1 1 auto",minHeight:0}}>
-      {/* Left: wider month calendar */}
+      {/* Left: full month calendar */}
       <div style={{display:"flex",flexDirection:"column",minHeight:0}}>
         <div style={{...tvS.card,flex:"1 1 auto",minHeight:0,overflowY:"auto",padding:14,marginBottom:dueSoon.length>0?6:0}}>
           <MonthCalendar events={events} S={tvS} selectedKey={selDay||tKey} onSelectDay={setSelDay}/>
@@ -81,51 +137,14 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
           {dueSoon.map(b=>{const dl=Math.ceil((new Date(b.dueDate+"T12:00:00")-now)/(864e5));return <span key={b.id} style={{...tvS.tag("#FF9800"),fontSize:11,padding:"3px 8px"}}>{b.name} — {dl===0?"Today":dl===1?"Tmrw":dl+"d"}</span>;})}
         </div>}
       </div>
-      {/* Right: Today leads (prominent), Menu + Shopping condensed below, tasks last */}
-      <div style={{display:"flex",flexDirection:"column",minHeight:0,gap:8}}>
-        <div style={{...tvS.card,marginBottom:0,flex:"0 1 auto",maxHeight:"38vh",minHeight:0,overflowY:"auto",padding:14}}>
-          <div style={{...tvS.h2,fontSize:15,marginBottom:6,paddingBottom:6}}>Today{tomorrowEvents.length>0?" / Tomorrow":""}</div>
-          {todayEvents.length===0&&<div style={{fontSize:13,color:T.sub}}>Nothing scheduled today</div>}
-          {todayEvents.map(ev=><EventRow key={ev.id} ev={ev} S={tvS} occKey={tKey}/>)}
-          {tomorrowEvents.length>0&&<>
-            <div style={{...tvS.label,marginTop:10}}>Tomorrow</div>
-            {tomorrowEvents.map(ev=><EventRow key={ev.id} ev={ev} S={tvS} occKey={tomorrowKey}/>)}
-          </>}
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,flex:"1 1 auto",minHeight:0}}>
-          <div style={{...tvS.card,marginBottom:0,display:"flex",flexDirection:"column",minHeight:0,padding:12}}>
-            <div style={{...tvS.h2,fontSize:13,marginBottom:5,paddingBottom:5}}>🍽 Menu This Week</div>
-            <div style={{overflowY:"auto",minHeight:0,flex:1}}>
-              {DAYS.map((d,di)=>{
-                const isToday=d===tn;
-                // On Sunday, show tomorrow (next week's Monday) dinner in Monday's row.
-                const src=(tomorrowIsNextWeek&&d===tomorrowDayName?nextWeekPlan:mealPlan)||{};
-                const dinner=(src[d]||{}).Dinner;
-                return(<div key={d} style={{display:"flex",gap:8,padding:"3px 0",borderBottom:`1px solid #1a1a0f`,alignItems:"baseline",background:isToday?GOLD+"11":"transparent"}}>
-                  <span style={{fontSize:10,color:isToday?GOLD:T.sub,fontFamily:"monospace",minWidth:50,fontWeight:isToday?"bold":"normal"}}>{d.slice(0,3).toUpperCase()} {dateOfWeekDay(weekKeyOf(),di).getDate()}</span>
-                  <span style={{fontSize:12,color:dinner?T.text:"#333",fontStyle:dinner?"normal":"italic"}}>{dinner||"—"}</span>
-                </div>);
-              })}
-            </div>
-          </div>
-          <div style={{...tvS.card,marginBottom:0,display:"flex",flexDirection:"column",minHeight:0,padding:12}}>
-            <div style={{...tvS.h2,fontSize:13,marginBottom:5,paddingBottom:5}}>🛒 Shopping ({unchecked.length})</div>
-            <div style={{overflowY:"auto",minHeight:0,flex:1}}>
-              {unchecked.length===0&&<div style={{fontSize:12,color:T.sub}}>List is empty!</div>}
-              {unchecked.map(i=><div key={i.id} style={{display:"flex",gap:8,padding:"3px 0",borderBottom:"1px solid #1a1a0f",alignItems:"center"}}>
-                <div style={{width:6,height:6,borderRadius:"50%",background:GOLD,flexShrink:0}}/>
-                <span style={{fontSize:12,color:T.text}}>{i.qty&&i.qty!=="1"?i.qty+"× ":""}{i.name}</span>
-              </div>)}
-            </div>
-          </div>
-        </div>
-        {todayChores.length>0&&<div style={{...tvS.card,marginTop:0,marginBottom:0,padding:"8px 12px",flexShrink:0}}>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-            <span style={{fontSize:10,color:T.sub,fontFamily:"monospace",letterSpacing:"0.1em"}}>TASKS:</span>
-            {todayChores.slice(0,6).map(c=>{const u=USERS.find(x=>x.key===c.assignee);return(
-              <span key={c.id} style={{...tvS.tag(u?.color||GOLD),fontSize:11,padding:"3px 9px"}}>{u?.emoji} {u?.label}: {c.task}</span>
-            );})}
-          </div>
+      {/* Right: a single full-size panel that auto-rotates through Today/Tomorrow,
+          Meal Plan, Shopping, and Tasks — one thing at a time, easy to read from
+          across the room. Dots at the bottom show what's next. */}
+      <div style={{...tvS.card,marginBottom:0,display:"flex",flexDirection:"column",minHeight:0,padding:18}}>
+        <div style={{...tvS.h2,fontSize:17,marginBottom:8,paddingBottom:8}}>{activePanel.label}</div>
+        <div style={{overflowY:"auto",minHeight:0,flex:1}}>{activePanel.body}</div>
+        {panels.length>1&&<div style={{display:"flex",justifyContent:"center",gap:6,marginTop:12,flexShrink:0}}>
+          {panels.map((p,i)=><div key={p.key} style={{width:i===panelIdx%panels.length?18:7,height:7,borderRadius:4,background:i===panelIdx%panels.length?GOLD:T.border,transition:"width 0.3s,background 0.3s"}}/>)}
         </div>}
       </div>
     </div>
