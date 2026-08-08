@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { store } from "./store";
 import { DAYS, DSHORT, MEAL_TYPES, GOLD, BORDER, THEMES, USERS, fmt, todayName, billPaid, weekKeyOf, dateOfWeekDay, S } from "./constants";
-import { MonthCalendar, UpcomingEvents, EventRow, CountdownStrip, WeeklyCelebrations, eventsOnDay, todayKey, fmtDayLong } from "./calendar";
+import { MonthCalendar, UpcomingEvents, CountdownStrip, WeeklyCelebrations, UpcomingBirthdaysCard, EventDetailPopup } from "./calendar";
 
 // ── SAVE STATUS — quiet unless there's actually something to worry about ──────
 // Stays invisible during normal saving/saved cycles; only surfaces once
@@ -374,7 +374,7 @@ function WeeklyChoreBoard({chores,setChores,appSettings,S}){
 }
 
 // ── PERSONAL HOME SCREEN (Brad / Mary Beth / Bradyn) ─────────────────────────
-function PersonalHomeScreen({currentUser,mealPlan,nextWeekPlan,bills,chores,setChores,messages,appSettings,events,S}){
+function PersonalHomeScreen({currentUser,mealPlan,nextWeekPlan,bills,chores,setChores,messages,appSettings,events,setEvents,S}){
   const today=new Date(),tn=todayName();
   const tomorrowName=DAYS[(DAYS.indexOf(tn)+1)%7];
   const u=USERS.find(x=>x.key===currentUser);
@@ -390,9 +390,10 @@ function PersonalHomeScreen({currentUser,mealPlan,nextWeekPlan,bills,chores,setC
   const todayMeals=mealPlan[tn]||{},tomorrowMeals=(DAYS.indexOf(tn)===6?(nextWeekPlan||{})[tomorrowName]:mealPlan[tomorrowName])||{};
   return(<div style={{padding:"0 0 16px"}}>
     <PinnedAnnouncements messages={messages} S={S}/>
-    <WeeklyCelebrations events={events} S={S}/>
-    <CountdownStrip events={events} S={S}/>
-    <UpcomingEvents events={events} S={S} days={7} title="📅 Coming Up This Week"/>
+    <WeeklyCelebrations events={events} S={S} setEvents={setEvents} canEdit currentUser={currentUser}/>
+    <CountdownStrip events={events} S={S} setEvents={setEvents} canEdit currentUser={currentUser}/>
+    <UpcomingBirthdaysCard events={events} S={S} setEvents={setEvents} canEdit currentUser={currentUser}/>
+    <UpcomingEvents events={events} S={S} days={7} title="📅 Coming Up This Week" setEvents={setEvents} canEdit currentUser={currentUser}/>
     <WeeklyChoreBoard chores={chores||[]} setChores={setChores} appSettings={appSettings} S={S}/>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:14}}>
       <div style={S.card}>
@@ -460,8 +461,7 @@ function ThemePicker({currentTheme,onSelect,S}){
 function PublicHomeScreen({mealPlan,shopList,setShopList,bills,expenses,onLogin,appSettings,messages,shopSettings,events,onTv}){
   const today=new Date(),tn=todayName();
   const [showShopView,setShowShopView]=useState(false);
-  const [calDay,setCalDay]=useState(todayKey());
-  const calDayEvents=eventsOnDay(events,calDay);
+  const [popupDay,setPopupDay]=useState(null);
   const tonightDinner=mealPlan[tn]?.Dinner||"";
   const unchecked=shopList.filter(i=>!i.checked);
   const dueSoon=bills.filter(b=>{if(billPaid(b))return false;const d=new Date(b.dueDate+"T12:00:00");return Math.ceil((d-today)/(864e5))>=0&&Math.ceil((d-today)/(864e5))<=7;});
@@ -481,15 +481,12 @@ function PublicHomeScreen({mealPlan,shopList,setShopList,bills,expenses,onLogin,
       <WeeklyCelebrations events={events} S={S}/>
       {dueSoon.length>0&&<BillsBanner bills={bills} S={S}/>}
       <CountdownStrip events={events} S={S}/>
+      <UpcomingBirthdaysCard events={events} S={S}/>
       <div style={S.card}>
-        <MonthCalendar events={events} S={S} selectedKey={calDay} onSelectDay={setCalDay}/>
-        <div style={{marginTop:14,borderTop:`1px solid ${BORDER}`,paddingTop:10}}>
-          <div style={{fontSize:11,color:"#888",fontFamily:"monospace",letterSpacing:"0.12em",marginBottom:4}}>{calDay===todayKey()?"TODAY — ":""}{fmtDayLong(calDay).toUpperCase()}</div>
-          {calDayEvents.length===0
-            ?<div style={{fontSize:13,color:"#555"}}>Nothing on the calendar. Sign in to add events.</div>
-            :calDayEvents.map(ev=><EventRow key={ev.id} ev={ev} S={S}/>)}
-        </div>
+        <MonthCalendar events={events} S={S} selectedKey={popupDay} onSelectDay={setPopupDay}/>
+        <div style={{marginTop:10,fontSize:11,color:"#555",textAlign:"center"}}>Tap a day to see what's on it. Sign in to add or edit events.</div>
       </div>
+      <EventDetailPopup dayKey={popupDay} events={events} S={S} onClose={()=>setPopupDay(null)}/>
       <div style={{overflowX:"auto",marginBottom:14}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(90px,1fr))",gap:6,minWidth:560}}>
           {DAYS.map((d,di)=>{const isToday=d===tn,m=mealPlan[d]||{};return(<div key={d} style={{background:isToday?`${GOLD}18`:"#1a1a0f",border:`1px solid ${isToday?GOLD:BORDER}`,borderRadius:10,padding:"8px 6px",textAlign:"center",minHeight:80}}><div style={{fontSize:9,fontFamily:"monospace",letterSpacing:"0.1em",color:isToday?GOLD:"#555"}}>{d.slice(0,3).toUpperCase()}</div><div style={{fontSize:11,color:isToday?GOLD:"#666",marginBottom:4}}>{dateOfWeekDay(weekKeyOf(),di).toLocaleDateString("en-US",{month:"numeric",day:"numeric"})}</div>{MEAL_TYPES.map(mt=>m[mt]?<div key={mt} style={{marginBottom:2}}><div style={{fontSize:8,color:"#555"}}>{mt==="Breakfast"?"🌅":mt==="Lunch"?"☀️":"🌙"}</div><div style={{fontSize:10,color:isToday?"#e8e0c8":"#888",lineHeight:"1.2"}}>{m[mt]}</div></div>:null)}{!m.Breakfast&&!m.Lunch&&!m.Dinner&&<div style={{fontSize:10,color:"#2a2a18",marginTop:8}}>—</div>}</div>);})}

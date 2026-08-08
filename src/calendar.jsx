@@ -187,10 +187,13 @@ function DateField({S,label,value,onChange,placeholder="Pick a date"}){
 }
 
 // ── EVENT ROW (used in day detail + upcoming lists) ───────────────────────────
-function EventRow({ev,S,showDate,canEdit,onEdit,onDelete,onDeleteSeries,occKey}){
+// onClick (optional) makes the whole row open the shared EventDetailPopup
+// instead of/alongside the inline canEdit buttons — used by every list that
+// wants "click to see full details" rather than editing right in the list.
+function EventRow({ev,S,showDate,canEdit,onEdit,onDelete,onDeleteSeries,occKey,onClick}){
   const os=evOwners(ev),o=os[0]||OWNERS[0],c=catOf(ev);
   const multi=ev.endDate&&ev.endDate!==ev.date;
-  return(<div style={{display:"flex",gap:10,padding:"9px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"flex-start"}}>
+  return(<div onClick={onClick} style={{display:"flex",gap:10,padding:"9px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"flex-start",cursor:onClick?"pointer":"default"}}>
     <div style={{width:4,alignSelf:"stretch",borderRadius:2,background:os.length>1?`linear-gradient(${os.map(x=>x.color).join(",")})`:o.color,flexShrink:0}}/>
     {ev.photo&&<img src={ev.photo} alt="" style={{width:40,height:40,borderRadius:8,objectFit:"cover",flexShrink:0}}/>}
     <div style={{flex:1,minWidth:0}}>
@@ -343,24 +346,101 @@ function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
   </div>);
 }
 
+// ── EVENT DETAIL POPUP — click any event anywhere and see/edit it here ───────
+// The one place clicking an event leads to, from the month grid, the
+// Birthdays view, Countdown/Celebrations tiles, or the Upcoming Events
+// widget. Shows everything on that day; when the viewer can edit (setEvents
+// + canEdit both given), each event gets Edit/Delete controls right here —
+// callers that omit setEvents/canEdit automatically get a view-only popup
+// (e.g. the public home screen, the TV display, Parker/Ryder's views).
+function EventDetailPopup({dayKey,events,setEvents,currentUser,canEdit,S,onClose}){
+  const [editingEv,setEditingEv]=useState(null);
+  if(!dayKey)return null;
+  const dayEvents=eventsOnDay(events,dayKey);
+  const canActuallyEdit=!!(canEdit&&typeof setEvents==="function");
+  const save=u=>{setEvents(u);store.save("fp2:events",u);};
+  const updateEvent=f=>{
+    save((events||[]).map(ev=>ev.id===editingEv.id?{...ev,title:f.title.trim(),owners:f.owners,owner:f.owners[0]||"",category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),photo:f.photo||"",originYear:f.originYear?+f.originYear:null,countdown:!!f.countdown,repeatYearly:!!f.repeatYearly}:ev));
+    setEditingEv(null);
+  };
+  const del=id=>{save((events||[]).filter(ev=>ev.id!==id));setEditingEv(null);};
+  const delSeries=seriesId=>{save((events||[]).filter(ev=>ev.seriesId!==seriesId));setEditingEv(null);};
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}>
+    <div style={{...S.card,maxWidth:520,width:"100%",maxHeight:"85vh",overflowY:"auto",marginBottom:0}} onClick={e=>e.stopPropagation()}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{...S.h2,marginBottom:0,paddingBottom:0,border:"none",fontSize:18}}>{dayKey===todayKey()?"Today — ":""}{fmtDayLong(dayKey)}</div>
+        <button onClick={onClose} style={{...S.btnGhost,padding:"7px 14px",fontSize:13}}>✕ Close</button>
+      </div>
+      {editingEv
+        ?<EventForm S={S} initial={editingEv} currentUser={currentUser} onSave={updateEvent} onCancel={()=>setEditingEv(null)}/>
+        :<>
+          {dayEvents.length===0&&<div style={{fontSize:14,color:S.T.sub}}>Nothing scheduled.</div>}
+          {dayEvents.map(ev=><EventRow key={ev.id} ev={ev} S={S} occKey={dayKey} canEdit={canActuallyEdit} onEdit={setEditingEv} onDelete={del} onDeleteSeries={delSeries}/>)}
+        </>
+      }
+    </div>
+  </div>);
+}
+
 // ── COUNTDOWN TILES — events flagged "countdown" show big days-to-go numbers ──
-function CountdownStrip({events,S,big}){
+function CountdownStrip({events,S,big,setEvents,canEdit,currentUser}){
   const today=todayKey();
   const items=(events||[])
     .map(ev=>ev.repeatYearly?{...ev,date:nextOccurrence(ev,today),endDate:""}:ev)
     .filter(ev=>ev.countdown&&(ev.endDate||ev.date)>=today).sort((a,b)=>a.date<b.date?-1:1).slice(0,4);
+  const [popupDay,setPopupDay]=useState(null);
   if(items.length===0)return null;
-  return(<div style={{display:"flex",gap:big?14:10,flexWrap:"wrap",marginBottom:14}}>
-    {items.map(ev=>{
-      const days=Math.max(0,Math.round((parseKey(ev.date)-parseKey(today))/864e5));
-      const o=ownerOf(ev),c=catOf(ev);
-      return(<div key={ev.id} style={{flex:`1 1 ${big?"210px":"150px"}`,background:o.color+"14",border:`1px solid ${o.color}44`,borderRadius:12,padding:big?"14px 18px":"9px 12px",textAlign:"center"}}>
-        {ev.photo&&<img src={ev.photo} alt="" style={{width:big?56:36,height:big?56:36,borderRadius:"50%",objectFit:"cover",margin:"0 auto 6px",display:"block",border:`2px solid ${o.color}`}}/>}
-        <div style={{fontSize:big?16:11,color:S.T.sub,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{!ev.photo&&c.emoji+" "}{displayTitle(ev,ev.date)}</div>
-        <div style={{fontSize:big?42:24,fontWeight:"bold",color:o.color,lineHeight:1.15}}>{days===0?"TODAY!":days}</div>
-        {days>0&&<div style={{fontSize:big?13:10,color:S.T.sub}}>{days===1?"day to go":"days to go"} · {fmtDayShort(ev.date)}</div>}
-      </div>);
-    })}
+  return(<>
+    <div style={{display:"flex",gap:big?14:10,flexWrap:"wrap",marginBottom:14}}>
+      {items.map(ev=>{
+        const days=Math.max(0,Math.round((parseKey(ev.date)-parseKey(today))/864e5));
+        const o=ownerOf(ev),c=catOf(ev);
+        return(<div key={ev.id} onClick={()=>setPopupDay(ev.date)} style={{cursor:"pointer",flex:`1 1 ${big?"210px":"150px"}`,background:o.color+"14",border:`1px solid ${o.color}44`,borderRadius:12,padding:big?"14px 18px":"9px 12px",textAlign:"center"}}>
+          {ev.photo&&<img src={ev.photo} alt="" style={{width:big?56:36,height:big?56:36,borderRadius:"50%",objectFit:"cover",margin:"0 auto 6px",display:"block",border:`2px solid ${o.color}`}}/>}
+          <div style={{fontSize:big?16:11,color:S.T.sub,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{!ev.photo&&c.emoji+" "}{displayTitle(ev,ev.date)}</div>
+          <div style={{fontSize:big?42:24,fontWeight:"bold",color:o.color,lineHeight:1.15}}>{days===0?"TODAY!":days}</div>
+          {days>0&&<div style={{fontSize:big?13:10,color:S.T.sub}}>{days===1?"day to go":"days to go"} · {fmtDayShort(ev.date)}</div>}
+        </div>);
+      })}
+    </div>
+    <EventDetailPopup dayKey={popupDay} events={events} setEvents={setEvents} currentUser={currentUser} canEdit={canEdit} S={S} onClose={()=>setPopupDay(null)}/>
+  </>);
+}
+
+// ── UPCOMING BIRTHDAYS CARD — countdown-tile look, rotates through everyone
+// with a birthday/anniversary in the next 30 days. Hidden entirely if there's
+// nobody coming up, same as CountdownStrip.
+function UpcomingBirthdaysCard({events,S,big,setEvents,canEdit,currentUser,intervalMs=7000}){
+  const today=todayKey();
+  const horizon=dateKey(new Date(Date.now()+30*864e5));
+  const items=(events||[])
+    .filter(ev=>ev.category==="birthday"||ev.category==="anniversary")
+    .map(ev=>ev.repeatYearly?{...ev,date:nextOccurrence(ev,today),endDate:""}:ev)
+    .filter(ev=>ev.date>=today&&ev.date<=horizon)
+    .sort((a,b)=>a.date<b.date?-1:1);
+  const [idx,setIdx]=useState(0);
+  const [popupDay,setPopupDay]=useState(null);
+  useEffect(()=>{
+    if(items.length<=1)return;
+    const id=setInterval(()=>setIdx(i=>(i+1)%items.length),intervalMs);
+    return()=>clearInterval(id);
+  },[items.length,intervalMs]);
+  if(items.length===0)return null;
+  const ev=items[idx%items.length];
+  const days=Math.max(0,Math.round((parseKey(ev.date)-parseKey(today))/864e5));
+  const o=ownerOf(ev),c=catOf(ev);
+  return(<div style={{marginBottom:big?16:14}}>
+    <div style={{fontSize:big?15:12,color:S.T.sub,fontFamily:"monospace",letterSpacing:"0.12em",marginBottom:8}}>🎂 UPCOMING</div>
+    <div onClick={()=>setPopupDay(ev.date)} style={{cursor:"pointer",background:o.color+"14",border:`1px solid ${o.color}44`,borderRadius:12,padding:big?"14px 18px":"9px 12px",textAlign:"center",maxWidth:big?260:200}}>
+      {ev.photo&&<img src={ev.photo} alt="" style={{width:big?56:36,height:big?56:36,borderRadius:"50%",objectFit:"cover",margin:"0 auto 6px",display:"block",border:`2px solid ${o.color}`}}/>}
+      <div style={{fontSize:big?16:11,color:S.T.sub,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{!ev.photo&&c.emoji+" "}{displayTitle(ev,ev.date)}</div>
+      <div style={{fontSize:big?42:24,fontWeight:"bold",color:o.color,lineHeight:1.15}}>{days===0?"TODAY!":days}</div>
+      {days>0&&<div style={{fontSize:big?13:10,color:S.T.sub}}>{days===1?"day to go":"days to go"} · {fmtDayShort(ev.date)}</div>}
+      {items.length>1&&<div style={{display:"flex",justifyContent:"center",gap:4,marginTop:8}}>
+        {items.map((_,i)=><div key={i} style={{width:i===idx%items.length?14:5,height:5,borderRadius:3,background:i===idx%items.length?o.color:S.T.border,transition:"width 0.3s"}}/>)}
+      </div>}
+    </div>
+    <EventDetailPopup dayKey={popupDay} events={events} setEvents={setEvents} currentUser={currentUser} canEdit={canEdit} S={S} onClose={()=>setPopupDay(null)}/>
   </div>);
 }
 
@@ -368,7 +448,7 @@ function CountdownStrip({events,S,big}){
 // Sunday–Saturday, matching the calendar's week. Picks up both yearly-recurring
 // birthdays/anniversaries (matched by month/day regardless of year) and any
 // one-off event someone tagged with those categories.
-function WeeklyCelebrations({events,S,big}){
+function WeeklyCelebrations({events,S,big,setEvents,canEdit,currentUser}){
   const now=new Date();
   const start=new Date(now);start.setDate(now.getDate()-now.getDay());
   const days=Array.from({length:7},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return dateKey(d);});
@@ -377,6 +457,7 @@ function WeeklyCelebrations({events,S,big}){
   days.forEach(dayKey=>{
     eventsOnDay(events,dayKey).filter(ev=>ev.category==="birthday"||ev.category==="anniversary").forEach(ev=>items.push({ev,dayKey}));
   });
+  const [popupDay,setPopupDay]=useState(null);
   if(items.length===0)return null;
   items.sort((a,b)=>a.dayKey<b.dayKey?-1:1);
   return(<div style={{marginBottom:big?16:14}}>
@@ -387,7 +468,7 @@ function WeeklyCelebrations({events,S,big}){
         const isToday=dayKey===today;
         const accent=c.key==="anniversary"?"#E91E63":"#FF9800";
         const ringColor=isToday?GOLD:accent;
-        return(<div key={ev.id+dayKey} style={{flex:`1 1 ${big?"200px":"160px"}`,background:ringColor+"14",border:`1px solid ${ringColor}55`,borderRadius:12,padding:big?"14px 16px":"10px 12px",textAlign:"center"}}>
+        return(<div key={ev.id+dayKey} onClick={()=>setPopupDay(dayKey)} style={{cursor:"pointer",flex:`1 1 ${big?"200px":"160px"}`,background:ringColor+"14",border:`1px solid ${ringColor}55`,borderRadius:12,padding:big?"14px 16px":"10px 12px",textAlign:"center"}}>
           {ev.photo
             ?<img src={ev.photo} alt="" style={{width:big?52:36,height:big?52:36,borderRadius:"50%",objectFit:"cover",margin:"0 auto 6px",display:"block",border:`2px solid ${ringColor}`}}/>
             :<div style={{fontSize:big?28:20,marginBottom:4}}>{c.emoji}</div>}
@@ -396,17 +477,20 @@ function WeeklyCelebrations({events,S,big}){
         </div>);
       })}
     </div>
+    <EventDetailPopup dayKey={popupDay} events={events} setEvents={setEvents} currentUser={currentUser} canEdit={canEdit} S={S} onClose={()=>setPopupDay(null)}/>
   </div>);
 }
 
 // ── UPCOMING EVENTS LIST (small widget for home screens) ──────────────────────
-function UpcomingEvents({events,S,days=7,title="Coming Up"}){
+function UpcomingEvents({events,S,days=7,title="Coming Up",setEvents,canEdit,currentUser}){
   const up=upcomingEvents(events,days);
+  const [popupDay,setPopupDay]=useState(null);
   if(up.length===0)return null;
   return(<div style={S.card}>
     <div style={S.h2}>{title}</div>
-    {up.slice(0,8).map(ev=><EventRow key={ev.id} ev={ev} S={S} showDate/>)}
+    {up.slice(0,8).map(ev=><EventRow key={ev.id} ev={ev} S={S} showDate onClick={()=>setPopupDay(ev.date)}/>)}
     {up.length>8&&<div style={{fontSize:11,color:S.T.sub,marginTop:6}}>+{up.length-8} more this week</div>}
+    <EventDetailPopup dayKey={popupDay} events={events} setEvents={setEvents} currentUser={currentUser} canEdit={canEdit} S={S} onClose={()=>setPopupDay(null)}/>
   </div>);
 }
 
@@ -456,8 +540,8 @@ function BirthdayQuickForm({S,onSave,onCancel}){
 function CalendarTab({events,setEvents,currentUser,canEdit,S}){
   const [view,setView]=useState("month"); // "month" or "celebrations"
   const [selected,setSelected]=useState(todayKey());
+  const [popupDay,setPopupDay]=useState(null);
   const [showForm,setShowForm]=useState(false);
-  const [editing,setEditing]=useState(null);
   const save=u=>{setEvents(u);store.save("fp2:events",u);};
   const addEvent=f=>{
     const base={title:f.title.trim(),owners:f.owners,owner:f.owners[0]||"",category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),photo:f.photo||"",originYear:f.originYear?+f.originYear:null,countdown:!!f.countdown,repeatYearly:!!f.repeatYearly,createdBy:currentUser||""};
@@ -476,13 +560,6 @@ function CalendarTab({events,setEvents,currentUser,canEdit,S}){
     setShowForm(false);
     setSelected(f.date);
   };
-  const updateEvent=f=>{
-    save((events||[]).map(ev=>ev.id===editing.id?{...ev,title:f.title.trim(),owners:f.owners,owner:f.owners[0]||"",category:f.category,date:f.date,endDate:f.endDate||"",time:f.time||"",endTime:f.endTime||"",notes:f.notes.trim(),photo:f.photo||"",originYear:f.originYear?+f.originYear:null,countdown:!!f.countdown,repeatYearly:!!f.repeatYearly}:ev));
-    setEditing(null);
-  };
-  const del=id=>save((events||[]).filter(ev=>ev.id!==id));
-  const delSeries=seriesId=>save((events||[]).filter(ev=>ev.seriesId!==seriesId));
-  const dayEvents=eventsOnDay(events,selected);
   // Celebrations: every birthday/anniversary, normalized to its next occurrence
   // (same trick upcomingEvents() uses for yearly-recurring events) so the list
   // reads as "who's coming up," not stuck on the year it was first added.
@@ -491,40 +568,35 @@ function CalendarTab({events,setEvents,currentUser,canEdit,S}){
     .filter(ev=>ev.category==="birthday"||ev.category==="anniversary")
     .map(ev=>ev.repeatYearly?{...ev,date:nextOccurrence(ev,today),endDate:""}:ev)
     .sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+  const openDay=k=>{setSelected(k);setPopupDay(k);};
   return(<div>
     <div style={{display:"flex",gap:4,background:S.T.bg,borderRadius:10,padding:3,marginBottom:12,width:"fit-content"}}>
       <button onClick={()=>setView("month")} style={{padding:"7px 16px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:13,background:view==="month"?S.T.accent:"transparent",color:view==="month"?"#0d0d08":S.T.sub,fontWeight:view==="month"?"bold":"normal"}}>📅 Month</button>
       <button onClick={()=>setView("celebrations")} style={{padding:"7px 16px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:13,background:view==="celebrations"?S.T.accent:"transparent",color:view==="celebrations"?"#0d0d08":S.T.sub,fontWeight:view==="celebrations"?"bold":"normal"}}>🎂 Birthdays{celebrations.length>0?` (${celebrations.length})`:""}</button>
     </div>
     {view==="month"&&<>
-      {canEdit&&!showForm&&!editing&&<div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+      {canEdit&&!showForm&&<div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
         <button style={S.btn()} onClick={()=>setShowForm(true)}>+ Add Event</button>
       </div>}
       {showForm&&<EventForm S={S} defaultDate={selected} currentUser={currentUser} onSave={addEvent} onCancel={()=>setShowForm(false)}/>}
-      {editing&&<EventForm S={S} initial={editing} currentUser={currentUser} onSave={updateEvent} onCancel={()=>setEditing(null)}/>}
       <div style={S.card}>
-        <MonthCalendar events={events} S={S} selectedKey={selected} onSelectDay={setSelected}/>
+        <MonthCalendar events={events} S={S} selectedKey={selected} onSelectDay={openDay}/>
       </div>
-      <div style={S.card}>
-        <div style={S.h2}>{selected===todayKey()?"Today — ":""}{fmtDayLong(selected)}</div>
-        {dayEvents.length===0&&<div style={{fontSize:13,color:S.T.sub,padding:"6px 0"}}>Nothing on the calendar{canEdit?" — tap Add Event to put something here.":"."}</div>}
-        {dayEvents.map(ev=><EventRow key={ev.id} ev={ev} S={S} occKey={selected} canEdit={canEdit} onEdit={e=>{setEditing(e);setShowForm(false);}} onDelete={del} onDeleteSeries={delSeries}/>)}
-      </div>
-      <UpcomingEvents events={events} S={S} days={14} title="Next 2 Weeks"/>
+      <UpcomingEvents events={events} S={S} days={14} title="Next 2 Weeks" setEvents={setEvents} canEdit={canEdit} currentUser={currentUser}/>
     </>}
     {view==="celebrations"&&<>
-      {canEdit&&!showForm&&!editing&&<div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+      {canEdit&&!showForm&&<div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
         <button style={S.btn()} onClick={()=>setShowForm(true)}>+ Add Birthday / Anniversary</button>
       </div>}
       {showForm&&<BirthdayQuickForm S={S} onSave={addEvent} onCancel={()=>setShowForm(false)}/>}
-      {editing&&<EventForm S={S} initial={editing} currentUser={currentUser} onSave={updateEvent} onCancel={()=>setEditing(null)}/>}
       <div style={S.card}>
         <div style={S.h2}>All Birthdays & Anniversaries</div>
         {celebrations.length===0&&<div style={{fontSize:13,color:S.T.sub,padding:"6px 0"}}>None added yet.{canEdit?" Tap Add Birthday / Anniversary to put one here.":""}</div>}
-        {celebrations.map(ev=><EventRow key={ev.id} ev={ev} S={S} showDate occKey={ev.date} canEdit={canEdit} onEdit={e=>{setEditing(e);setShowForm(false);}} onDelete={del} onDeleteSeries={delSeries}/>)}
+        {celebrations.map(ev=><EventRow key={ev.id} ev={ev} S={S} showDate occKey={ev.date} onClick={()=>setPopupDay(ev.date)}/>)}
       </div>
     </>}
+    <EventDetailPopup dayKey={popupDay} events={events} setEvents={setEvents} currentUser={currentUser} canEdit={canEdit} S={S} onClose={()=>setPopupDay(null)}/>
   </div>);
 }
 
-export { MonthCalendar, UpcomingEvents, EventRow, CalendarTab, CountdownStrip, WeeklyCelebrations, eventsOnDay, upcomingEvents, todayKey, fmtDayLong };
+export { MonthCalendar, UpcomingEvents, EventRow, CalendarTab, CountdownStrip, WeeklyCelebrations, UpcomingBirthdaysCard, EventDetailPopup, eventsOnDay, upcomingEvents, todayKey, fmtDayLong };

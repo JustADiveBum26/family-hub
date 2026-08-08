@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { DAYS, MEAL_TYPES, GOLD, BORDER, USERS, todayName, billPaid, weekKeyOf, dateOfWeekDay } from "./constants";
 import { WeatherScroll } from "./shared";
-import { MonthCalendar, EventRow, CountdownStrip, WeeklyCelebrations, eventsOnDay, todayKey, fmtDayLong } from "./calendar";
+import { MonthCalendar, EventRow, CountdownStrip, WeeklyCelebrations, UpcomingBirthdaysCard, EventDetailPopup, eventsOnDay, todayKey } from "./calendar";
 
 const T={bg:"#0d0d08",card:"#141410",border:"#2a2a18",text:"#e8e0c8",sub:"#888",accent:GOLD};
 // Big-type style object shaped like makeS output so shared components render correctly.
@@ -133,6 +133,7 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
     </div>}
     <div style={{flexShrink:0}}><WeeklyCelebrations events={events} S={tvS}/></div>
     <div style={{flexShrink:0}}><CountdownStrip events={events} S={tvS}/></div>
+    <div style={{flexShrink:0}}><UpcomingBirthdaysCard events={events} S={tvS}/></div>
     {/* Main: fills whatever height is left — never pushes the sign-in row off-screen */}
     <div style={{display:"grid",gridTemplateColumns:"minmax(0,54fr) minmax(0,46fr)",gap:14,flex:"1 1 auto",minHeight:0}}>
       {/* Left: full month calendar */}
@@ -156,17 +157,10 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
         </div>}
       </div>
     </div>
-    {/* Day detail popup: tap any day on the calendar to see everything on it */}
-    {selDay&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setSelDay(null)}>
-      <div style={{...tvS.card,maxWidth:520,width:"100%",maxHeight:"80vh",overflowY:"auto",marginBottom:0}} onClick={e=>e.stopPropagation()}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-          <div style={{...tvS.h2,marginBottom:0,paddingBottom:0,border:"none",fontSize:20}}>{selDay===tKey?"Today — ":""}{fmtDayLong(selDay)}</div>
-          <button onClick={()=>setSelDay(null)} style={{...tvS.btnGhost,padding:"7px 14px",fontSize:13}}>✕ Close</button>
-        </div>
-        {eventsOnDay(events,selDay).length===0&&<div style={{fontSize:15,color:T.sub}}>Nothing scheduled.</div>}
-        {eventsOnDay(events,selDay).map(ev=><EventRow key={ev.id} ev={ev} S={tvS} occKey={selDay}/>)}
-      </div>
-    </div>}
+    {/* Day detail popup: tap any day on the calendar to see everything on it.
+        Read-only here — no setEvents/canEdit passed — same as every other
+        unauthenticated view of this popup. */}
+    <EventDetailPopup dayKey={selDay} events={events} S={tvS} onClose={()=>setSelDay(null)}/>
     {/* Footer: sign in straight from the TV, or leave TV mode — always visible, never needs scrolling */}
     <div style={{display:"flex",justifyContent:"center",gap:8,alignItems:"center",marginTop:8,paddingTop:8,borderTop:`1px solid ${T.border}`,flexWrap:"wrap",flexShrink:0}}>
       <span style={{fontSize:10,color:T.sub,fontFamily:"monospace",letterSpacing:"0.15em"}}>SIGN IN:</span>
