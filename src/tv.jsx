@@ -119,11 +119,14 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
         <div style={{fontSize:14,color:GOLD,marginTop:2}}>{now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</div>
       </div>
       <div style={{zoom:0.78}}><WeatherScroll big/></div>
-      <div style={{textAlign:"right"}}>
-        <div style={{fontSize:10,color:"#555",fontFamily:"monospace",letterSpacing:"0.12em"}}>TONIGHT</div>
-        <div style={{fontSize:24,color:tonightDinner?GOLD:"#444",marginTop:2,fontWeight:tonightDinner?"bold":"normal",fontStyle:tonightDinner?"normal":"italic",lineHeight:1.15,maxWidth:260}}>{tonightDinner||"Nothing planned"}</div>
-      </div>
       <button onClick={onExit} style={{...tvS.btnGhost,position:"fixed",top:8,right:8,opacity:0.85,zIndex:10,fontSize:13,padding:"7px 14px"}}>✕ Exit</button>
+    </div>
+    {/* Tonight's dinner: its own full-width banner rather than a fourth header
+        item — logo/clock/weather keep the header row entirely to themselves
+        so it can't get squeezed into wrapping on narrower TV resolutions. */}
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:12,padding:"8px 18px",marginBottom:8,flexShrink:0,borderRadius:12,border:`1px solid ${GOLD}55`,background:GOLD+"0f"}}>
+      <span style={{fontSize:11,color:T.sub,fontFamily:"monospace",letterSpacing:"0.15em"}}>🍽 TONIGHT'S DINNER</span>
+      <span style={{fontSize:22,color:tonightDinner?GOLD:"#555",fontWeight:tonightDinner?"bold":"normal",fontStyle:tonightDinner?"normal":"italic"}}>{tonightDinner||"Nothing planned"}</span>
     </div>
     {pinned.length>0&&<div style={{...tvS.alert(GOLD),display:"flex",gap:12,flexWrap:"wrap",padding:"8px 14px",marginBottom:6,flexShrink:0}}>
       {pinned.map(m=><div key={m.id} style={{fontSize:13}}>📌 <strong style={{color:GOLD}}>{m.authorLabel}:</strong> {m.text}</div>)}
