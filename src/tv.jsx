@@ -63,6 +63,7 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
   const todayChores=(chores||[]).filter(c=>showFor(c.assignee)&&c.days&&c.days.includes(tn)&&!(c.donedays||{})[tn]);
   const tomorrowIsNextWeek=DAYS.indexOf(tn)===6;
   const tomorrowDayName=DAYS[(DAYS.indexOf(tn)+1)%7];
+  const tonightDinner=mealPlan[tn]?.Dinner||"";
   // Right-hand panel rotates through Today/Tomorrow, Meal Plan, Shopping, and
   // Tasks so each gets a full-size view instead of being crammed into a
   // quarter of the screen — a lot easier to read from across the room.
@@ -118,6 +119,10 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
         <div style={{fontSize:14,color:GOLD,marginTop:2}}>{now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</div>
       </div>
       <div style={{zoom:0.78}}><WeatherScroll big/></div>
+      <div style={{textAlign:"right"}}>
+        <div style={{fontSize:10,color:"#555",fontFamily:"monospace",letterSpacing:"0.12em"}}>TONIGHT</div>
+        <div style={{fontSize:24,color:tonightDinner?GOLD:"#444",marginTop:2,fontWeight:tonightDinner?"bold":"normal",fontStyle:tonightDinner?"normal":"italic",lineHeight:1.15,maxWidth:260}}>{tonightDinner||"Nothing planned"}</div>
+      </div>
       <button onClick={onExit} style={{...tvS.btnGhost,position:"fixed",top:8,right:8,opacity:0.85,zIndex:10,fontSize:13,padding:"7px 14px"}}>✕ Exit</button>
     </div>
     {pinned.length>0&&<div style={{...tvS.alert(GOLD),display:"flex",gap:12,flexWrap:"wrap",padding:"8px 14px",marginBottom:6,flexShrink:0}}>
