@@ -383,19 +383,30 @@ function EventDetailPopup({dayKey,events,setEvents,currentUser,canEdit,S,onClose
 }
 
 // ── COUNTDOWN TILES — events flagged "countdown" show big days-to-go numbers ──
+// Manually-flagged countdown events, plus every birthday/anniversary coming
+// up in the next 30 days — merged into one deduped, date-sorted set of tiles
+// (an event flagged countdown AND a birthday only shows once). Laid out 3 per
+// row; anything past 3 just flows onto additional rows below, and a tile
+// drops out on its own once the date passes.
 function CountdownStrip({events,S,big,setEvents,canEdit,currentUser}){
   const today=todayKey();
-  const items=(events||[])
-    .map(ev=>ev.repeatYearly?{...ev,date:nextOccurrence(ev,today),endDate:""}:ev)
-    .filter(ev=>ev.countdown&&(ev.endDate||ev.date)>=today).sort((a,b)=>a.date<b.date?-1:1).slice(0,4);
+  const horizon=dateKey(new Date(Date.now()+30*864e5));
+  const normalized=(events||[]).map(ev=>ev.repeatYearly?{...ev,date:nextOccurrence(ev,today),endDate:""}:ev);
+  const manual=normalized.filter(ev=>ev.countdown&&(ev.endDate||ev.date)>=today);
+  const birthdays=normalized.filter(ev=>(ev.category==="birthday"||ev.category==="anniversary")&&ev.date>=today&&ev.date<=horizon);
+  const seen=new Set();
+  const items=[...manual,...birthdays].filter(ev=>{
+    if(seen.has(ev.id))return false;
+    seen.add(ev.id);return true;
+  }).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
   const [popupDay,setPopupDay]=useState(null);
   if(items.length===0)return null;
   return(<>
-    <div style={{display:"flex",gap:big?14:10,flexWrap:"wrap",marginBottom:14}}>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:big?14:10,marginBottom:14}}>
       {items.map(ev=>{
         const days=Math.max(0,Math.round((parseKey(ev.date)-parseKey(today))/864e5));
         const o=ownerOf(ev),c=catOf(ev);
-        return(<div key={ev.id} onClick={()=>setPopupDay(ev.date)} style={{cursor:"pointer",flex:`1 1 ${big?"210px":"150px"}`,background:o.color+"14",border:`1px solid ${o.color}44`,borderRadius:12,padding:big?"14px 18px":"9px 12px",textAlign:"center"}}>
+        return(<div key={ev.id} onClick={()=>setPopupDay(ev.date)} style={{cursor:"pointer",background:o.color+"14",border:`1px solid ${o.color}44`,borderRadius:12,padding:big?"14px 18px":"9px 12px",textAlign:"center"}}>
           {ev.photo&&<img src={ev.photo} alt="" style={{width:big?56:36,height:big?56:36,borderRadius:"50%",objectFit:"cover",margin:"0 auto 6px",display:"block",border:`2px solid ${o.color}`}}/>}
           <div style={{fontSize:big?16:11,color:S.T.sub,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{!ev.photo&&c.emoji+" "}{displayTitle(ev,ev.date)}</div>
           <div style={{fontSize:big?42:24,fontWeight:"bold",color:o.color,lineHeight:1.15}}>{days===0?"TODAY!":days}</div>
@@ -405,43 +416,6 @@ function CountdownStrip({events,S,big,setEvents,canEdit,currentUser}){
     </div>
     <EventDetailPopup dayKey={popupDay} events={events} setEvents={setEvents} currentUser={currentUser} canEdit={canEdit} S={S} onClose={()=>setPopupDay(null)}/>
   </>);
-}
-
-// ── UPCOMING BIRTHDAYS CARD — countdown-tile look, rotates through everyone
-// with a birthday/anniversary in the next 30 days. Hidden entirely if there's
-// nobody coming up, same as CountdownStrip.
-function UpcomingBirthdaysCard({events,S,big,setEvents,canEdit,currentUser,intervalMs=7000}){
-  const today=todayKey();
-  const horizon=dateKey(new Date(Date.now()+30*864e5));
-  const items=(events||[])
-    .filter(ev=>ev.category==="birthday"||ev.category==="anniversary")
-    .map(ev=>ev.repeatYearly?{...ev,date:nextOccurrence(ev,today),endDate:""}:ev)
-    .filter(ev=>ev.date>=today&&ev.date<=horizon)
-    .sort((a,b)=>a.date<b.date?-1:1);
-  const [idx,setIdx]=useState(0);
-  const [popupDay,setPopupDay]=useState(null);
-  useEffect(()=>{
-    if(items.length<=1)return;
-    const id=setInterval(()=>setIdx(i=>(i+1)%items.length),intervalMs);
-    return()=>clearInterval(id);
-  },[items.length,intervalMs]);
-  if(items.length===0)return null;
-  const ev=items[idx%items.length];
-  const days=Math.max(0,Math.round((parseKey(ev.date)-parseKey(today))/864e5));
-  const o=ownerOf(ev),c=catOf(ev);
-  return(<div style={{marginBottom:big?16:14}}>
-    <div style={{fontSize:big?15:12,color:S.T.sub,fontFamily:"monospace",letterSpacing:"0.12em",marginBottom:8}}>🎂 UPCOMING</div>
-    <div onClick={()=>setPopupDay(ev.date)} style={{cursor:"pointer",background:o.color+"14",border:`1px solid ${o.color}44`,borderRadius:12,padding:big?"14px 18px":"9px 12px",textAlign:"center",maxWidth:big?260:200}}>
-      {ev.photo&&<img src={ev.photo} alt="" style={{width:big?56:36,height:big?56:36,borderRadius:"50%",objectFit:"cover",margin:"0 auto 6px",display:"block",border:`2px solid ${o.color}`}}/>}
-      <div style={{fontSize:big?16:11,color:S.T.sub,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{!ev.photo&&c.emoji+" "}{displayTitle(ev,ev.date)}</div>
-      <div style={{fontSize:big?42:24,fontWeight:"bold",color:o.color,lineHeight:1.15}}>{days===0?"TODAY!":days}</div>
-      {days>0&&<div style={{fontSize:big?13:10,color:S.T.sub}}>{days===1?"day to go":"days to go"} · {fmtDayShort(ev.date)}</div>}
-      {items.length>1&&<div style={{display:"flex",justifyContent:"center",gap:4,marginTop:8}}>
-        {items.map((_,i)=><div key={i} style={{width:i===idx%items.length?14:5,height:5,borderRadius:3,background:i===idx%items.length?o.color:S.T.border,transition:"width 0.3s"}}/>)}
-      </div>}
-    </div>
-    <EventDetailPopup dayKey={popupDay} events={events} setEvents={setEvents} currentUser={currentUser} canEdit={canEdit} S={S} onClose={()=>setPopupDay(null)}/>
-  </div>);
 }
 
 // ── THIS WEEK'S BIRTHDAYS & ANNIVERSARIES — prominent homepage banner ─────────
@@ -599,4 +573,4 @@ function CalendarTab({events,setEvents,currentUser,canEdit,S}){
   </div>);
 }
 
-export { MonthCalendar, UpcomingEvents, EventRow, CalendarTab, CountdownStrip, WeeklyCelebrations, UpcomingBirthdaysCard, EventDetailPopup, eventsOnDay, upcomingEvents, todayKey, fmtDayLong };
+export { MonthCalendar, UpcomingEvents, EventRow, CalendarTab, CountdownStrip, WeeklyCelebrations, EventDetailPopup, eventsOnDay, upcomingEvents, todayKey, fmtDayLong };

@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { DAYS, MEAL_TYPES, GOLD, BORDER, USERS, todayName, billPaid, weekKeyOf, dateOfWeekDay } from "./constants";
 import { WeatherScroll } from "./shared";
-import { MonthCalendar, EventRow, CountdownStrip, WeeklyCelebrations, UpcomingBirthdaysCard, EventDetailPopup, eventsOnDay, todayKey } from "./calendar";
+import { MonthCalendar, EventRow, CountdownStrip, WeeklyCelebrations, EventDetailPopup, eventsOnDay, todayKey } from "./calendar";
 
 const T={bg:"#0d0d08",card:"#141410",border:"#2a2a18",text:"#e8e0c8",sub:"#888",accent:GOLD};
 // Big-type style object shaped like makeS output so shared components render correctly.
@@ -133,7 +133,6 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
     </div>}
     <div style={{flexShrink:0}}><WeeklyCelebrations events={events} S={tvS}/></div>
     <div style={{flexShrink:0}}><CountdownStrip events={events} S={tvS}/></div>
-    <div style={{flexShrink:0}}><UpcomingBirthdaysCard events={events} S={tvS}/></div>
     {/* Main: fills whatever height is left — never pushes the sign-in row off-screen */}
     <div style={{display:"grid",gridTemplateColumns:"minmax(0,54fr) minmax(0,46fr)",gap:14,flex:"1 1 auto",minHeight:0}}>
       {/* Left: full month calendar */}

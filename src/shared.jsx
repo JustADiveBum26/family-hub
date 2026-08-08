@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { store } from "./store";
 import { DAYS, DSHORT, MEAL_TYPES, GOLD, BORDER, THEMES, USERS, fmt, todayName, billPaid, weekKeyOf, dateOfWeekDay, S } from "./constants";
-import { MonthCalendar, UpcomingEvents, CountdownStrip, WeeklyCelebrations, UpcomingBirthdaysCard, EventDetailPopup } from "./calendar";
+import { MonthCalendar, UpcomingEvents, CountdownStrip, WeeklyCelebrations, EventDetailPopup } from "./calendar";
 
 // ── SAVE STATUS — quiet unless there's actually something to worry about ──────
 // Stays invisible during normal saving/saved cycles; only surfaces once
@@ -392,7 +392,6 @@ function PersonalHomeScreen({currentUser,mealPlan,nextWeekPlan,bills,chores,setC
     <PinnedAnnouncements messages={messages} S={S}/>
     <WeeklyCelebrations events={events} S={S} setEvents={setEvents} canEdit currentUser={currentUser}/>
     <CountdownStrip events={events} S={S} setEvents={setEvents} canEdit currentUser={currentUser}/>
-    <UpcomingBirthdaysCard events={events} S={S} setEvents={setEvents} canEdit currentUser={currentUser}/>
     <UpcomingEvents events={events} S={S} days={7} title="📅 Coming Up This Week" setEvents={setEvents} canEdit currentUser={currentUser}/>
     <WeeklyChoreBoard chores={chores||[]} setChores={setChores} appSettings={appSettings} S={S}/>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:14}}>
@@ -481,7 +480,6 @@ function PublicHomeScreen({mealPlan,shopList,setShopList,bills,expenses,onLogin,
       <WeeklyCelebrations events={events} S={S}/>
       {dueSoon.length>0&&<BillsBanner bills={bills} S={S}/>}
       <CountdownStrip events={events} S={S}/>
-      <UpcomingBirthdaysCard events={events} S={S}/>
       <div style={S.card}>
         <MonthCalendar events={events} S={S} selectedKey={popupDay} onSelectDay={setPopupDay}/>
         <div style={{marginTop:10,fontSize:11,color:"#555",textAlign:"center"}}>Tap a day to see what's on it. Sign in to add or edit events.</div>
