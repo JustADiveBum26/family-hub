@@ -210,6 +210,78 @@ function WeatherStrip({big}){
   </div>);
 }
 
+// ── FAMILY WEATHER SCROLL — TV wall display, rotates through where everyone lives ──
+const FAMILY_CITIES=[
+  {name:"Columbia, MO",lat:38.9517,lon:-92.3341},
+  {name:"Blue Springs, MO",lat:39.0169,lon:-94.2816},
+  {name:"Huntington, WV",lat:38.4192,lon:-82.4452},
+  {name:"Atlanta, GA",lat:33.7490,lon:-84.3880},
+];
+// Keyed by lat,lon rather than the shared weatherLoc singleton above — these
+// four are fixed regardless of whatever location the family has set for their
+// own personal dashboards.
+const cityWxCache={};
+function loadCityWeather(loc){
+  const key=loc.lat+","+loc.lon;
+  const c=cityWxCache[key];
+  if(c?.data&&Date.now()-c.at<30*60*1000)return Promise.resolve(c.data);
+  if(c?.promise)return c.promise;
+  const promise=(async()=>{
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=temperature_2m,weathercode,windspeed_10m&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=auto&forecast_days=7`);
+    const d=await r.json();
+    const data={
+      place:loc.name,
+      current:{temp:Math.round(d.current.temperature_2m),icon:wxIcon(d.current.weathercode),desc:wxDesc(d.current.weathercode),wind:Math.round(d.current.windspeed_10m)},
+      days:(d.daily?.time||[]).map((t,i)=>({date:t,day:new Date(t+"T12:00:00").toLocaleDateString("en-US",{weekday:"short"}),icon:wxIcon(d.daily.weathercode[i]),hi:Math.round(d.daily.temperature_2m_max[i]),lo:Math.round(d.daily.temperature_2m_min[i]),rain:d.daily.precipitation_probability_max?.[i]??null})),
+    };
+    cityWxCache[key]={at:Date.now(),data,promise:null};
+    return data;
+  })();
+  cityWxCache[key]={at:c?.at||0,data:c?.data||null,promise};
+  promise.catch(()=>{if(cityWxCache[key])cityWxCache[key].promise=null;});
+  return promise;
+}
+function WeatherScroll({cities=FAMILY_CITIES,big,intervalMs=8000}){
+  const [idx,setIdx]=useState(0);
+  const [wx,setWx]=useState(null);
+  useEffect(()=>{
+    if(cities.length<=1)return;
+    const id=setInterval(()=>setIdx(i=>(i+1)%cities.length),intervalMs);
+    return()=>clearInterval(id);
+  },[cities.length,intervalMs]);
+  useEffect(()=>{
+    let live=true;
+    loadCityWeather(cities[idx]).then(d=>{if(live)setWx(d);}).catch(()=>{});
+    return()=>{live=false;};
+  },[idx,cities]);
+  if(!wx)return null;
+  const fs=big?{t:36,d:15,day:13,hilo:15,ic:34,cic:48,cell:78,gap:12,pad:"14px 20px"}:{t:17,d:10,day:9,hilo:11,ic:17,cic:24,cell:46,gap:4,pad:"6px 12px"};
+  return(<div style={{display:"flex",alignItems:"center",gap:big?18:10,padding:fs.pad,background:"rgba(255,255,255,0.04)",borderRadius:big?16:12,border:"1px solid rgba(255,255,255,0.09)",overflowX:"auto",WebkitOverflowScrolling:"touch",maxWidth:"100%"}}>
+    <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+      <span style={{fontSize:fs.cic}}>{wx.current.icon}</span>
+      <div>
+        <div style={{fontSize:big?12:9,color:"#C9A84C",fontFamily:"monospace",letterSpacing:"0.06em",whiteSpace:"nowrap"}}>{wx.place}</div>
+        <div style={{fontSize:fs.t,fontWeight:"bold",color:"#e8e0c8",lineHeight:1.05}}>{wx.current.temp}°</div>
+        <div style={{fontSize:fs.d,color:"#888",whiteSpace:"nowrap"}}>{wx.current.desc}</div>
+      </div>
+    </div>
+    <div style={{width:1,alignSelf:"stretch",background:"rgba(255,255,255,0.1)",flexShrink:0}}/>
+    <div style={{display:"flex",gap:fs.gap}}>
+      {wx.days.slice(0,7).map((d,i)=>(
+        <div key={d.date} style={{textAlign:"center",minWidth:fs.cell,flexShrink:0}}>
+          <div style={{fontSize:fs.day,color:i===0?"#e8e0c8":"#777",fontFamily:"monospace"}}>{i===0?"TODAY":d.day.toUpperCase()}</div>
+          <div style={{fontSize:fs.ic,lineHeight:1.25}}>{d.icon}</div>
+          <div style={{fontSize:fs.hilo,color:"#e8e0c8",whiteSpace:"nowrap"}}>{d.hi}°<span style={{color:"#666"}}> {d.lo}°</span></div>
+          {d.rain!=null&&d.rain>=20&&<div style={{fontSize:fs.day,color:"#4a9eff"}}>💧{d.rain}%</div>}
+        </div>
+      ))}
+    </div>
+    {cities.length>1&&<div style={{display:"flex",flexDirection:"column",gap:5,flexShrink:0,marginLeft:4}}>
+      {cities.map((c,i)=><div key={c.name} style={{width:6,height:i===idx?16:6,borderRadius:4,background:i===idx?"#C9A84C":"rgba(255,255,255,0.25)",transition:"height 0.3s"}}/>)}
+    </div>}
+  </div>);
+}
+
 function BillsBanner({bills,S}){
   const today=new Date();
   const due=bills.filter(b=>{if(billPaid(b))return false;const d=new Date(b.dueDate+"T12:00:00");const dl=Math.ceil((d-today)/(864e5));return dl>=0&&dl<=7;});
@@ -428,7 +500,7 @@ function DayPills({selected,onToggle,S}){
 }
 
 export {
-  Ring, Bar, PinPad, ShoppingListView, LoginModal, WeatherStrip, configureWeather, BillsBanner,
+  Ring, Bar, PinPad, ShoppingListView, LoginModal, WeatherStrip, WeatherScroll, FAMILY_CITIES, configureWeather, BillsBanner,
   PinnedAnnouncements, WeeklyChoreBoard, PersonalHomeScreen, UserHeader,
   ThemePicker, PublicHomeScreen, DayPills,
 };
