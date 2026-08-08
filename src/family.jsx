@@ -963,8 +963,29 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
 function BradynLedger({ledger,setLedger,currentUser,S}){
   const isParent=currentUser==="brad";
   const [showAdd,setShowAdd]=useState(false);
+  const [showHistory,setShowHistory]=useState(false);
   const [form,setForm]=useState({name:"",type:"recurring",defaultAmount:"",paymentsRemaining:"",dueDate:"",notes:""});
+  const [editingId,setEditingId]=useState(null),[editForm,setEditForm]=useState({});
   const save=u=>{setLedger(u);store.save("fp2:bradynLedger",u);};
+  const startEdit=item=>{setEditingId(item.id);setEditForm({name:item.name,type:item.type,defaultAmount:String(item.defaultAmount),paymentsRemaining:item.paymentsRemaining!=null?String(item.paymentsRemaining):"",dueDate:item.dueDate||"",notes:item.notes||""});};
+  const cancelEdit=()=>setEditingId(null);
+  const saveEdit=id=>{
+    if(!editForm.name||!editForm.defaultAmount)return;
+    const newDefault=+editForm.defaultAmount;
+    save(ledger.map(i=>i.id!==id?i:{
+      ...i,name:editForm.name,type:editForm.type,defaultAmount:newDefault,
+      paymentsRemaining:editForm.type==="recurring"&&editForm.paymentsRemaining?+editForm.paymentsRemaining:null,
+      dueDate:editForm.dueDate,notes:editForm.notes,
+      // Unpaid items pick up the new default right away; once paid this cycle,
+      // the amount already logged shouldn't retroactively change.
+      currentMonthAmount:i.paid?i.currentMonthAmount:newDefault,
+    }));
+    setEditingId(null);
+  };
+  // Every payment across every item, newest first — the ledger equivalent of
+  // BillsTab's Payment Log, since each item only kept its own mini-history before.
+  const paymentLog=ledger.flatMap(i=>(i.history||[]).map(h=>({...h,itemName:i.name})))
+    .sort((a,b)=>new Date(b.date)-new Date(a.date));
   const monthKey=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");};
   const addMonth=(dateStr)=>{
     if(!dateStr)return dateStr;
@@ -1024,9 +1045,18 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
     <div style={{...S.alert(totalOwed>0?"#FF9800":"#4CAF50"),marginBottom:14}}>
       <span style={{color:totalOwed>0?"#FF9800":"#4CAF50",fontWeight:"bold"}}>Bradyn currently owes Brad: {fmt(totalOwed)}</span>
     </div>
-    {isParent&&<div style={{...S.row,marginBottom:14,flexWrap:"wrap",gap:8}}>
+    <div style={{...S.row,marginBottom:14,flexWrap:"wrap",gap:8}}>
       <div style={{fontSize:15,color:S.T.accent}}>Bradyn & Brad Ledger</div>
-      <button style={S.btn()} onClick={()=>setShowAdd(!showAdd)}>{showAdd?"Cancel":"Add Item"}</button>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        <button style={S.btnGhost} onClick={()=>setShowHistory(!showHistory)}>{showHistory?"Hide History":`History${paymentLog.length>0?` (${paymentLog.length})`:""}`}</button>
+        {isParent&&<button style={S.btn()} onClick={()=>setShowAdd(!showAdd)}>{showAdd?"Cancel":"Add Item"}</button>}
+      </div>
+    </div>
+    {showHistory&&<div style={S.card}>
+      <div style={S.h2}>Payment History{paymentLog.length>0?` (${paymentLog.length})`:""}</div>
+      {paymentLog.length===0
+        ?<div style={{color:S.T.sub,fontSize:13}}>No payments logged yet.</div>
+        :<div style={{maxHeight:360,overflowY:"auto"}}>{paymentLog.map((h,i)=><div key={i} style={{...S.row,padding:"6px 0",borderBottom:`1px solid ${S.T.border}`}}><div><div style={{fontSize:13,color:S.T.text}}>{h.itemName}</div><div style={{fontSize:11,color:S.T.sub}}>{h.date}</div></div><span style={{color:"#4CAF50",fontFamily:"monospace",fontWeight:"bold"}}>{fmt(h.amount)}</span></div>)}</div>}
     </div>}
     {showAdd&&isParent&&<div style={S.card}>
       <div style={S.h2}>New Item</div>
@@ -1048,6 +1078,21 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
         const dl=item.dueDate?Math.ceil((new Date(item.dueDate+"T12:00:00")-today)/(864e5)):null;
         const isOver=dl!=null&&dl<0&&!item.paid;
         const isSoon=dl!=null&&dl>=0&&dl<=3&&!item.paid;
+        if(editingId===item.id)return(<div key={item.id} style={{...S.card,borderLeft:`4px solid ${S.T.accent}`,marginBottom:8}}>
+          <div style={{fontSize:13,color:S.T.accent,fontWeight:"bold",marginBottom:10}}>Edit Item</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:12}}>
+            <div><div style={S.label}>Name</div><input style={S.input} value={editForm.name} onChange={e=>setEditForm({...editForm,name:e.target.value})}/></div>
+            <div><div style={S.label}>Type</div><select style={S.select} value={editForm.type} onChange={e=>setEditForm({...editForm,type:e.target.value})}><option value="recurring">Recurring Monthly</option><option value="oneTime">One-Time</option></select></div>
+            <div><div style={S.label}>{editForm.type==="recurring"?"Default Monthly Amount":"Amount"}</div><input style={S.input} type="number" value={editForm.defaultAmount} onChange={e=>setEditForm({...editForm,defaultAmount:e.target.value})}/></div>
+            {editForm.type==="recurring"&&<div><div style={S.label}>Payments Remaining (optional)</div><input style={S.input} type="number" value={editForm.paymentsRemaining} onChange={e=>setEditForm({...editForm,paymentsRemaining:e.target.value})}/></div>}
+            <div><div style={S.label}>Due Date</div><input style={S.input} type="date" value={editForm.dueDate} onChange={e=>setEditForm({...editForm,dueDate:e.target.value})}/></div>
+            <div><div style={S.label}>Notes</div><input style={S.input} value={editForm.notes} onChange={e=>setEditForm({...editForm,notes:e.target.value})}/></div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button style={{...S.btn("#4CAF50"),padding:"8px 18px",fontSize:13}} onClick={()=>saveEdit(item.id)}>Save Changes</button>
+            <button style={S.btnGhost} onClick={cancelEdit}>Cancel</button>
+          </div>
+        </div>);
         return(
         <div key={item.id} style={{...S.card,borderLeft:`4px solid ${item.paid?"#4CAF50":isOver?"#f44336":isSoon?"#FF9800":"#FF9800"}`,marginBottom:8}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
@@ -1063,7 +1108,10 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
               <div style={{fontSize:11,color:S.T.sub,marginTop:2}}>Default: {fmt(item.defaultAmount)}/mo</div>
               {item.dueDate&&<div style={{fontSize:11,marginTop:2,color:isOver?"#f44336":isSoon?"#FF9800":S.T.sub}}>Due {new Date(item.dueDate+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})}{!item.paid&&dl!=null?` — ${isOver?Math.abs(dl)+"d overdue":dl===0?"today":dl===1?"tomorrow":dl+" days"}`:""}</div>}
             </div>
-            {isParent&&<button style={S.btnDanger} onClick={()=>del(item.id)}>X</button>}
+            <div style={{display:"flex",gap:6,flexShrink:0}}>
+              <button style={{...S.btnGhost,padding:"5px 12px",fontSize:12}} onClick={()=>startEdit(item)}>✏ Edit</button>
+              <button style={S.btnDanger} onClick={()=>del(item.id)}>X</button>
+            </div>
           </div>
           <div style={{display:"flex",gap:8,marginTop:10,paddingTop:10,borderTop:`1px solid ${S.T.border}`,alignItems:"center",flexWrap:"wrap"}}>
             <div style={{display:"flex",gap:6,alignItems:"center"}}>
@@ -1094,6 +1142,21 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
         const dl=item.dueDate?Math.ceil((new Date(item.dueDate+"T12:00:00")-today)/(864e5)):null;
         const isOver=dl!=null&&dl<0&&!item.paid;
         const isSoon=dl!=null&&dl>=0&&dl<=3&&!item.paid;
+        if(editingId===item.id)return(<div key={item.id} style={{...S.card,borderLeft:`4px solid ${S.T.accent}`,marginBottom:8}}>
+          <div style={{fontSize:13,color:S.T.accent,fontWeight:"bold",marginBottom:10}}>Edit Item</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:12}}>
+            <div><div style={S.label}>Name</div><input style={S.input} value={editForm.name} onChange={e=>setEditForm({...editForm,name:e.target.value})}/></div>
+            <div><div style={S.label}>Type</div><select style={S.select} value={editForm.type} onChange={e=>setEditForm({...editForm,type:e.target.value})}><option value="recurring">Recurring Monthly</option><option value="oneTime">One-Time</option></select></div>
+            <div><div style={S.label}>{editForm.type==="recurring"?"Default Monthly Amount":"Amount"}</div><input style={S.input} type="number" value={editForm.defaultAmount} onChange={e=>setEditForm({...editForm,defaultAmount:e.target.value})}/></div>
+            {editForm.type==="recurring"&&<div><div style={S.label}>Payments Remaining (optional)</div><input style={S.input} type="number" value={editForm.paymentsRemaining} onChange={e=>setEditForm({...editForm,paymentsRemaining:e.target.value})}/></div>}
+            <div><div style={S.label}>Due Date</div><input style={S.input} type="date" value={editForm.dueDate} onChange={e=>setEditForm({...editForm,dueDate:e.target.value})}/></div>
+            <div><div style={S.label}>Notes</div><input style={S.input} value={editForm.notes} onChange={e=>setEditForm({...editForm,notes:e.target.value})}/></div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button style={{...S.btn("#4CAF50"),padding:"8px 18px",fontSize:13}} onClick={()=>saveEdit(item.id)}>Save Changes</button>
+            <button style={S.btnGhost} onClick={cancelEdit}>Cancel</button>
+          </div>
+        </div>);
         return(
         <div key={item.id} style={{...S.card,borderLeft:`4px solid ${item.paid?"#4CAF50":isOver?"#f44336":"#FF9800"}`,marginBottom:8}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
@@ -1110,7 +1173,8 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
             </div>
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
               {!item.paid&&<button style={{...S.btn("#4CAF50"),padding:"7px 16px",fontSize:12}} onClick={()=>markPaid(item.id)}>Mark Paid</button>}
-              {isParent&&<button style={S.btnDanger} onClick={()=>del(item.id)}>X</button>}
+              <button style={{...S.btnGhost,padding:"5px 12px",fontSize:12}} onClick={()=>startEdit(item)}>✏ Edit</button>
+              <button style={S.btnDanger} onClick={()=>del(item.id)}>X</button>
             </div>
           </div>
         </div>

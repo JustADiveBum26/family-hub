@@ -410,8 +410,51 @@ function UpcomingEvents({events,S,days=7,title="Coming Up"}){
   </div>);
 }
 
+// ── BIRTHDAY / ANNIVERSARY QUICK-ADD — just a name, type, date, optional year ──
+function BirthdayQuickForm({S,onSave,onCancel}){
+  const blank={title:"",category:"birthday",date:todayKey(),originYear:""};
+  const [f,setF]=useState(blank);
+  const [err,setErr]=useState("");
+  const set=(k,v)=>{setF(x=>({...x,[k]:v}));setErr("");};
+  const submit=()=>{
+    if(!f.title.trim()){setErr("Give it a name.");return;}
+    onSave({title:f.title.trim(),owners:["family"],category:f.category,date:f.date,endDate:"",time:"",endTime:"",notes:"",photo:"",originYear:f.originYear?+f.originYear:null,countdown:false,repeatYearly:true,repeatWeekly:false,repeatUntil:""});
+    setF(blank);
+  };
+  return(<div style={{...S.cardSm,border:`1px solid ${S.T.accent}55`}}>
+    <div style={{fontSize:14,color:S.T.accent,fontWeight:"bold",marginBottom:10}}>Add Birthday / Anniversary</div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:10}}>
+      <div style={{gridColumn:"1/-1"}}>
+        <div style={S.label}>{f.category==="birthday"?"Whose birthday? *":"Whose/what anniversary? *"}</div>
+        <input style={S.input} placeholder={f.category==="birthday"?"e.g. Mary Beth":"e.g. Brad & Mary Beth, or Our Wedding"} value={f.title} onChange={e=>set("title",e.target.value)}/>
+      </div>
+      <div>
+        <div style={S.label}>Type</div>
+        <div style={{display:"flex",gap:6}}>
+          <button type="button" onClick={()=>set("category","birthday")} style={{...S.btnGhost,flex:1,textAlign:"center",background:f.category==="birthday"?S.T.accent+"22":"transparent",border:`1px solid ${f.category==="birthday"?S.T.accent:S.T.border}`,color:f.category==="birthday"?S.T.accent:S.T.sub}}>🎂 Birthday</button>
+          <button type="button" onClick={()=>set("category","anniversary")} style={{...S.btnGhost,flex:1,textAlign:"center",background:f.category==="anniversary"?S.T.accent+"22":"transparent",border:`1px solid ${f.category==="anniversary"?S.T.accent:S.T.border}`,color:f.category==="anniversary"?S.T.accent:S.T.sub}}>💍 Anniversary</button>
+        </div>
+      </div>
+      <DateField S={S} label="Date *" value={f.date} onChange={v=>set("date",v)}/>
+      <div>
+        <div style={S.label}>{f.category==="birthday"?"Year of Birth (optional)":"Year of Anniversary (optional)"}</div>
+        <input style={S.input} type="number" placeholder="e.g. 1990" min="1900" max={new Date().getFullYear()} value={f.originYear} onChange={e=>set("originYear",e.target.value)}/>
+      </div>
+      {f.title.trim()&&<div style={{gridColumn:"1/-1",fontSize:12,color:S.T.accent}}>
+        Will show as: <strong>{displayTitle({title:f.title.trim(),category:f.category,originYear:f.originYear?+f.originYear:null},f.date)}</strong>
+      </div>}
+    </div>
+    {err&&<div style={{color:"#f44336",fontSize:12,marginBottom:8}}>{err}</div>}
+    <div style={{display:"flex",gap:8}}>
+      <button style={S.btn()} onClick={submit}>Add</button>
+      <button style={S.btnGhost} onClick={onCancel}>Cancel</button>
+    </div>
+  </div>);
+}
+
 // ── FULL CALENDAR TAB ─────────────────────────────────────────────────────────
 function CalendarTab({events,setEvents,currentUser,canEdit,S}){
+  const [view,setView]=useState("month"); // "month" or "celebrations"
   const [selected,setSelected]=useState(todayKey());
   const [showForm,setShowForm]=useState(false);
   const [editing,setEditing]=useState(null);
@@ -440,21 +483,47 @@ function CalendarTab({events,setEvents,currentUser,canEdit,S}){
   const del=id=>save((events||[]).filter(ev=>ev.id!==id));
   const delSeries=seriesId=>save((events||[]).filter(ev=>ev.seriesId!==seriesId));
   const dayEvents=eventsOnDay(events,selected);
+  // Celebrations: every birthday/anniversary, normalized to its next occurrence
+  // (same trick upcomingEvents() uses for yearly-recurring events) so the list
+  // reads as "who's coming up," not stuck on the year it was first added.
+  const today=todayKey();
+  const celebrations=(events||[])
+    .filter(ev=>ev.category==="birthday"||ev.category==="anniversary")
+    .map(ev=>ev.repeatYearly?{...ev,date:nextOccurrence(ev,today),endDate:""}:ev)
+    .sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
   return(<div>
-    {canEdit&&!showForm&&!editing&&<div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
-      <button style={S.btn()} onClick={()=>setShowForm(true)}>+ Add Event</button>
-    </div>}
-    {showForm&&<EventForm S={S} defaultDate={selected} currentUser={currentUser} onSave={addEvent} onCancel={()=>setShowForm(false)}/>}
-    {editing&&<EventForm S={S} initial={editing} currentUser={currentUser} onSave={updateEvent} onCancel={()=>setEditing(null)}/>}
-    <div style={S.card}>
-      <MonthCalendar events={events} S={S} selectedKey={selected} onSelectDay={setSelected}/>
+    <div style={{display:"flex",gap:4,background:S.T.bg,borderRadius:10,padding:3,marginBottom:12,width:"fit-content"}}>
+      <button onClick={()=>setView("month")} style={{padding:"7px 16px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:13,background:view==="month"?S.T.accent:"transparent",color:view==="month"?"#0d0d08":S.T.sub,fontWeight:view==="month"?"bold":"normal"}}>📅 Month</button>
+      <button onClick={()=>setView("celebrations")} style={{padding:"7px 16px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:13,background:view==="celebrations"?S.T.accent:"transparent",color:view==="celebrations"?"#0d0d08":S.T.sub,fontWeight:view==="celebrations"?"bold":"normal"}}>🎂 Birthdays{celebrations.length>0?` (${celebrations.length})`:""}</button>
     </div>
-    <div style={S.card}>
-      <div style={S.h2}>{selected===todayKey()?"Today — ":""}{fmtDayLong(selected)}</div>
-      {dayEvents.length===0&&<div style={{fontSize:13,color:S.T.sub,padding:"6px 0"}}>Nothing on the calendar{canEdit?" — tap Add Event to put something here.":"."}</div>}
-      {dayEvents.map(ev=><EventRow key={ev.id} ev={ev} S={S} occKey={selected} canEdit={canEdit} onEdit={e=>{setEditing(e);setShowForm(false);}} onDelete={del} onDeleteSeries={delSeries}/>)}
-    </div>
-    <UpcomingEvents events={events} S={S} days={14} title="Next 2 Weeks"/>
+    {view==="month"&&<>
+      {canEdit&&!showForm&&!editing&&<div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+        <button style={S.btn()} onClick={()=>setShowForm(true)}>+ Add Event</button>
+      </div>}
+      {showForm&&<EventForm S={S} defaultDate={selected} currentUser={currentUser} onSave={addEvent} onCancel={()=>setShowForm(false)}/>}
+      {editing&&<EventForm S={S} initial={editing} currentUser={currentUser} onSave={updateEvent} onCancel={()=>setEditing(null)}/>}
+      <div style={S.card}>
+        <MonthCalendar events={events} S={S} selectedKey={selected} onSelectDay={setSelected}/>
+      </div>
+      <div style={S.card}>
+        <div style={S.h2}>{selected===todayKey()?"Today — ":""}{fmtDayLong(selected)}</div>
+        {dayEvents.length===0&&<div style={{fontSize:13,color:S.T.sub,padding:"6px 0"}}>Nothing on the calendar{canEdit?" — tap Add Event to put something here.":"."}</div>}
+        {dayEvents.map(ev=><EventRow key={ev.id} ev={ev} S={S} occKey={selected} canEdit={canEdit} onEdit={e=>{setEditing(e);setShowForm(false);}} onDelete={del} onDeleteSeries={delSeries}/>)}
+      </div>
+      <UpcomingEvents events={events} S={S} days={14} title="Next 2 Weeks"/>
+    </>}
+    {view==="celebrations"&&<>
+      {canEdit&&!showForm&&!editing&&<div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+        <button style={S.btn()} onClick={()=>setShowForm(true)}>+ Add Birthday / Anniversary</button>
+      </div>}
+      {showForm&&<BirthdayQuickForm S={S} onSave={addEvent} onCancel={()=>setShowForm(false)}/>}
+      {editing&&<EventForm S={S} initial={editing} currentUser={currentUser} onSave={updateEvent} onCancel={()=>setEditing(null)}/>}
+      <div style={S.card}>
+        <div style={S.h2}>All Birthdays & Anniversaries</div>
+        {celebrations.length===0&&<div style={{fontSize:13,color:S.T.sub,padding:"6px 0"}}>None added yet.{canEdit?" Tap Add Birthday / Anniversary to put one here.":""}</div>}
+        {celebrations.map(ev=><EventRow key={ev.id} ev={ev} S={S} showDate occKey={ev.date} canEdit={canEdit} onEdit={e=>{setEditing(e);setShowForm(false);}} onDelete={del} onDeleteSeries={delSeries}/>)}
+      </div>
+    </>}
   </div>);
 }
 
