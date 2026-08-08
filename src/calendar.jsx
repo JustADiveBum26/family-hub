@@ -300,21 +300,23 @@ function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
         Will show as: <strong>{displayTitle({title:f.title.trim(),category:f.category,originYear:f.originYear?+f.originYear:null},f.date)}</strong>
       </div>}
       <DateField S={S} label="Date *" value={f.date} onChange={v=>set("date",v)}/>
-      <DateField S={S} label="End date (optional)" value={f.endDate} onChange={v=>set("endDate",v)} placeholder="No end date"/>
-      <div><div style={S.label}>Start time (optional)</div><input style={S.input} type="time" value={f.time} onChange={e=>set("time",e.target.value)}/></div>
-      <div><div style={S.label}>End time (optional)</div><input style={S.input} type="time" value={f.endTime} onChange={e=>set("endTime",e.target.value)}/></div>
-      <div style={{gridColumn:"1/-1"}}><div style={S.label}>Notes</div><input style={S.input} placeholder="Anything the family should know..." value={f.notes} onChange={e=>set("notes",e.target.value)}/></div>
-      <div style={{gridColumn:"1/-1"}}>
-        <div style={S.label}>Photo (optional)</div>
-        {f.photo
-          ?<div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-            <img src={f.photo} alt="" style={{width:56,height:56,borderRadius:8,objectFit:"cover",border:`1px solid ${S.T.border}`}}/>
-            <label style={{...S.btnGhost,cursor:"pointer",padding:"7px 14px",fontSize:12}}>{photoBusy?"Loading...":"Change"}<input type="file" accept="image/*" onChange={handlePhotoFile} style={{display:"none"}}/></label>
-            <button style={S.btnDanger} onClick={()=>set("photo","")}>✕ Remove</button>
-          </div>
-          :<label style={{...S.btnGhost,cursor:"pointer",padding:"8px 16px",fontSize:13,display:"inline-block"}}>{photoBusy?"Loading...":"📷 Add a Photo"}<input type="file" accept="image/*" onChange={handlePhotoFile} style={{display:"none"}}/></label>
-        }
-      </div>
+      {f.category!=="birthday"&&f.category!=="anniversary"&&<>
+        <DateField S={S} label="End date (optional)" value={f.endDate} onChange={v=>set("endDate",v)} placeholder="No end date"/>
+        <div><div style={S.label}>Start time (optional)</div><input style={S.input} type="time" value={f.time} onChange={e=>set("time",e.target.value)}/></div>
+        <div><div style={S.label}>End time (optional)</div><input style={S.input} type="time" value={f.endTime} onChange={e=>set("endTime",e.target.value)}/></div>
+        <div style={{gridColumn:"1/-1"}}><div style={S.label}>Notes</div><input style={S.input} placeholder="Anything the family should know..." value={f.notes} onChange={e=>set("notes",e.target.value)}/></div>
+        <div style={{gridColumn:"1/-1"}}>
+          <div style={S.label}>Photo (optional)</div>
+          {f.photo
+            ?<div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+              <img src={f.photo} alt="" style={{width:56,height:56,borderRadius:8,objectFit:"cover",border:`1px solid ${S.T.border}`}}/>
+              <label style={{...S.btnGhost,cursor:"pointer",padding:"7px 14px",fontSize:12}}>{photoBusy?"Loading...":"Change"}<input type="file" accept="image/*" onChange={handlePhotoFile} style={{display:"none"}}/></label>
+              <button style={S.btnDanger} onClick={()=>set("photo","")}>✕ Remove</button>
+            </div>
+            :<label style={{...S.btnGhost,cursor:"pointer",padding:"8px 16px",fontSize:13,display:"inline-block"}}>{photoBusy?"Loading...":"📷 Add a Photo"}<input type="file" accept="image/*" onChange={handlePhotoFile} style={{display:"none"}}/></label>
+          }
+        </div>
+      </>}
     </div>
     <div style={{marginBottom:10}}>
       <label style={{display:"flex",gap:6,alignItems:"center",fontSize:13,color:S.T.text,cursor:"pointer"}}>
