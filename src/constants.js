@@ -10,6 +10,9 @@ const SHOP_CATS=["Grocery","Dairy","Produce","Meat","Snacks","Beverages","Househ
 const CHORE_MASTER=["Make bed","Dishes / unload dishwasher","Take out trash","Vacuum","Sweep / mop","Clean bathroom","Laundry","Feed pets","Wipe counters","Take out recycling","Pick up living room","Homework done","Practice instrument","Walk dog","Set table","Clear table","Yard work","Clean room"];
 const GOLD="#C9A84C",DARK="#0d0d08",MID="#141410",BORDER="#2a2a18";
 const TIMEOUT_MS=5*60*1000;
+// $ credited per chore point when a kid redeems completed chores into their
+// allowance balance (AllowanceCard in family.jsx).
+const POINT_VALUE=0.10;
 
 const THEMES={
   dark:{bg:"#0d0d08",card:"#141410",border:"#2a2a18",text:"#e8e0c8",sub:"#888",accent:GOLD,name:"Dark Gold"},
@@ -39,7 +42,7 @@ const D={
   pslf:{totalPayments:120,qualifyingPayments:96,pslfMonths:24,certDue:"2025-09-01",employer:"Federal Agency",idrPlan:"SAVE",notes:""},
   bills:[],mealPlan:blankMealPlan(),shopList:[],mealSuggestions:[],shopRequests:[],
   auth:{brad:null,maryBeth:null,bradyn:null,parker:null,ryder:null},
-  chores:[],messages:[],billHistory:[],
+  chores:[],messages:[],billHistory:[],choreLog:[],allowance:{},
   appSettings:{showPoints:false,showAdultChores:{brad:false,maryBeth:false,bradyn:false},userThemes:{},todoEnabled:{brad:true,maryBeth:true}},
   todos:{brad:[],maryBeth:[]},
   shopSettings:{
@@ -102,7 +105,7 @@ const S=makeS("dark");
 
 export {
   DAYS, DSHORT, MEAL_TYPES, CATS, ACCT_TYPES, DEBT_TYPES, BILL_CATS, SHOP_CATS,
-  CHORE_MASTER, GOLD, DARK, MID, BORDER, TIMEOUT_MS, THEMES, USERS,
+  CHORE_MASTER, GOLD, DARK, MID, BORDER, TIMEOUT_MS, POINT_VALUE, THEMES, USERS,
   blankMealPlan, D, fmt, calcMortgage, scoreToRate, calcPayoff, todayName, billPaid,
   weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek,
   getTheme, makeS, S,

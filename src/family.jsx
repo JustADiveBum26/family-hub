@@ -1,11 +1,62 @@
 // ── Family features: chores, message board, settings, bills, meals, ledger ────
 import { useState, useEffect } from "react";
 import { store } from "./store";
-import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek } from "./constants";
+import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, POINT_VALUE, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek } from "./constants";
 import { DayPills } from "./shared";
 
+// ── CHORE COMPLETION LOG — dated history behind streaks/leaderboard ──────────
+// Chores themselves only track a per-weekday-name "done" flag (donedays), not
+// which actual date it was done on, so it can't tell "done this Monday" from
+// "done three Mondays ago." This log is the dated record that makes real
+// streaks/weekly totals possible without changing how chores themselves work.
+const todayISO=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;};
+const logChoreDone=(choreLog,setChoreLog,{choreId,assignee,points,task})=>{
+  const entry={id:Date.now()+Math.random(),choreId,assignee,points:points||0,task,date:todayISO()};
+  const u=[entry,...(choreLog||[])].slice(0,500);
+  setChoreLog(u);store.save("fp2:choreLog",u);
+};
+const unlogChoreDone=(choreLog,setChoreLog,choreId)=>{
+  const today=todayISO();
+  const u=(choreLog||[]).filter(e=>!(e.choreId===choreId&&e.date===today));
+  setChoreLog(u);store.save("fp2:choreLog",u);
+};
+
+// ── CHORE LEADERBOARD — this week's points + a daily-completion streak ───────
+function ChoreLeaderboard({chores,choreLog,S}){
+  const now=new Date();
+  const weekStart=new Date(now);weekStart.setDate(now.getDate()-now.getDay());
+  const wsISO=`${weekStart.getFullYear()}-${String(weekStart.getMonth()+1).padStart(2,"0")}-${String(weekStart.getDate()).padStart(2,"0")}`;
+  const log=choreLog||[];
+  const active=USERS.filter(u=>(chores||[]).some(c=>c.assignee===u.key));
+  if(active.length===0||log.length===0)return null;
+  const rows=active.map(u=>{
+    const mine=log.filter(e=>e.assignee===u.key);
+    const weekPts=mine.filter(e=>e.date>=wsISO).reduce((s,e)=>s+(e.points||0),0);
+    const days=new Set(mine.map(e=>e.date));
+    let streak=0,cursor=new Date(now);
+    while(true){
+      const key=`${cursor.getFullYear()}-${String(cursor.getMonth()+1).padStart(2,"0")}-${String(cursor.getDate()).padStart(2,"0")}`;
+      if(!days.has(key))break;
+      streak++;cursor.setDate(cursor.getDate()-1);
+    }
+    return{u,weekPts,streak,count:mine.filter(e=>e.date>=wsISO).length};
+  }).filter(r=>r.weekPts>0||r.streak>0).sort((a,b)=>b.weekPts-a.weekPts||b.streak-a.streak);
+  if(rows.length===0)return null;
+  return(<div style={{...S.card,padding:"14px 18px"}}>
+    <div style={{...S.h2,fontSize:14,marginBottom:10,paddingBottom:8}}>🏆 This Week</div>
+    <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+      {rows.map((r,i)=>(<div key={r.u.key} style={{display:"flex",alignItems:"center",gap:8,background:r.u.color+"14",border:`1px solid ${r.u.color}44`,borderRadius:10,padding:"8px 14px"}}>
+        {i===0&&<span style={{fontSize:14}}>👑</span>}
+        <span style={{fontSize:13,color:r.u.color,fontWeight:"bold"}}>{r.u.emoji} {r.u.label}</span>
+        <span style={{fontSize:12,color:S.T.sub}}>{r.count} done</span>
+        {r.streak>=2&&<span style={{fontSize:12,color:"#FF9800"}}>🔥{r.streak}d</span>}
+      </div>))}
+    </div>
+  </div>);
+}
+
 // ── CHORES TAB ────────────────────────────────────────────────────────────────
-function ChoresTab({chores,setChores,appSettings,S,currentUser}){
+function ChoresTab({chores,setChores,choreLog,setChoreLog,appSettings,S,currentUser}){
   const isParent=currentUser==="brad"||currentUser==="maryBeth";
   const [showAssign,setShowAssign]=useState(false);
   const [editingId,setEditingId]=useState(null);
@@ -33,11 +84,19 @@ function ChoresTab({chores,setChores,appSettings,S,currentUser}){
   };
   const startEdit=c=>{setEditingId(c.id);setEditForm({assignee:c.assignee,task:c.task,points:c.points||5,due:c.due||"",days:c.days||[]});};
   const saveEdit=id=>{save(chores.map(c=>c.id===id?{...c,...editForm}:c));setEditingId(null);};
-  const toggleDone=id=>save(chores.map(c=>c.id===id?{...c,done:!c.done,doneAt:!c.done?new Date().toLocaleDateString():null}:c));
+  const toggleDone=id=>{
+    const c=chores.find(x=>x.id===id);
+    if(!c)return;
+    const nowDone=!c.done;
+    save(chores.map(x=>x.id===id?{...x,done:nowDone,doneAt:nowDone?new Date().toLocaleDateString():null}:x));
+    if(nowDone)logChoreDone(choreLog,setChoreLog,{choreId:c.id,assignee:c.assignee,points:c.points,task:c.task});
+    else unlogChoreDone(choreLog,setChoreLog,c.id);
+  };
   const del=id=>save(chores.filter(c=>c.id!==id));
   const tn=todayName();
 
   return(<div>
+    <ChoreLeaderboard chores={chores} choreLog={choreLog} S={S}/>
     {isParent&&<div style={{...S.row,marginBottom:14,flexWrap:"wrap",gap:8}}>
       <div style={{fontSize:15,color:S.T.accent}}>Task Assignments</div>
       <button style={S.btn()} onClick={()=>{setShowAssign(!showAssign);if(!showAssign)setForm({assignee:firstUser,task:"",customTask:"",points:5,due:"",days:[]});}}>{showAssign?"Cancel":"Add Task"}</button>
@@ -126,20 +185,26 @@ function ChoresTab({chores,setChores,appSettings,S,currentUser}){
 }
 
 // ── KID CHORE VIEW ────────────────────────────────────────────────────────────
-function KidChoreView({chores,setChores,userKey,userName,userColor,appSettings,S}){
+function KidChoreView({chores,setChores,choreLog,setChoreLog,userKey,userName,userColor,appSettings,S}){
   const myChores=(chores||[]).filter(c=>c.assignee===userKey);
   const recurring=myChores.filter(c=>c.days&&c.days.length>0);
   const oneoff=myChores.filter(c=>(!c.days||c.days.length===0)&&!c.done);
   const tn=todayName();
   const save=u=>{setChores(u);store.save("fp2:chores",u);};
   const toggleDayDone=(id,day)=>{
-    save(chores.map(c=>{
-      if(c.id!==id)return c;
-      const dd={...(c.donedays||{}),[day]:!(c.donedays||{})[day]};
-      return{...c,donedays:dd};
+    const c=chores.find(x=>x.id===id);
+    if(!c)return;
+    const nowDone=!(c.donedays||{})[day];
+    save(chores.map(x=>{
+      if(x.id!==id)return x;
+      const dd={...(x.donedays||{}),[day]:nowDone};
+      return{...x,donedays:dd};
     }));
+    if(nowDone)logChoreDone(choreLog,setChoreLog,{choreId:c.id,assignee:c.assignee,points:c.points,task:c.task});
+    else unlogChoreDone(choreLog,setChoreLog,c.id);
   };
   return(<div>
+    <ChoreLeaderboard chores={chores} choreLog={choreLog} S={S}/>
     {recurring.length>0&&<div style={S.card}>
       <div style={S.h2}>My Weekly Chores</div>
       {recurring.map(c=>{
@@ -285,7 +350,7 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
     setBackupBusy(false);
   };
   return(<div>
-    {false&&<div style={S.card}>
+    {isParent&&<div style={S.card}>
       <div style={S.h2}>Profile</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,marginBottom:14}}>
         <div><div style={S.label}>Your Name</div><input style={S.input} value={local.myName} onChange={e=>setLocal({...local,myName:e.target.value})}/></div>
@@ -796,6 +861,26 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
   // weeks existed used day-only keys — keep using those until a weeked one exists.
   const slotKey=(day,mt)=>{const wkKey=wk+"__"+day+"__"+mt;if(mealDetails[wkKey])return wkKey;const legacy=day+"__"+mt;return mealDetails[legacy]?legacy:wkKey;};
   const hasDetail=(day,mt)=>{const d=mealDetails[slotKey(day,mt)];return d&&(d.ingredients?.length>0||d.recipe?.trim());};
+  // Every ingredient saved against a planned meal this week, minus anything
+  // already unchecked on the shopping list — so "Add This Week's Ingredients"
+  // doesn't require opening each meal's modal one at a time.
+  const weekIngredientsToAdd=(()=>{
+    const seen=new Set(shopList.filter(i=>!i.checked).map(i=>i.name.toLowerCase()));
+    const result=[];
+    DAYS.forEach(day=>MEAL_TYPES.forEach(mt=>{
+      if(!mealPlan[day]?.[mt])return;
+      (mealDetails[slotKey(day,mt)]?.ingredients||[]).forEach(ing=>{
+        const nl=ing.name.toLowerCase();
+        if(seen.has(nl))return;
+        seen.add(nl);result.push(ing);
+      });
+    }));
+    return result;
+  })();
+  const addWeekIngredientsToShop=()=>{
+    if(weekIngredientsToAdd.length===0)return;
+    saveShop([...shopList,...weekIngredientsToAdd.map(ing=>({id:Date.now()+Math.random(),name:ing.name,qty:ing.qty||"1",category:"Grocery",store:"",addedBy:"Meal Plan",checked:false,notes:""}))]);
+  };
   return(<>
     <MealDetailModal detailSlot={detailSlot} setDetailSlot={setDetailSlot} mealPlan={mealPlan} mealDetails={mealDetails} shopList={shopList} saveDetails={saveDetails} saveShop={saveShop} onClearMeal={clearCell} onSaveFavorite={saveFavorite} shopSettings={shopSettings} S={S}/>
     {(pendS.length>0||pendR.length>0)&&<div style={{...S.alert(GOLD),marginBottom:14}}><span style={{color:GOLD,fontWeight:"bold"}}>★ {pendS.length+pendR.length} pending request{pendS.length+pendR.length!==1?"s":""} from the kids — </span><span style={{color:S.T.sub,fontSize:13}}>scroll down to review</span></div>}
@@ -810,6 +895,7 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
           <button style={{...S.btnGhost,padding:"7px 14px",fontSize:15,lineHeight:1}} onClick={()=>setWk(weekKeyOffset(wk,1))}>›</button>
           {!isCur&&<button style={{...S.btnGhost,padding:"7px 12px",fontSize:12}} onClick={()=>setWk(curWk)}>Back to Today</button>}
         </div>
+        <button style={{...S.btn("#4CAF50"),padding:"7px 14px",fontSize:12}} onClick={addWeekIngredientsToShop} disabled={weekIngredientsToAdd.length===0}>🛒 Add This Week's Ingredients{weekIngredientsToAdd.length>0?` (${weekIngredientsToAdd.length})`:""}</button>
         <div style={{fontSize:11,color:S.T.sub}}>{isPast?"Browsing past menus — edits still save":"Click a meal name to add ingredients or a recipe"}</div>
       </div>
       <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:620}}>
@@ -1184,7 +1270,72 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
   </div>);
 }
 
+// ── ALLOWANCE / PIGGY BANK ─────────────────────────────────────────────────────
+// A kid's own spending-money balance — separate from BradynLedger, which
+// tracks what Bradyn owes Brad for bills, not money that's his to spend.
+// Chore points (from completed one-off chores) can be redeemed into it at
+// POINT_VALUE per point; parents can also credit/debit it directly.
+// fmt() rounds to whole dollars and drops the sign — fine for bills (always
+// positive, whole-dollar), wrong here where redeemed points and spending
+// need cents and a debit needs to actually show as negative.
+const fmtCents=n=>(n<0?"-$":"$")+Math.abs(n).toFixed(2);
+function AllowanceCard({kidKey,kidLabel,kidColor,log,setLog,chores,setChores,S,isParent}){
+  const [amt,setAmt]=useState(""),[note,setNote]=useState("");
+  const myLog=(log||{})[kidKey]||[];
+  const balance=myLog.reduce((s,e)=>s+e.amount,0);
+  const saveLog=entries=>{const u={...(log||{}),[kidKey]:entries};setLog(u);store.save("fp2:allowance",u);};
+  const redeemable=(chores||[]).filter(c=>c.assignee===kidKey&&(!c.days||c.days.length===0)&&c.done&&(c.points||0)>0&&!c.redeemed).reduce((s,c)=>s+(c.points||0),0);
+  const redeemPoints=()=>{
+    if(redeemable<=0)return;
+    const amount=+(redeemable*POINT_VALUE).toFixed(2);
+    saveLog([{id:Date.now(),type:"redeem",amount,note:`Redeemed ${redeemable} chore point${redeemable!==1?"s":""}`,date:new Date().toLocaleDateString()},...myLog]);
+    const u=(chores||[]).map(c=>c.assignee===kidKey&&(!c.days||c.days.length===0)&&c.done&&(c.points||0)>0&&!c.redeemed?{...c,redeemed:true}:c);
+    setChores(u);store.save("fp2:chores",u);
+  };
+  const addEntry=sign=>{
+    const v=parseFloat(amt);
+    if(!v||v<=0)return;
+    saveLog([{id:Date.now(),type:sign>0?"credit":"debit",amount:sign*v,note:note.trim()||(sign>0?"Added":"Spent"),date:new Date().toLocaleDateString()},...myLog]);
+    setAmt("");setNote("");
+  };
+  const del=id=>saveLog(myLog.filter(e=>e.id!==id));
+  return(<div style={S.card}>
+    <div style={{...S.row,marginBottom:12,flexWrap:"wrap",gap:8}}>
+      <div style={{fontSize:15,color:kidColor,fontWeight:"bold"}}>💰 {kidLabel}'s Piggy Bank</div>
+      <div style={{fontSize:22,color:balance>=0?"#4CAF50":"#f44336",fontFamily:"monospace",fontWeight:"bold"}}>{fmtCents(balance)}</div>
+    </div>
+    {redeemable>0&&<div style={{...S.alert(GOLD),display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+      <span style={{color:GOLD,fontSize:13}}>{redeemable} chore point{redeemable!==1?"s":""} ready to redeem — {fmtCents(redeemable*POINT_VALUE)}</span>
+      <button style={{...S.btn("#4CAF50"),padding:"6px 14px",fontSize:12}} onClick={redeemPoints}>Redeem</button>
+    </div>}
+    <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+      <input style={{...S.input,width:100}} type="number" placeholder="0.00" value={amt} onChange={e=>setAmt(e.target.value)}/>
+      <input style={{...S.input,flex:1,minWidth:120}} placeholder={isParent?"e.g. Weekly allowance":"What did you buy?"} value={note} onChange={e=>setNote(e.target.value)}/>
+      {isParent&&<button style={{...S.btn("#4CAF50"),padding:"8px 14px",fontSize:12}} onClick={()=>addEntry(1)}>+ Add</button>}
+      <button style={{...S.btn("#f44336"),padding:"8px 14px",fontSize:12}} onClick={()=>addEntry(-1)}>− Spend</button>
+    </div>
+    {myLog.length===0&&<div style={{fontSize:13,color:S.T.sub}}>No activity yet.</div>}
+    {myLog.length>0&&<div style={{maxHeight:220,overflowY:"auto"}}>
+      {myLog.map(e=><div key={e.id} style={{...S.row,padding:"6px 0",borderBottom:`1px solid ${S.T.border}`}}>
+        <div><div style={{fontSize:13,color:S.T.text}}>{e.note}</div><div style={{fontSize:11,color:S.T.sub}}>{e.date}</div></div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <span style={{fontFamily:"monospace",fontWeight:"bold",color:e.amount>=0?"#4CAF50":"#f44336"}}>{e.amount>=0?"+":""}{fmtCents(e.amount)}</span>
+          {isParent&&<button style={S.btnDanger} onClick={()=>del(e.id)}>✕</button>}
+        </div>
+      </div>)}
+    </div>}
+  </div>);
+}
+
+// Parent-facing view: all three kids' piggy banks in one tab.
+function AllowanceOverview({log,setLog,chores,setChores,S}){
+  const kids=[{key:"bradyn",label:"Bradyn",color:"#00d4ff"},{key:"parker",label:"Parker",color:"#b44fef"},{key:"ryder",label:"Ryder",color:"#ff6b35"}];
+  return(<div>
+    {kids.map(k=><AllowanceCard key={k.key} kidKey={k.key} kidLabel={k.label} kidColor={k.color} log={log} setLog={setLog} chores={chores} setChores={setChores} S={S} isParent/>)}
+  </div>);
+}
+
 export {
-  ChoresTab, KidChoreView, MessageBoard, SettingsTab, AdminPanel, BillCard,
-  SecHead, BillsTab, MealDetailModal, MealsTab, BradynLedger, TodoTab,
+  ChoresTab, KidChoreView, ChoreLeaderboard, MessageBoard, SettingsTab, AdminPanel, BillCard,
+  SecHead, BillsTab, MealDetailModal, MealsTab, BradynLedger, TodoTab, AllowanceCard, AllowanceOverview,
 };

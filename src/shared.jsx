@@ -4,6 +4,20 @@ import { store } from "./store";
 import { DAYS, DSHORT, MEAL_TYPES, GOLD, BORDER, THEMES, USERS, fmt, todayName, billPaid, weekKeyOf, dateOfWeekDay, S } from "./constants";
 import { MonthCalendar, UpcomingEvents, EventRow, CountdownStrip, WeeklyCelebrations, eventsOnDay, todayKey, fmtDayLong } from "./calendar";
 
+// ── SAVE STATUS — quiet unless there's actually something to worry about ──────
+// Stays invisible during normal saving/saved cycles; only surfaces once
+// store.js has a save it couldn't get through, so a lost connection doesn't
+// silently drop someone's edit.
+function SaveStatusBadge(){
+  const [status,setStatus]=useState({state:"idle",pending:0});
+  useEffect(()=>store.subscribe(setStatus),[]);
+  if(status.state!=="error"||!status.pending)return null;
+  return(<div style={{position:"fixed",bottom:10,left:10,zIndex:5000,background:"#3a1a0f",border:"1px solid #f4433677",borderRadius:10,padding:"8px 14px",display:"flex",alignItems:"center",gap:8,boxShadow:"0 4px 16px rgba(0,0,0,0.4)"}}>
+    <span style={{fontSize:14}}>⚠</span>
+    <span style={{fontSize:12,color:"#ffb3a3",fontFamily:"Georgia,serif"}}>{status.pending} change{status.pending!==1?"s":""} not saved — retrying...</span>
+  </div>);
+}
+
 function Ring({pct:p=0,size=80,stroke=8,color=GOLD,label,sub}){const r=(size-stroke)/2,circ=2*Math.PI*r,filled=circ*Math.min(p/100,1);return(<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}><div style={{position:"relative",width:size,height:size}}><svg width={size} height={size} style={{transform:"rotate(-90deg)"}}><circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#1a1a0f" strokeWidth={stroke}/><circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={`${filled} ${circ}`} style={{transition:"stroke-dasharray 0.6s"}}/></svg>{label&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:"bold",color}}>{label}</div>}</div>{sub&&<div style={{fontSize:10,color:"#888",textAlign:"center",maxWidth:80}}>{sub}</div>}</div>);}
 function Bar({value,max,color=GOLD,height=6}){return <div style={{background:"#1a1a0f",borderRadius:4,height,overflow:"hidden"}}><div style={{width:`${Math.min(value/Math.max(max,1)*100,100)}%`,height:"100%",background:color,borderRadius:4,transition:"width 0.5s"}}/></div>;}
 
@@ -502,5 +516,5 @@ function DayPills({selected,onToggle,S}){
 export {
   Ring, Bar, PinPad, ShoppingListView, LoginModal, WeatherStrip, WeatherScroll, FAMILY_CITIES, configureWeather, BillsBanner,
   PinnedAnnouncements, WeeklyChoreBoard, PersonalHomeScreen, UserHeader,
-  ThemePicker, PublicHomeScreen, DayPills,
+  ThemePicker, PublicHomeScreen, DayPills, SaveStatusBadge,
 };
