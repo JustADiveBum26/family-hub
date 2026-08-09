@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { store } from "./store";
 import { D, DAYS, CATS, S, GOLD, TIMEOUT_MS, scoreToRate, calcMortgage, weekKeyOf, weekKeyOffset, normalizeWeek } from "./constants";
-import { LoginModal, PublicHomeScreen, SaveStatusBadge } from "./shared";
+import { LoginModal, PublicHomeScreen, SaveStatusBadge, VersionBadge } from "./shared";
 import { BradDashboard, MaryBethDashboard, BradynDashboard, ParkerTab, RyderTab } from "./dashboards";
 import { TVDisplay } from "./tv";
 
@@ -160,6 +160,7 @@ export default function App(){
 
   return(<div style={S.page}>
     <SaveStatusBadge/>
+    <VersionBadge/>
     {loginTarget&&<LoginModal user={loginTarget} auth={auth} onSuccess={pwd=>handleLoginSuccess(loginTarget,pwd)} onClose={()=>setLoginTarget(null)}/>}
     {!currentUser&&tvMode&&<TVDisplay mealPlan={mealPlan} nextWeekPlan={nextWeekPlan} events={events} shopList={shopList} bills={bills} messages={messages} chores={chores} appSettings={appSettings} onExit={exitTv} onLogin={k=>{exitTv();setLoginTarget(k);}} onRefresh={loadAll}/>}
     {!currentUser&&!tvMode&&<PublicHomeScreen mealPlan={mealPlan} shopList={shopList} setShopList={setShopList} bills={bills} expenses={expenses} onLogin={handleLogin} appSettings={appSettings} messages={messages} shopSettings={shopSettings} events={events} onTv={enterTv}/>}

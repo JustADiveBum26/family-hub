@@ -13,6 +13,9 @@ const TIMEOUT_MS=5*60*1000;
 // $ credited per chore point when a kid redeems completed chores into their
 // allowance balance (AllowanceCard in family.jsx).
 const POINT_VALUE=0.10;
+// Bumped by hand alongside each commit's "vNN: ..." message, so the number
+// shown in the app (VersionBadge in shared.jsx) always matches git history.
+const APP_VERSION="54";
 
 const THEMES={
   dark:{bg:"#0d0d08",card:"#141410",border:"#2a2a18",text:"#e8e0c8",sub:"#888",accent:GOLD,name:"Dark Gold"},
@@ -105,7 +108,7 @@ const S=makeS("dark");
 
 export {
   DAYS, DSHORT, MEAL_TYPES, CATS, ACCT_TYPES, DEBT_TYPES, BILL_CATS, SHOP_CATS,
-  CHORE_MASTER, GOLD, DARK, MID, BORDER, TIMEOUT_MS, POINT_VALUE, THEMES, USERS,
+  CHORE_MASTER, GOLD, DARK, MID, BORDER, TIMEOUT_MS, POINT_VALUE, APP_VERSION, THEMES, USERS,
   blankMealPlan, D, fmt, calcMortgage, scoreToRate, calcPayoff, todayName, billPaid,
   weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek,
   getTheme, makeS, S,

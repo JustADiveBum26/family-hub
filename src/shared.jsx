@@ -1,7 +1,7 @@
 // ── Shared UI components (login, home screens, widgets) ───────────────────────
 import { useState, useEffect } from "react";
 import { store } from "./store";
-import { DAYS, DSHORT, MEAL_TYPES, GOLD, BORDER, THEMES, USERS, fmt, todayName, billPaid, weekKeyOf, dateOfWeekDay, S } from "./constants";
+import { DAYS, DSHORT, MEAL_TYPES, GOLD, BORDER, THEMES, USERS, APP_VERSION, fmt, todayName, billPaid, weekKeyOf, dateOfWeekDay, S } from "./constants";
 import { MonthCalendar, UpcomingEvents, CountdownStrip, WeeklyCelebrations, EventDetailPopup } from "./calendar";
 
 // ── SAVE STATUS — quiet unless there's actually something to worry about ──────
@@ -15,6 +15,17 @@ function SaveStatusBadge(){
   return(<div style={{position:"fixed",bottom:10,left:10,zIndex:5000,background:"#3a1a0f",border:"1px solid #f4433677",borderRadius:10,padding:"8px 14px",display:"flex",alignItems:"center",gap:8,boxShadow:"0 4px 16px rgba(0,0,0,0.4)"}}>
     <span style={{fontSize:14}}>⚠</span>
     <span style={{fontSize:12,color:"#ffb3a3",fontFamily:"Georgia,serif"}}>{status.pending} change{status.pending!==1?"s":""} not saved — retrying...</span>
+  </div>);
+}
+
+// ── VERSION BADGE — small, quiet corner tag so it's easy to confirm which
+// build is actually loaded (handy right after a deploy, or on a stale tab).
+// __BUILD_DATE__ is stamped in by vite.config.js at build time.
+function VersionBadge(){
+  const built=typeof __BUILD_DATE__!=="undefined"?new Date(__BUILD_DATE__):null;
+  const label=built?built.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):"";
+  return(<div style={{position:"fixed",bottom:10,right:10,zIndex:50,fontSize:10,color:"#555",fontFamily:"monospace",letterSpacing:"0.05em",pointerEvents:"none",opacity:0.6}}>
+    v{APP_VERSION}{label?` · updated ${label}`:""}
   </div>);
 }
 
@@ -412,5 +423,5 @@ function DayPills({selected,onToggle,S}){
 export {
   Ring, Bar, PinPad, ShoppingListView, LoginModal, WeatherScroll, FAMILY_CITIES, BillsBanner,
   PinnedAnnouncements, WeeklyChoreBoard, PersonalHomeScreen, UserHeader,
-  ThemePicker, PublicHomeScreen, DayPills, SaveStatusBadge,
+  ThemePicker, PublicHomeScreen, DayPills, SaveStatusBadge, VersionBadge,
 };
