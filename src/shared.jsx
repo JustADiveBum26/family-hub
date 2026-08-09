@@ -226,10 +226,10 @@ function WeatherStrip({big}){
 
 // ── FAMILY WEATHER SCROLL — TV wall display, rotates through where everyone lives ──
 const FAMILY_CITIES=[
-  {name:"Columbia, MO",lat:38.9517,lon:-92.3341},
-  {name:"Blue Springs, MO",lat:39.0169,lon:-94.2816},
-  {name:"Huntington, WV",lat:38.4192,lon:-82.4452},
-  {name:"Atlanta, GA",lat:33.7490,lon:-84.3880},
+  {name:"CoMo",lat:38.9517,lon:-92.3341},
+  {name:"KC",lat:39.0169,lon:-94.2816},
+  {name:"WV",lat:38.4192,lon:-82.4452},
+  {name:"Atlanta",lat:33.7490,lon:-84.3880},
 ];
 // Keyed by lat,lon rather than the shared weatherLoc singleton above — these
 // four are fixed regardless of whatever location the family has set for their
