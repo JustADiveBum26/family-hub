@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { store } from "./store";
 import { D, DAYS, CATS, S, GOLD, TIMEOUT_MS, scoreToRate, calcMortgage, weekKeyOf, weekKeyOffset, normalizeWeek } from "./constants";
-import { LoginModal, PublicHomeScreen, configureWeather, SaveStatusBadge } from "./shared";
+import { LoginModal, PublicHomeScreen, SaveStatusBadge } from "./shared";
 import { BradDashboard, MaryBethDashboard, BradynDashboard, ParkerTab, RyderTab } from "./dashboards";
 import { TVDisplay } from "./tv";
 
@@ -47,7 +47,7 @@ export default function App(){
   const timerRef=useRef(null);
 
   const loadAll=useCallback(async()=>{
-    const [p,a,d,e,g,t,ps,bl,mp,sl,ms,sr,au,ch,mg,bh,as,md,ss,pa,bn,evts,mps,mf,wloc,td,stp,cl,al]=await Promise.all([
+    const [p,a,d,e,g,t,ps,bl,mp,sl,ms,sr,au,ch,mg,bh,as,md,ss,pa,bn,evts,mps,mf,td,stp,cl,al]=await Promise.all([
       store.load("fp2:profile",D.profile),store.load("fp2:accounts",D.accounts),
       store.load("fp2:debts",D.debts),store.load("fp2:expenses",D.expenses),
       store.load("fp2:goals",D.goals),store.load("fp2:transactions",D.transactions),
@@ -62,7 +62,6 @@ export default function App(){
       store.load("fp2:events",[]),
       store.load("fp2:mealPlans",null),
       store.load("fp2:mealFavs",[]),
-      store.load("fp2:weatherLoc",null),
       store.load("fp2:todos",D.todos),
       store.load("fp2:shopStaples",[]),
       store.load("fp2:choreLog",D.choreLog||[]),
@@ -92,7 +91,6 @@ export default function App(){
     setTodos({...D.todos,...(td||{})});
     setChoreLog(cl||[]);
     setAllowance(al||{});
-    if(wloc)configureWeather(wloc);
     setLoaded(true);
   },[]);
   useEffect(()=>{loadAll();},[loadAll]);

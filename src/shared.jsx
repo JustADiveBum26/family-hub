@@ -121,119 +121,20 @@ function LoginModal({user,auth,onSuccess,onClose}){
   return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}><div style={{background:"#141410",border:`2px solid ${u.color}44`,borderRadius:16,padding:32,maxWidth:380,width:"100%"}} onClick={e=>e.stopPropagation()}><div style={{textAlign:"center",marginBottom:24}}><div style={{fontSize:44,marginBottom:6}}>{u.emoji}</div><div style={{fontSize:22,color:"#e8e0c8",marginBottom:4}}>{isFirst&&!isPin?`Welcome, ${u.label}!`:`Hey ${u.label}!`}</div><div style={{fontSize:13,color:"#666"}}>{isFirst&&!isPin?"Create your password to get started":isPin?pinNotSet?"Your PIN has not been set — ask Brad!":"Enter your 4-digit code":"Enter your password"}</div></div>{isPin&&!pinNotSet&&<PinPad onSubmit={submitPin} color={u.color} error={pinErr}/>}{isPin&&pinNotSet&&<div style={{textAlign:"center",padding:"20px 0",color:"#666",fontSize:14}}>Ask Brad to set your code!</div>}{!isPin&&<div><div style={{marginBottom:12}}><div style={S.label}>{isFirst?"Create Password":"Password"}</div><input autoFocus style={S.input} type="password" value={pwd} onChange={e=>{setPwd(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&submitPwd()}/></div>{isFirst&&<div style={{marginBottom:12}}><div style={S.label}>Confirm Password</div><input style={S.input} type="password" value={confirm} onChange={e=>{setConfirm(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&submitPwd()}/></div>}{error&&<div style={{color:"#f44336",fontSize:12,marginBottom:10}}>{error}</div>}<button style={{...S.btn(u.color),width:"100%",padding:"11px",fontSize:15,marginTop:4}} onClick={submitPwd}>{isFirst?"Create Password and Sign In":"Sign In"}</button></div>}<button onClick={onClose} style={{...S.btnGhost,width:"100%",marginTop:12,textAlign:"center"}}>Cancel</button></div></div>);
 }
 
-// ── WEATHER STRIP — current conditions + rest-of-week forecast ────────────────
-// Location comes from a family-wide saved home location (fp2:weatherLoc, set
-// once from the "📍 Set weather location" button); browser geolocation is only
-// a fallback. This matters because denied permission prompts and TV browsers
-// with no geolocation used to make the widget silently disappear.
-// One shared module-level cache: every header/view reuses the same fetch and it
-// refreshes at most every 30 minutes.
-let weatherCache={at:0,data:null,promise:null};
-let weatherLoc=null;
-const configureWeather=loc=>{
-  if(loc&&loc.lat!=null&&loc.lon!=null){
-    const changed=!weatherLoc||weatherLoc.lat!==loc.lat||weatherLoc.lon!==loc.lon;
-    weatherLoc=loc;
-    if(changed)weatherCache={at:0,data:null,promise:null};
-  }
-};
+// ── FAMILY WEATHER SCROLL — rotates through where everyone lives ──────────────
+// Used everywhere in the app that shows weather (was previously a single
+// saved-location WeatherStrip per screen; now every screen shows the same
+// family-wide rotation the TV display uses).
 const wxIcon=code=>code===0?"☀️":code<=2?"🌤":code<=3?"☁️":code<=48?"🌫":code<=57?"🌧":code<=67?"🌧":code<=77?"❄️":code<=82?"🌦":code<=86?"🌨":"⛈";
 const wxDesc=code=>code===0?"Clear":code<=2?"Partly Cloudy":code<=3?"Cloudy":code<=48?"Foggy":code<=67?"Rainy":code<=77?"Snowy":code<=82?"Showers":"Stormy";
-function loadWeather(){
-  if(weatherCache.data&&Date.now()-weatherCache.at<30*60*1000)return Promise.resolve(weatherCache.data);
-  if(weatherCache.promise)return weatherCache.promise;
-  weatherCache.promise=(async()=>{
-    let lat,lon;
-    if(weatherLoc){({lat,lon}=weatherLoc);}
-    else{
-      const pos=await new Promise((res,rej)=>{
-        if(!navigator.geolocation)return rej(new Error("no geolocation"));
-        navigator.geolocation.getCurrentPosition(res,rej,{timeout:8000});
-      });
-      lat=pos.coords.latitude;lon=pos.coords.longitude;
-    }
-    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,windspeed_10m&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=auto&forecast_days=7`);
-    const d=await r.json();
-    const data={
-      place:weatherLoc?.name||"",
-      current:{temp:Math.round(d.current.temperature_2m),icon:wxIcon(d.current.weathercode),desc:wxDesc(d.current.weathercode),wind:Math.round(d.current.windspeed_10m)},
-      days:(d.daily?.time||[]).map((t,i)=>({date:t,day:new Date(t+"T12:00:00").toLocaleDateString("en-US",{weekday:"short"}),icon:wxIcon(d.daily.weathercode[i]),hi:Math.round(d.daily.temperature_2m_max[i]),lo:Math.round(d.daily.temperature_2m_min[i]),rain:d.daily.precipitation_probability_max?.[i]??null})),
-    };
-    weatherCache={at:Date.now(),data,promise:null};
-    return data;
-  })();
-  weatherCache.promise.catch(()=>{weatherCache.promise=null;});
-  return weatherCache.promise;
-}
-function WeatherStrip({big}){
-  const [wx,setWx]=useState(weatherCache.data);
-  const [failed,setFailed]=useState(false);
-  const [showSearch,setShowSearch]=useState(false);
-  const [q,setQ]=useState(""),[results,setResults]=useState(null),[searching,setSearching]=useState(false);
-  useEffect(()=>{let live=true;loadWeather().then(d=>{if(live){setWx(d);setFailed(false);}}).catch(()=>{if(live)setFailed(true);});return()=>{live=false;};},[]);
-  const search=async()=>{
-    if(!q.trim())return;
-    setSearching(true);
-    try{
-      const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q.trim())}&count=5&language=en&format=json`);
-      const d=await r.json();
-      setResults(d.results||[]);
-    }catch(e){setResults([]);}
-    setSearching(false);
-  };
-  const pick=res=>{
-    const loc={name:res.name+(res.admin1?", "+res.admin1:""),lat:res.latitude,lon:res.longitude};
-    store.save("fp2:weatherLoc",loc);
-    configureWeather(loc);
-    setShowSearch(false);setQ("");setResults(null);
-    loadWeather().then(d=>{setWx(d);setFailed(false);}).catch(()=>setFailed(true));
-  };
-  // No data yet: show the fix-it button on failure (never disappear silently).
-  if(!wx){
-    if(!failed)return null;
-    return(<div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",padding:"6px 12px",background:"rgba(255,255,255,0.04)",borderRadius:12,border:"1px solid rgba(255,255,255,0.09)"}}>
-      {!showSearch&&<button onClick={()=>setShowSearch(true)} style={{background:"transparent",border:"1px dashed rgba(255,255,255,0.25)",borderRadius:8,padding:"7px 14px",color:"#aaa",fontFamily:"Georgia,serif",fontSize:13,cursor:"pointer"}}>📍 Set weather location</button>}
-      {showSearch&&<>
-        <input autoFocus value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==="Enter"&&search()} placeholder="City name..." style={{background:"rgba(0,0,0,0.4)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:8,padding:"7px 12px",color:"#e8e0c8",fontFamily:"Georgia,serif",fontSize:13,outline:"none",width:150}}/>
-        <button onClick={search} style={{background:"#C9A84C",border:"none",borderRadius:8,padding:"7px 14px",color:"#0d0d08",fontWeight:"bold",fontFamily:"Georgia,serif",fontSize:13,cursor:"pointer"}}>{searching?"...":"Search"}</button>
-        {results&&results.length===0&&<span style={{fontSize:12,color:"#888"}}>No matches</span>}
-        {results&&results.map(r=><button key={r.id||r.latitude+","+r.longitude} onClick={()=>pick(r)} style={{background:"rgba(201,168,76,0.15)",border:"1px solid rgba(201,168,76,0.4)",borderRadius:8,padding:"6px 12px",color:"#C9A84C",fontFamily:"Georgia,serif",fontSize:12,cursor:"pointer"}}>{r.name}{r.admin1?", "+r.admin1:""}</button>)}
-      </>}
-    </div>);
-  }
-  const fs=big?{t:36,d:15,day:13,hilo:15,ic:34,cic:48,cell:78,gap:12,pad:"14px 20px"}:{t:17,d:10,day:9,hilo:11,ic:17,cic:24,cell:46,gap:4,pad:"6px 12px"};
-  return(<div style={{display:"flex",alignItems:"center",gap:big?18:10,padding:fs.pad,background:"rgba(255,255,255,0.04)",borderRadius:big?16:12,border:"1px solid rgba(255,255,255,0.09)",overflowX:"auto",WebkitOverflowScrolling:"touch",maxWidth:"100%"}}>
-    <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-      <span style={{fontSize:fs.cic}}>{wx.current.icon}</span>
-      <div>
-        <div style={{fontSize:fs.t,fontWeight:"bold",color:"#e8e0c8",lineHeight:1.05}}>{wx.current.temp}°</div>
-        <div style={{fontSize:fs.d,color:"#888",whiteSpace:"nowrap"}}>{wx.current.desc}</div>
-      </div>
-    </div>
-    <div style={{width:1,alignSelf:"stretch",background:"rgba(255,255,255,0.1)",flexShrink:0}}/>
-    <div style={{display:"flex",gap:fs.gap}}>
-      {wx.days.slice(0,7).map((d,i)=>(
-        <div key={d.date} style={{textAlign:"center",minWidth:fs.cell,flexShrink:0}}>
-          <div style={{fontSize:fs.day,color:i===0?"#e8e0c8":"#777",fontFamily:"monospace"}}>{i===0?"TODAY":d.day.toUpperCase()}</div>
-          <div style={{fontSize:fs.ic,lineHeight:1.25}}>{d.icon}</div>
-          <div style={{fontSize:fs.hilo,color:"#e8e0c8",whiteSpace:"nowrap"}}>{d.hi}°<span style={{color:"#666"}}> {d.lo}°</span></div>
-          {d.rain!=null&&d.rain>=20&&<div style={{fontSize:fs.day,color:"#4a9eff"}}>💧{d.rain}%</div>}
-        </div>
-      ))}
-    </div>
-  </div>);
-}
-
-// ── FAMILY WEATHER SCROLL — TV wall display, rotates through where everyone lives ──
 const FAMILY_CITIES=[
   {name:"CoMo",lat:38.9517,lon:-92.3341},
   {name:"KC",lat:39.0169,lon:-94.2816},
   {name:"WV",lat:38.4192,lon:-82.4452},
   {name:"Atlanta",lat:33.7490,lon:-84.3880},
 ];
-// Keyed by lat,lon rather than the shared weatherLoc singleton above — these
-// four are fixed regardless of whatever location the family has set for their
-// own personal dashboards.
+// One cache per city (keyed by lat,lon), shared across every screen so they
+// all reuse the same fetch instead of hitting the API independently.
 const cityWxCache={};
 function loadCityWeather(loc){
   const key=loc.lat+","+loc.lon;
@@ -439,7 +340,7 @@ function UserHeader({user,onLogout,extra,children,S}){
     <div style={{maxWidth:1400,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:8}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:24}}>{u.emoji}</span><div><div style={{fontSize:9,color:"#444",fontFamily:"monospace",letterSpacing:"0.2em"}}>FAMILY HUB</div><div style={{fontSize:15,color:"#e8e0c8"}}>{u.label}</div></div></div>
-        <WeatherStrip/>
+        <WeatherScroll/>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>{extra}<button onClick={onLogout} style={{...S.btnGhost,fontSize:12}}>Sign Out</button></div>
       </div>
       {children}
@@ -469,7 +370,7 @@ function PublicHomeScreen({mealPlan,shopList,setShopList,bills,expenses,onLogin,
       <div style={{maxWidth:1300,margin:"0 auto"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
           <div><div style={{fontSize:9,color:"#555",letterSpacing:"0.28em",fontFamily:"monospace"}}>THE</div><h1 style={{margin:"1px 0 0",fontSize:26,fontWeight:"normal",color:"#e8e0c8"}}>Family <span style={{color:GOLD}}>Hub</span></h1><div style={{fontSize:11,color:"#444",fontFamily:"monospace"}}>Brad & Mary Beth</div></div>
-          <WeatherStrip/>
+          <WeatherScroll/>
           <div style={{textAlign:"right"}}><div style={{fontSize:10,color:"#444",fontFamily:"monospace",letterSpacing:"0.12em"}}>TONIGHT</div><div style={{fontSize:16,color:tonightDinner?GOLD:"#333",marginTop:2,fontStyle:tonightDinner?"normal":"italic"}}>{tonightDinner||"Nothing planned"}</div><div style={{fontSize:11,color:"#555",marginTop:3}}>{today.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</div></div>
         </div>
       </div>
@@ -509,7 +410,7 @@ function DayPills({selected,onToggle,S}){
 }
 
 export {
-  Ring, Bar, PinPad, ShoppingListView, LoginModal, WeatherStrip, WeatherScroll, FAMILY_CITIES, configureWeather, BillsBanner,
+  Ring, Bar, PinPad, ShoppingListView, LoginModal, WeatherScroll, FAMILY_CITIES, BillsBanner,
   PinnedAnnouncements, WeeklyChoreBoard, PersonalHomeScreen, UserHeader,
   ThemePicker, PublicHomeScreen, DayPills, SaveStatusBadge,
 };

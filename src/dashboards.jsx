@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { store } from "./store";
 import { DAYS, MEAL_TYPES, GOLD, fmt, makeS } from "./constants";
-import { ShoppingListView, UserHeader, ThemePicker, PersonalHomeScreen, BillsBanner, WeatherStrip } from "./shared";
+import { ShoppingListView, UserHeader, ThemePicker, PersonalHomeScreen, BillsBanner, WeatherScroll } from "./shared";
 import { ChoresTab, KidChoreView, MessageBoard, SettingsTab, AdminPanel, BillsTab, MealDetailModal, MealsTab, BradynLedger, TodoTab, AllowanceCard, AllowanceOverview } from "./family";
 import { AccountsTab, DebtsTab, BudgetTab, GoalsTab, StatementsTab, ScenariosTab, PslfTab, DashboardTab } from "./finance";
 import { CalendarTab, WeeklyCelebrations } from "./calendar";
@@ -45,7 +45,7 @@ function BradynDashboard({mealPlan,shopList,setShopList,shopRequests,setShopRequ
       <div style={{display:"flex",gap:8,alignItems:"center"}}>{TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{...bS.btnGhost,borderBottom:tab===t.id?`2px solid ${C.accent}`:"2px solid transparent",borderRadius:0,color:tab===t.id?C.accent:C.sub,padding:"6px 10px",fontSize:12}}>{t.icon} {t.label}</button>)}<button onClick={()=>setShowShopView(true)} style={{...bS.btnGhost,fontSize:12,padding:"6px 10px"}}>🛒</button><button onClick={onLogout} style={{...bS.btnGhost,fontSize:12}}>Sign Out ↩</button></div>
     </div>
     <div style={{maxWidth:900,margin:"0 auto",padding:16}}>
-      <div style={{marginBottom:12}}><WeatherStrip/></div>
+      <div style={{marginBottom:12}}><WeatherScroll/></div>
       {tab==="home"&&<>
       <WeeklyCelebrations events={events} S={bS} setEvents={setEvents} canEdit currentUser="bradyn"/>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:14}}>
@@ -117,7 +117,7 @@ function ParkerTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMea
       <div style={{display:"flex",gap:6,alignItems:"center"}}>{TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{...pBtnG,color:tab===t.id?"#b44fef":"#7a6aaa",borderColor:tab===t.id?"rgba(180,79,239,0.6)":"rgba(180,79,239,0.2)"}}>{t.label}</button>)}<button onClick={onLogout} style={pBtnG}>Sign Out ↩</button></div>
     </div>
     <div style={{maxWidth:800,margin:"0 auto",padding:16}}>
-      <div style={{marginBottom:12}}><WeatherStrip/></div>
+      <div style={{marginBottom:12}}><WeatherScroll/></div>
       {tab==="home"&&<div>
         <WeeklyCelebrations events={events} S={pS} setEvents={setEvents} currentUser="parker"/>
         <div style={pS.card}>
@@ -178,7 +178,7 @@ function RyderTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMeal
       <div style={{display:"flex",gap:6,alignItems:"center"}}>{TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{background:"transparent",border:`1px solid ${tab===t.id?"rgba(255,107,53,0.6)":"rgba(255,107,53,0.2)"}`,borderRadius:6,padding:"8px 14px",color:tab===t.id?"#ff6b35":"#887766",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:15}}>{t.label}</button>)}<button onClick={onLogout} style={{background:"transparent",border:"1px solid rgba(255,107,53,0.2)",borderRadius:6,padding:"8px 14px",color:"#887766",cursor:"pointer",fontFamily:"Georgia,serif",fontSize:15}}>Sign Out ↩</button></div>
     </div>
     <div style={{maxWidth:800,margin:"0 auto",padding:16}}>
-      <div style={{marginBottom:12}}><WeatherStrip/></div>
+      <div style={{marginBottom:12}}><WeatherScroll/></div>
       {tab==="home"&&<>
         {flash&&<div style={{textAlign:"center",padding:"14px 0",marginBottom:10}}><div style={{fontSize:48,marginBottom:4}}>{flash==="meal"?"🎉":"✅"}</div><div style={{fontSize:18,color:flash==="meal"?"#ff6b35":"#4cdf7a",fontWeight:"bold"}}>{flash==="meal"?"Sent to Mom & Dad!":"Added to the list!"}</div></div>}
         <div style={{textAlign:"center",marginBottom:16}}><div style={{fontSize:44,marginBottom:2}}>🌟</div><div style={{fontSize:30,fontWeight:"bold",color:"#ff6b35"}}>Hey Ryder!</div></div>
