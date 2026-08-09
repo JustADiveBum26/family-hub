@@ -15,10 +15,13 @@ const EVENT_CATS=[
   {key:"anniversary",label:"Anniversary",emoji:"💍"},
   {key:"work",label:"Work",emoji:"💼"},
   {key:"school",label:"School",emoji:"🎒"},
-  {key:"sports",label:"Sports",emoji:"🏈"},
+  {key:"sports",label:"Sports",emoji:"⚽"},
   {key:"appointment",label:"Appointment",emoji:"🩺"},
   {key:"activity",label:"Activity",emoji:"🎉"},
   {key:"trip",label:"Trip",emoji:"✈️"},
+  {key:"holiday",label:"Holiday",emoji:"🎆"},
+  {key:"concert",label:"Concert",emoji:"🎤"},
+  {key:"movie",label:"Movie / Show",emoji:"🎬"},
   {key:"other",label:"Other",emoji:"📌"},
 ];
 const WEEK_HEAD=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];

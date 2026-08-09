@@ -1,4 +1,5 @@
 // ── Shared constants, defaults, and style helpers ─────────────────────────────
+import { store } from "./store";
 const DAYS=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const DSHORT=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const MEAL_TYPES=["Breakfast","Lunch","Dinner"];
@@ -15,7 +16,7 @@ const TIMEOUT_MS=5*60*1000;
 const POINT_VALUE=0.10;
 // Bumped by hand alongside each commit's "vNN: ..." message, so the number
 // shown in the app (VersionBadge in shared.jsx) always matches git history.
-const APP_VERSION="54";
+const APP_VERSION="55";
 
 const THEMES={
   dark:{bg:"#0d0d08",card:"#141410",border:"#2a2a18",text:"#e8e0c8",sub:"#888",accent:GOLD,name:"Dark Gold"},
@@ -78,6 +79,42 @@ const dateOfWeekDay=(wk,dayIdx)=>{const d=new Date(wk+"T12:00:00");d.setDate(d.g
 const weekLabel=wk=>{const s=dateOfWeekDay(wk,0),e=dateOfWeekDay(wk,6);return s.toLocaleDateString("en-US",{month:"short",day:"numeric"})+" – "+e.toLocaleDateString("en-US",{month:"short",day:"numeric"});};
 const normalizeWeek=p=>Object.fromEntries(DAYS.map(dy=>[dy,{Breakfast:p?.[dy]?.Breakfast||"",Lunch:p?.[dy]?.Lunch||"",Dinner:p?.[dy]?.Dinner||""}]));
 
+// ── Chore completion — dated, per-current-week ────────────────────────────────
+// Chore "done" checkboxes are keyed by ISO date (not just weekday name) so a
+// chore marked done this Monday doesn't still show as done next Monday —
+// otherwise the box (and the leaderboard streak built from choreLog) would
+// never actually reset week to week.
+const todayISO=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;};
+const isoDateForDayName=(dayName)=>{
+  const idx=DAYS.indexOf(dayName);
+  const d=new Date();
+  d.setDate(d.getDate()-((d.getDay()+6)%7)+idx);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+};
+// Dated history behind streaks/leaderboard — the source of truth for "what got
+// done when," independent of (and unaffected by) the donedays checkbox state.
+const logChoreDone=(choreLog,setChoreLog,{choreId,assignee,points,task,date})=>{
+  const entry={id:Date.now()+Math.random(),choreId,assignee,points:points||0,task,date:date||todayISO()};
+  const u=[entry,...(choreLog||[])].slice(0,500);
+  setChoreLog(u);store.save("fp2:choreLog",u);
+};
+const unlogChoreDone=(choreLog,setChoreLog,choreId,date)=>{
+  const target=date||todayISO();
+  const u=(choreLog||[]).filter(e=>!(e.choreId===choreId&&e.date===target));
+  setChoreLog(u);store.save("fp2:choreLog",u);
+};
+
+// Advances a "YYYY-MM-DD" date string by one month, clamping month-end
+// overflow (e.g. Jan 31 -> Feb 28) to the last day of the target month.
+const addMonthToDate=(dateStr)=>{
+  if(!dateStr)return dateStr;
+  const d=new Date(dateStr+"T12:00:00");
+  const day=d.getDate();
+  d.setMonth(d.getMonth()+1);
+  if(d.getDate()!==day)d.setDate(0);
+  return d.toISOString().slice(0,10);
+};
+
 function getTheme(k){return THEMES[k]||THEMES.dark;}
 function makeS(theme,scale=1.15){
   const T=getTheme(theme);
@@ -111,5 +148,6 @@ export {
   CHORE_MASTER, GOLD, DARK, MID, BORDER, TIMEOUT_MS, POINT_VALUE, APP_VERSION, THEMES, USERS,
   blankMealPlan, D, fmt, calcMortgage, scoreToRate, calcPayoff, todayName, billPaid,
   weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek,
+  todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate,
   getTheme, makeS, S,
 };

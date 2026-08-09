@@ -1,25 +1,8 @@
 // ── Family features: chores, message board, settings, bills, meals, ledger ────
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { store } from "./store";
-import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, POINT_VALUE, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek } from "./constants";
+import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, POINT_VALUE, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate } from "./constants";
 import { DayPills } from "./shared";
-
-// ── CHORE COMPLETION LOG — dated history behind streaks/leaderboard ──────────
-// Chores themselves only track a per-weekday-name "done" flag (donedays), not
-// which actual date it was done on, so it can't tell "done this Monday" from
-// "done three Mondays ago." This log is the dated record that makes real
-// streaks/weekly totals possible without changing how chores themselves work.
-const todayISO=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;};
-const logChoreDone=(choreLog,setChoreLog,{choreId,assignee,points,task})=>{
-  const entry={id:Date.now()+Math.random(),choreId,assignee,points:points||0,task,date:todayISO()};
-  const u=[entry,...(choreLog||[])].slice(0,500);
-  setChoreLog(u);store.save("fp2:choreLog",u);
-};
-const unlogChoreDone=(choreLog,setChoreLog,choreId)=>{
-  const today=todayISO();
-  const u=(choreLog||[]).filter(e=>!(e.choreId===choreId&&e.date===today));
-  setChoreLog(u);store.save("fp2:choreLog",u);
-};
 
 // ── CHORE LEADERBOARD — this week's points + a daily-completion streak ───────
 function ChoreLeaderboard({chores,choreLog,S}){
@@ -139,7 +122,7 @@ function ChoresTab({chores,setChores,choreLog,setChoreLog,appSettings,S,currentU
                 </div>
                 <div style={{display:"flex",gap:6}}><button style={{...S.btn("#4CAF50"),padding:"5px 12px",fontSize:12}} onClick={()=>saveEdit(c.id)}>Save</button><button style={{...S.btnGhost,padding:"5px 10px",fontSize:12}} onClick={()=>setEditingId(null)}>Cancel</button></div>
               </div>);
-              const doneToday=(c.donedays||{})[tn];
+              const doneToday=(c.donedays||{})[todayISO()];
               const schedToday=c.days.includes(tn);
               return(<div key={c.id} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"flex-start"}}>
                 <div style={{flex:1}}>
@@ -194,10 +177,11 @@ function KidChoreView({chores,setChores,choreLog,setChoreLog,userKey,userName,us
   const toggleDayDone=(id,day)=>{
     const c=chores.find(x=>x.id===id);
     if(!c)return;
-    const nowDone=!(c.donedays||{})[day];
+    const dateKey=isoDateForDayName(day);
+    const nowDone=!(c.donedays||{})[dateKey];
     save(chores.map(x=>{
       if(x.id!==id)return x;
-      const dd={...(x.donedays||{}),[day]:nowDone};
+      const dd={...(x.donedays||{}),[dateKey]:nowDone};
       return{...x,donedays:dd};
     }));
     if(nowDone)logChoreDone(choreLog,setChoreLog,{choreId:c.id,assignee:c.assignee,points:c.points,task:c.task});
@@ -208,7 +192,7 @@ function KidChoreView({chores,setChores,choreLog,setChoreLog,userKey,userName,us
     {recurring.length>0&&<div style={S.card}>
       <div style={S.h2}>My Weekly Chores</div>
       {recurring.map(c=>{
-        const doneToday=(c.donedays||{})[tn];
+        const doneToday=(c.donedays||{})[todayISO()];
         const schedToday=c.days.includes(tn);
         return(<div key={c.id} style={{padding:"8px 0",borderBottom:`1px solid ${S.T.border}`}}>
           <div style={{...S.row,marginBottom:4}}>
@@ -216,7 +200,7 @@ function KidChoreView({chores,setChores,choreLog,setChoreLog,userKey,userName,us
             {schedToday&&<button onClick={()=>toggleDayDone(c.id,tn)} style={{...S.btn(doneToday?"#4CAF50":userColor||S.T.accent),padding:"4px 12px",fontSize:11}}>{doneToday?"Done!":"Mark Done"}</button>}
           </div>
           <div style={{display:"flex",gap:3,flexWrap:"wrap"}}>
-            {DAYS.map((d,i)=>c.days.includes(d)?<span key={d} style={{...S.tag((c.donedays||{})[d]?"#4CAF50":d===tn?S.T.accent:S.T.sub),fontSize:9,padding:"1px 5px"}}>{DSHORT[i]}</span>:null)}
+            {DAYS.map((d,i)=>c.days.includes(d)?<span key={d} style={{...S.tag((c.donedays||{})[isoDateForDayName(d)]?"#4CAF50":d===tn?S.T.accent:S.T.sub),fontSize:9,padding:"1px 5px"}}>{DSHORT[i]}</span>:null)}
           </div>
         </div>);
       })}
@@ -349,6 +333,40 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
     }catch(e){console.error("Backup failed:",e);}
     setBackupBusy(false);
   };
+  const restoreInputRef=useRef(null);
+  const [restoreBusy,setRestoreBusy]=useState(false);
+  const [restorePreview,setRestorePreview]=useState(null);
+  const [restoreConfirm,setRestoreConfirm]=useState(false);
+  const [restoreDone,setRestoreDone]=useState(false);
+  const [restoreError,setRestoreError]=useState("");
+  const pickRestoreFile=()=>{setRestoreError("");setRestoreDone(false);restoreInputRef.current?.click();};
+  const onRestoreFileChosen=e=>{
+    const file=e.target.files?.[0];
+    e.target.value="";
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      try{
+        const parsed=JSON.parse(reader.result);
+        const keys=Object.keys(parsed).filter(k=>k.startsWith("fp2:"));
+        if(keys.length===0){setRestoreError("That file doesn't look like a Family Hub backup.");return;}
+        setRestorePreview({fileName:file.name,keys,data:parsed});
+        setRestoreConfirm(false);
+      }catch(err){setRestoreError("Couldn't read that file — make sure it's a Family Hub backup JSON.");}
+    };
+    reader.readAsText(file);
+  };
+  const runRestore=async()=>{
+    if(!restorePreview)return;
+    setRestoreBusy(true);
+    try{
+      for(const k of restorePreview.keys)await store.save(k,restorePreview.data[k]);
+      setRestoreDone(true);
+      setRestorePreview(null);
+      setRestoreConfirm(false);
+    }catch(e){setRestoreError("Restore failed partway through — check your connection and try again.");}
+    setRestoreBusy(false);
+  };
   return(<div>
     {isParent&&<div style={S.card}>
       <div style={S.h2}>Profile</div>
@@ -411,6 +429,27 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
       <div style={S.h2}>💾 Backup & Export</div>
       <div style={{fontSize:12,color:S.T.sub,marginBottom:12}}>Downloads everything — bills, meals, calendar, chores, messages, settings — as one JSON file. Keep one before big changes.</div>
       <button style={S.btn()} onClick={downloadBackup} disabled={backupBusy}>{backupBusy?"Preparing...":"⬇ Download Backup"}</button>
+      <div style={{marginTop:18,paddingTop:16,borderTop:`1px solid ${S.T.border}`}}>
+        <div style={{fontSize:13,color:S.T.text,marginBottom:6,fontWeight:"bold"}}>Restore from Backup</div>
+        <div style={{fontSize:12,color:S.T.sub,marginBottom:10}}>Upload a backup JSON — from Download Backup above, or a pre-deploy snapshot — to overwrite the live data with it. Use this if something got lost or wiped by mistake.</div>
+        <input ref={restoreInputRef} type="file" accept=".json,application/json" onChange={onRestoreFileChosen} style={{display:"none"}}/>
+        <button style={S.btnGhost} onClick={pickRestoreFile}>Choose Backup File...</button>
+        {restoreError&&<div style={{color:"#f44336",fontSize:12,marginTop:8}}>{restoreError}</div>}
+        {restoreDone&&<div style={{color:"#4CAF50",fontSize:12,marginTop:8}}>✓ Restore complete. Reload the app to see the restored data everywhere.</div>}
+        {restorePreview&&<div style={{marginTop:12,padding:12,background:S.T.bg,borderRadius:8}}>
+          <div style={{fontSize:13,color:S.T.text,marginBottom:6}}>{restorePreview.fileName}</div>
+          <div style={{fontSize:11,color:S.T.sub,marginBottom:10}}>Will overwrite {restorePreview.keys.length} field{restorePreview.keys.length!==1?"s":""}: {restorePreview.keys.map(k=>k.replace("fp2:","")).join(", ")}</div>
+          {!restoreConfirm
+            ?<button style={S.btn("#FF9800")} onClick={()=>setRestoreConfirm(true)}>Restore This File</button>
+            :<div>
+              <div style={{fontSize:12,color:"#f44336",marginBottom:8}}>This overwrites the current live data for these fields and can't be undone from here. Are you sure?</div>
+              <div style={{display:"flex",gap:8}}>
+                <button style={S.btn("#f44336")} onClick={runRestore} disabled={restoreBusy}>{restoreBusy?"Restoring...":"Yes, Overwrite"}</button>
+                <button style={S.btnGhost} onClick={()=>{setRestoreConfirm(false);setRestorePreview(null);}}>Cancel</button>
+              </div>
+            </div>}
+        </div>}
+      </div>
     </div>}
     {isParent&&<div style={S.card}>
       <div style={S.h2}>Feature Toggles</div>
@@ -423,10 +462,22 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
           <div><div style={{fontSize:14,color:S.T.text}}>{label}</div><div style={{fontSize:12,color:S.T.sub}}>Show task list for {label.split("'")[0]}</div></div>
           <button onClick={()=>toggleAdultChore(key)} style={{...S.btn(appSettings.showAdultChores?.[key]?"#4CAF50":S.T.border),padding:"7px 16px",fontSize:12}}>{appSettings.showAdultChores?.[key]?"ON":"OFF"}</button>
         </div>)}
-        {(currentUser==="brad"||currentUser==="maryBeth")&&<div style={{...S.row,padding:"10px 0"}}>
+        {(currentUser==="brad"||currentUser==="maryBeth")&&<div style={{...S.row,padding:"10px 0",borderBottom:`1px solid ${S.T.border}`}}>
           <div><div style={{fontSize:14,color:S.T.text}}>My To-Do List</div><div style={{fontSize:12,color:S.T.sub}}>Show a personal to-do list tab on your own dashboard</div></div>
           <button onClick={()=>saveSettings({...appSettings,todoEnabled:{...appSettings.todoEnabled,[currentUser]:!(appSettings.todoEnabled?.[currentUser]!==false)}})} style={{...S.btn(appSettings.todoEnabled?.[currentUser]!==false?"#4CAF50":S.T.border),padding:"7px 16px",fontSize:12}}>{appSettings.todoEnabled?.[currentUser]!==false?"ON":"OFF"}</button>
         </div>}
+        <div style={{padding:"10px 0"}}>
+          <div style={{...S.row,marginBottom:appSettings.goodnightMode?.enabled?10:0}}>
+            <div><div style={{fontSize:14,color:S.T.text}}>TV Goodnight Mode</div><div style={{fontSize:12,color:S.T.sub}}>Auto-dim the TV wall display overnight</div></div>
+            <button onClick={()=>saveSettings({...appSettings,goodnightMode:{...appSettings.goodnightMode,enabled:!appSettings.goodnightMode?.enabled}})} style={{...S.btn(appSettings.goodnightMode?.enabled?"#4CAF50":S.T.border),padding:"7px 16px",fontSize:12}}>{appSettings.goodnightMode?.enabled?"ON":"OFF"}</button>
+          </div>
+          {appSettings.goodnightMode?.enabled&&<div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+            <div style={{fontSize:12,color:S.T.sub}}>Dim from</div>
+            <select style={{...S.select,width:90}} value={appSettings.goodnightMode?.start??21} onChange={e=>saveSettings({...appSettings,goodnightMode:{...appSettings.goodnightMode,start:+e.target.value}})}>{Array.from({length:24},(_,h)=><option key={h} value={h}>{h===0?"12 AM":h<12?h+" AM":h===12?"12 PM":(h-12)+" PM"}</option>)}</select>
+            <div style={{fontSize:12,color:S.T.sub}}>until</div>
+            <select style={{...S.select,width:90}} value={appSettings.goodnightMode?.end??7} onChange={e=>saveSettings({...appSettings,goodnightMode:{...appSettings.goodnightMode,end:+e.target.value}})}>{Array.from({length:24},(_,h)=><option key={h} value={h}>{h===0?"12 AM":h<12?h+" AM":h===12?"12 PM":(h-12)+" PM"}</option>)}</select>
+          </div>}
+        </div>
       </div>
     </div>}
   </div>);
@@ -482,6 +533,10 @@ function BillCard({bill,today,togglePaid,setPaidFrom,del,profile,payAccounts,S,e
       <div><div style={S.label}>Due Date</div><input style={S.input} type="date" value={editForm.dueDate} onChange={e=>setEditForm({...editForm,dueDate:e.target.value})}/></div>
       <div><div style={S.label}>Notes</div><input style={S.input} value={editForm.notes} onChange={e=>setEditForm({...editForm,notes:e.target.value})}/></div>
     </div>
+    <label style={{display:"flex",gap:8,alignItems:"center",marginBottom:12,cursor:"pointer",fontSize:13,color:S.T.text}}>
+      <input type="checkbox" checked={!!editForm.recurring} onChange={e=>setEditForm({...editForm,recurring:e.target.checked})} style={{width:16,height:16,cursor:"pointer"}}/>
+      Repeats monthly — auto-create next month's bill once this one's paid
+    </label>
     <div style={{display:"flex",gap:8}}>
       <button style={{...S.btn("#4CAF50"),padding:"8px 18px",fontSize:13}} onClick={()=>saveEdit(bill.id)}>Save Changes</button>
       <button style={S.btnGhost} onClick={cancelEdit}>Cancel</button>
@@ -498,6 +553,7 @@ function BillCard({bill,today,togglePaid,setPaidFrom,del,profile,payAccounts,S,e
           {isShared&&<span style={S.tag("#2196F3")}>Shared</span>}
           {isBradOnly&&<span style={S.tag("#2196F3")}>{profile.myName} Only</span>}
           {isMBOnly&&<span style={S.tag("#E91E63")}>{profile.fianceName} Only</span>}
+          {bill.recurring&&<span style={S.tag("#9C27B0")}>⟳ Monthly</span>}
           {full&&<span style={S.tag("#4CAF50")}>PAID</span>}
           {isOver&&!full&&<span style={S.tag("#f44336")}>OVERDUE</span>}
           {isSoon&&!isOver&&!full&&<span style={S.tag("#FF9800")}>DUE SOON</span>}
@@ -546,19 +602,35 @@ function SecHead({label,total,color,S}){
 
 // ── BILLS TAB ─────────────────────────────────────────────────────────────────
 function BillsTab({bills,setBills,billHistory,setBillHistory,profile,payAccounts,S}){
-  const blank={name:"",payee:"",category:"Utilities",amount:"",dueDate:"",notes:"",owner:"shared",paidFromBrad:"",paidFromMB:""};
+  const blank={name:"",payee:"",category:"Utilities",amount:"",dueDate:"",notes:"",owner:"shared",paidFromBrad:"",paidFromMB:"",recurring:false};
   const [form,setForm]=useState(blank),[showForm,setShowForm]=useState(false),[showHistory,setShowHistory]=useState(false),[clearConfirm,setClearConfirm]=useState(false);
   const [editingId,setEditingId]=useState(null),[editForm,setEditForm]=useState({});
   const save=u=>{setBills(u);store.save("fp2:bills",u);};
-  const startEdit=b=>{setEditingId(b.id);setEditForm({name:b.name,payee:b.payee||"",category:b.category,owner:b.owner||"shared",amount:String(b.amount),dueDate:b.dueDate,notes:b.notes||""});};
+  const startEdit=b=>{setEditingId(b.id);setEditForm({name:b.name,payee:b.payee||"",category:b.category,owner:b.owner||"shared",amount:String(b.amount),dueDate:b.dueDate,notes:b.notes||"",recurring:!!b.recurring});};
   const saveEdit=id=>{
     if(!editForm.name||!editForm.amount||!editForm.dueDate)return;
-    save(bills.map(b=>b.id===id?{...b,name:editForm.name,payee:editForm.payee,category:editForm.category,owner:editForm.owner,amount:+editForm.amount,dueDate:editForm.dueDate,notes:editForm.notes}:b));
+    save(bills.map(b=>b.id===id?{...b,name:editForm.name,payee:editForm.payee,category:editForm.category,owner:editForm.owner,amount:+editForm.amount,dueDate:editForm.dueDate,notes:editForm.notes,recurring:!!editForm.recurring}:b));
     setEditingId(null);
   };
   const cancelEdit=()=>setEditingId(null);
   const saveHistory=u=>{setBillHistory(u);store.save("fp2:billHistory",u);};
   const addBill=()=>{if(!form.name||!form.amount||!form.dueDate)return;save([...bills,{...form,id:Date.now(),amount:+form.amount,bradPaid:false,bradPaidDate:null,maryBethPaid:false,maryBethPaidDate:null}]);setForm(blank);setShowForm(false);};
+  // Auto-roll recurring bills forward: once a "repeats monthly" bill is fully
+  // paid (and thus archived to History), create next month's copy so it
+  // doesn't have to be manually re-added every month — same pattern as
+  // BradynLedger's month rollover.
+  useEffect(()=>{
+    const toCreate=[];
+    bills.forEach(b=>{
+      if(!b.recurring||!billPaid(b))return;
+      const rid=b.recurringId||b.id;
+      const nextDue=addMonthToDate(b.dueDate);
+      const exists=bills.some(x=>(x.recurringId||x.id)===rid&&x.dueDate===nextDue);
+      if(!exists)toCreate.push({...b,id:Date.now()+Math.random(),recurringId:rid,dueDate:nextDue,bradPaid:false,bradPaidDate:null,maryBethPaid:false,maryBethPaidDate:null,paidFromBrad:"",paidFromMB:""});
+    });
+    if(toCreate.length>0)save([...bills,...toCreate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
   const togglePaid=(id,person)=>{
     const bill=bills.find(b=>b.id===id);if(!bill)return;
     const f=person==="brad"?"bradPaid":"maryBethPaid",df=person==="brad"?"bradPaidDate":"maryBethPaidDate";
@@ -643,6 +715,10 @@ function BillsTab({bills,setBills,billHistory,setBillHistory,profile,payAccounts
         <div><div style={S.label}>Due Date</div><input style={S.input} type="date" value={form.dueDate} onChange={e=>setForm({...form,dueDate:e.target.value})}/></div>
         <div><div style={S.label}>Notes</div><input style={S.input} placeholder="Any notes..." value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/></div>
       </div>
+      <label style={{display:"flex",gap:8,alignItems:"center",marginBottom:14,cursor:"pointer",fontSize:13,color:S.T.text}}>
+        <input type="checkbox" checked={form.recurring} onChange={e=>setForm({...form,recurring:e.target.checked})} style={{width:16,height:16,cursor:"pointer"}}/>
+        Repeats monthly — auto-create next month's bill once this one's paid
+      </label>
       <button style={{...S.btn(),padding:"9px 22px"}} onClick={addBill}>Add Expense</button>
     </div>}
     {active.length===0&&<div style={{...S.card,textAlign:"center",padding:40,color:S.T.sub}}>{bills.length===0?"No expenses yet. Click Add Expense to start.":"All caught up! 🎉 Every bill is paid — see History for the details."}</div>}
@@ -752,7 +828,7 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList
 }
 
 // ── MEALS TAB ─────────────────────────────────────────────────────────────────
-function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,mealDetails,setMealDetails,mealFavs,setMealFavs,shopStaples,setShopStaples,shopSettings,profile,S}){
+function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,mealDetails,setMealDetails,mealFavs,setMealFavs,shopStaples,setShopStaples,shopSettings,profile,expenses,S}){
   // Week navigation: plans are stored per week (keyed by Monday's date), so the
   // family can plan next week and look back at past menus.
   const curWk=weekKeyOf();
@@ -761,11 +837,11 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
   const isCur=wk===curWk,isNext=wk===weekKeyOffset(curWk,1),isPast=wk<curWk;
   const weekTitle=isCur?"This Week":isNext?"Next Week":isPast?"Past Week":"Week of "+weekLabel(wk).split(" – ")[0];
   const [editCell,setEditCell]=useState(null),[cellVal,setCellVal]=useState("");
-  const [showAdd,setShowAdd]=useState(false),[newItem,setNewItem]=useState({name:"",qty:"1",category:"Grocery",store:"",notes:""});
+  const [showAdd,setShowAdd]=useState(false),[newItem,setNewItem]=useState({name:"",qty:"1",category:"Grocery",store:"",notes:"",price:""});
   const [addMode,setAddMode]=useState("single");
   const cats=shopSettings?.categories||["Grocery","Dairy","Produce","Meat","Snacks","Beverages","Household","Personal Care","Other"];
   const stores=shopSettings?.stores||["Walmart","Kroger","Target","Costco","Aldi","Other"];
-  const blankRow=()=>({id:Date.now()+Math.random(),name:"",qty:"1",category:cats[0]||"Grocery",store:""});
+  const blankRow=()=>({id:Date.now()+Math.random(),name:"",qty:"1",category:cats[0]||"Grocery",store:"",price:""});
   const [bulkRows,setBulkRows]=useState([blankRow(),blankRow(),blankRow(),blankRow(),blankRow()]);
   const updateRow=(i,field,val)=>setBulkRows(rows=>rows.map((r,ri)=>ri===i?{...r,[field]:val}:r));
   const addRow=()=>setBulkRows(rows=>[...rows,blankRow()]);
@@ -773,7 +849,7 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
   const addBulk=()=>{
     const valid=bulkRows.filter(r=>r.name.trim());
     if(!valid.length)return;
-    saveShop([...shopList,...valid.map(r=>({...r,name:r.name.trim(),id:Date.now()+Math.random(),addedBy:"Parents",checked:false,notes:""}))]);
+    saveShop([...shopList,...valid.map(r=>({...r,name:r.name.trim(),price:+r.price||0,id:Date.now()+Math.random(),addedBy:"Parents",checked:false,notes:""}))]);
     setBulkRows([blankRow(),blankRow(),blankRow(),blankRow(),blankRow()]);
     setShowAdd(false);
   };
@@ -792,6 +868,13 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
   const placeFav=f=>{
     saveMeals({...mealPlan,[favTarget.day]:{...mealPlan[favTarget.day],[favTarget.mt]:f.name}});
     if((f.ingredients&&f.ingredients.length)||f.recipe)saveDetails({...mealDetails,[wk+"__"+favTarget.day+"__"+favTarget.mt]:{ingredients:f.ingredients||[],recipe:f.recipe||""}});
+  };
+  // "Surprise me" — fill one empty slot with a random favorite, ingredients and all.
+  const surpriseSlot=(day,mt)=>{
+    if(favs.length===0)return;
+    const f=favs[Math.floor(Math.random()*favs.length)];
+    saveMeals({...mealPlan,[day]:{...mealPlan[day],[mt]:f.name}});
+    if((f.ingredients&&f.ingredients.length)||f.recipe)saveDetails({...mealDetails,[wk+"__"+day+"__"+mt]:{ingredients:f.ingredients||[],recipe:f.recipe||""}});
   };
   const copyLastWeek=()=>{saveWeek(wk,normalizeWeek(mealPlans[weekKeyOffset(wk,-1)]));setCopyConfirm(false);};
   // Staples: things bought every week (milk, eggs...) that can be added with one tap.
@@ -819,7 +902,7 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
   const saveDetails=u=>{setMealDetails(u);store.save("fp2:mealDetails",u);};
   const saveCell=()=>{if(!editCell)return;saveMeals({...mealPlan,[editCell.day]:{...mealPlan[editCell.day],[editCell.mt]:cellVal}});setEditCell(null);setCellVal("");};
   const clearCell=(day,mt)=>{saveMeals({...mealPlan,[day]:{...mealPlan[day],[mt]:""}});};
-  const addItem=()=>{if(!newItem.name)return;saveShop([...shopList,{...newItem,id:Date.now(),addedBy:"Parents",checked:false}]);setNewItem({name:"",qty:"1",category:"Grocery",store:"",notes:""});setShowAdd(false);};
+  const addItem=()=>{if(!newItem.name)return;saveShop([...shopList,{...newItem,price:+newItem.price||0,id:Date.now(),addedBy:"Parents",checked:false}]);setNewItem({name:"",qty:"1",category:"Grocery",store:"",notes:"",price:""});setShowAdd(false);};
   const toggleItem=id=>saveShop(shopList.map(i=>i.id===id?{...i,checked:!i.checked}:i));
   const delItem=id=>saveShop(shopList.filter(i=>i.id!==id));
   const approveSugg=id=>{
@@ -852,6 +935,11 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
   const declineReq=id=>saveReqs(shopRequests.map(r=>r.id===id?{...r,status:"declined"}:r));
   const pendS=mealSuggestions.filter(s=>s.status==="pending"),pendR=shopRequests.filter(r=>r.status==="pending");
   const unchecked=shopList.filter(i=>!i.checked),checked=shopList.filter(i=>i.checked);
+  // Bridges the shopping list to BudgetTab's Food category: an optional
+  // per-item price adds up to a running estimated total, shown against
+  // whatever's actually budgeted for Food this month (if any).
+  const listEstTotal=unchecked.reduce((s,i)=>s+(+i.price||0),0);
+  const foodBudget=(expenses||[]).find(c=>c.category==="Food")?.items.reduce((s,i)=>s+(+i.amount||0),0)||0;
   const filteredItems=unchecked.filter(i=>(filterStore==="All"||i.store===filterStore)&&(filterCat==="All"||i.category===filterCat));
   const groupedByStore=filterStore==="All"
     ?[...new Set(filteredItems.map(i=>i.store||"No Store"))].reduce((acc,s)=>{const items=filteredItems.filter(i=>(i.store||"No Store")===s);if(items.length>0)acc[s]=items;return acc;},{})
@@ -913,7 +1001,10 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
                     <span onClick={()=>clearCell(day,mt)} style={{fontSize:9,color:"#f44336",cursor:"pointer"}}>✕ del</span>
                   </div>
                 </div>
-                :<div onClick={()=>{setEditCell({day,mt});setCellVal("");}} style={{cursor:"pointer",color:"#2a2a18",fontSize:10,textAlign:"center",paddingTop:6}}>+</div>
+                :<div style={{display:"flex",gap:6,justifyContent:"center",alignItems:"center",paddingTop:6}}>
+                  <span onClick={()=>{setEditCell({day,mt});setCellVal("");}} style={{cursor:"pointer",color:"#5a5a3a",fontSize:13}} title="Add meal">+</span>
+                  {favs.length>0&&<span onClick={()=>surpriseSlot(day,mt)} style={{cursor:"pointer",fontSize:11,opacity:0.6}} title="Surprise me — random favorite">🎲</span>}
+                </div>
               }
             </div>
           }
@@ -987,25 +1078,28 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
             <button style={S.btn()} onClick={()=>{setShowAdd(!showAdd);setBulkRows([blankRow(),blankRow(),blankRow(),blankRow(),blankRow()])}}>{showAdd?"Cancel":"Add Item"}</button>
           </div>
         </div>
+        {listEstTotal>0&&<div style={{fontSize:12,color:foodBudget>0&&listEstTotal>foodBudget?"#f44336":S.T.sub,marginBottom:10}}>Est. total: <strong style={{color:S.T.text}}>{fmt(listEstTotal)}</strong>{foodBudget>0?` of ${fmt(foodBudget)} Food budget${listEstTotal>foodBudget?" — over":""}`:""}</div>}
         {showAdd&&addMode==="single"&&<div style={{marginBottom:14,padding:12,background:S.T.bg,borderRadius:8}}>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,marginBottom:8}}>
             <div><div style={S.label}>Item</div><input style={S.input} placeholder="e.g. Milk" value={newItem.name} onChange={e=>setNewItem({...newItem,name:e.target.value})}/></div>
             <div><div style={S.label}>Qty</div><input style={S.input} value={newItem.qty} onChange={e=>setNewItem({...newItem,qty:e.target.value})}/></div>
             <div><div style={S.label}>Category</div><select style={S.select} value={newItem.category} onChange={e=>setNewItem({...newItem,category:e.target.value})}>{cats.map(c=><option key={c}>{c}</option>)}</select></div>
             <div><div style={S.label}>Store</div><select style={S.select} value={newItem.store} onChange={e=>setNewItem({...newItem,store:e.target.value})}><option value="">Any store</option>{stores.map(s=><option key={s}>{s}</option>)}</select></div>
+            <div><div style={S.label}>Est. Price (optional)</div><input style={S.input} type="number" placeholder="0.00" value={newItem.price} onChange={e=>setNewItem({...newItem,price:e.target.value})}/></div>
           </div>
           <div style={{display:"flex",gap:8}}><input style={{...S.input,flex:1}} placeholder="Notes" value={newItem.notes} onChange={e=>setNewItem({...newItem,notes:e.target.value})}/><button style={S.btn()} onClick={addItem}>Add</button></div>
         </div>}
         {showAdd&&addMode==="bulk"&&<div style={{marginBottom:14,padding:12,background:S.T.bg,borderRadius:8}}>
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",minWidth:420}}>
-              <thead><tr style={{borderBottom:`1px solid ${S.T.border}`}}><th style={{...S.label,textAlign:"left",padding:"4px 6px",fontWeight:"normal"}}>Item *</th><th style={{...S.label,textAlign:"left",padding:"4px 6px",fontWeight:"normal",width:60}}>Qty</th><th style={{...S.label,textAlign:"left",padding:"4px 6px",fontWeight:"normal",width:120}}>Category</th><th style={{...S.label,textAlign:"left",padding:"4px 6px",fontWeight:"normal",width:120}}>Store</th><th style={{width:28}}></th></tr></thead>
+              <thead><tr style={{borderBottom:`1px solid ${S.T.border}`}}><th style={{...S.label,textAlign:"left",padding:"4px 6px",fontWeight:"normal"}}>Item *</th><th style={{...S.label,textAlign:"left",padding:"4px 6px",fontWeight:"normal",width:60}}>Qty</th><th style={{...S.label,textAlign:"left",padding:"4px 6px",fontWeight:"normal",width:120}}>Category</th><th style={{...S.label,textAlign:"left",padding:"4px 6px",fontWeight:"normal",width:120}}>Store</th><th style={{...S.label,textAlign:"left",padding:"4px 6px",fontWeight:"normal",width:80}}>Price</th><th style={{width:28}}></th></tr></thead>
               <tbody>
                 {bulkRows.map((row,i)=><tr key={row.id}>
                   <td style={{padding:"4px 4px 4px 0"}}><input style={{...S.input,padding:"6px 8px"}} placeholder="Item name" value={row.name} onChange={e=>updateRow(i,"name",e.target.value)}/></td>
                   <td style={{padding:"4px 4px"}}><input style={{...S.input,padding:"6px 8px"}} value={row.qty} onChange={e=>updateRow(i,"qty",e.target.value)}/></td>
                   <td style={{padding:"4px 4px"}}><select style={{...S.select,padding:"6px 8px"}} value={row.category} onChange={e=>updateRow(i,"category",e.target.value)}>{cats.map(c=><option key={c}>{c}</option>)}</select></td>
                   <td style={{padding:"4px 4px"}}><select style={{...S.select,padding:"6px 8px"}} value={row.store} onChange={e=>updateRow(i,"store",e.target.value)}><option value="">Any</option>{stores.map(s=><option key={s}>{s}</option>)}</select></td>
+                  <td style={{padding:"4px 4px"}}><input style={{...S.input,padding:"6px 8px"}} type="number" placeholder="0.00" value={row.price} onChange={e=>updateRow(i,"price",e.target.value)}/></td>
                   <td style={{padding:"4px 0 4px 4px"}}><button onClick={()=>removeRow(i)} style={{...S.btnDanger,padding:"5px 7px"}}>×</button></td>
                 </tr>)}
               </tbody>
@@ -1032,7 +1126,7 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
         {unchecked.length===0&&checked.length===0&&<div style={{color:S.T.sub,fontSize:13,padding:"10px 0",textAlign:"center"}}>List is empty.</div>}
         {Object.entries(groupedUnchecked).map(([storeName,catGroups])=><div key={storeName} style={{marginBottom:12}}>
           <div style={{fontSize:12,color:"#2196F3",fontWeight:"bold",fontFamily:"monospace",letterSpacing:"0.1em",padding:"6px 0 4px",borderBottom:`2px solid #2196F333`,marginBottom:6}}>🛒 {storeName}</div>
-          {Object.entries(catGroups).map(([cat,items])=>items.length>0&&<div key={cat}><div style={{...S.label,marginTop:6,marginBottom:3,fontSize:10}}>{cat}</div>{items.map(item=><div key={item.id} style={{display:"flex",gap:8,padding:"5px 0",borderBottom:`1px solid #1a1a0f`,alignItems:"center"}}><div onClick={()=>toggleItem(item.id)} style={{width:17,height:17,borderRadius:3,border:`2px solid ${S.T.border}`,cursor:"pointer",flexShrink:0}}/><div style={{flex:1}}><div style={{fontSize:13,color:S.T.text}}>{item.qty&&item.qty!=="1"?item.qty+"x ":""}{item.name}</div>{(item.addedBy&&item.addedBy!=="Parents"||item.notes)?<div style={{fontSize:10,color:S.T.sub}}>{item.addedBy&&item.addedBy!=="Parents"?item.addedBy:""}{item.notes?" — "+item.notes:""}</div>:null}</div><button style={S.btnDanger} onClick={()=>delItem(item.id)}>X</button></div>)}</div>)}
+          {Object.entries(catGroups).map(([cat,items])=>items.length>0&&<div key={cat}><div style={{...S.label,marginTop:6,marginBottom:3,fontSize:10}}>{cat}</div>{items.map(item=><div key={item.id} style={{display:"flex",gap:8,padding:"5px 0",borderBottom:`1px solid #1a1a0f`,alignItems:"center"}}><div onClick={()=>toggleItem(item.id)} style={{width:17,height:17,borderRadius:3,border:`2px solid ${S.T.border}`,cursor:"pointer",flexShrink:0}}/><div style={{flex:1}}><div style={{fontSize:13,color:S.T.text}}>{item.qty&&item.qty!=="1"?item.qty+"x ":""}{item.name}{item.price>0&&<span style={{color:S.T.sub}}> · {fmt(item.price)}</span>}</div>{(item.addedBy&&item.addedBy!=="Parents"||item.notes)?<div style={{fontSize:10,color:S.T.sub}}>{item.addedBy&&item.addedBy!=="Parents"?item.addedBy:""}{item.notes?" — "+item.notes:""}</div>:null}</div><button style={S.btnDanger} onClick={()=>delItem(item.id)}>X</button></div>)}</div>)}
         </div>)}
         {checked.length>0&&<div style={{marginTop:8}}><div style={{...S.label,marginBottom:4}}>DONE</div>{checked.map(item=><div key={item.id} style={{display:"flex",gap:8,padding:"4px 0",alignItems:"center",opacity:0.45}}><div onClick={()=>toggleItem(item.id)} style={{width:17,height:17,borderRadius:3,border:"2px solid #4CAF50",background:"#4CAF50",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#0d0d08",fontSize:10,fontWeight:"bold"}}>✓</div><span style={{fontSize:12,color:S.T.sub,textDecoration:"line-through",flex:1}}>{item.name}</span><button style={S.btnDanger} onClick={()=>delItem(item.id)}>X</button></div>)}<button style={{...S.btnGhost,marginTop:6,fontSize:11}} onClick={()=>saveShop(shopList.filter(i=>!i.checked))}>Clear Done</button></div>}
       </div>

@@ -1,7 +1,7 @@
 // ── Shared UI components (login, home screens, widgets) ───────────────────────
 import { useState, useEffect } from "react";
 import { store } from "./store";
-import { DAYS, DSHORT, MEAL_TYPES, GOLD, BORDER, THEMES, USERS, APP_VERSION, fmt, todayName, billPaid, weekKeyOf, dateOfWeekDay, S } from "./constants";
+import { DAYS, DSHORT, MEAL_TYPES, GOLD, BORDER, THEMES, USERS, APP_VERSION, fmt, todayName, billPaid, weekKeyOf, dateOfWeekDay, S, isoDateForDayName, logChoreDone, unlogChoreDone } from "./constants";
 import { MonthCalendar, UpcomingEvents, CountdownStrip, WeeklyCelebrations, EventDetailPopup } from "./calendar";
 
 // ── SAVE STATUS — quiet unless there's actually something to worry about ──────
@@ -231,16 +231,24 @@ function PinnedAnnouncements({messages,S}){
 }
 
 // ── WEEKLY CHORE BOARD — visible on all home screens ─────────────────────────
-function WeeklyChoreBoard({chores,setChores,appSettings,S}){
+function WeeklyChoreBoard({chores,setChores,choreLog,setChoreLog,appSettings,S}){
   const tn=todayName();
   const todayIdx=DAYS.indexOf(tn);
   const saveChores=u=>{setChores(u);store.save("fp2:chores",u);};
   const toggleDay=(choreId,day)=>{
-    saveChores(chores.map(c=>{
-      if(c.id!==choreId)return c;
-      const dd={...(c.donedays||{}),[day]:!(c.donedays||{})[day]};
-      return{...c,donedays:dd};
+    const c=chores.find(x=>x.id===choreId);
+    if(!c)return;
+    const dateKey=isoDateForDayName(day);
+    const nowDone=!(c.donedays||{})[dateKey];
+    saveChores(chores.map(x=>{
+      if(x.id!==choreId)return x;
+      const dd={...(x.donedays||{}),[dateKey]:nowDone};
+      return{...x,donedays:dd};
     }));
+    if(choreLog&&setChoreLog){
+      if(nowDone)logChoreDone(choreLog,setChoreLog,{choreId:c.id,assignee:c.assignee,points:c.points,task:c.task,date:dateKey});
+      else unlogChoreDone(choreLog,setChoreLog,c.id,dateKey);
+    }
   };
   const showFor=id=>{
     if(id==="brad"&&!appSettings.showAdultChores?.brad)return false;
@@ -269,7 +277,7 @@ function WeeklyChoreBoard({chores,setChores,appSettings,S}){
             </td>
             {DAYS.map((d,i)=>{
               const sched=c.days.includes(d);
-              const done=(c.donedays||{})[d];
+              const done=(c.donedays||{})[isoDateForDayName(d)];
               const isToday=i===todayIdx;
               return(<td key={d} style={{textAlign:"center",padding:"4px 2px",borderBottom:`1px solid ${S.T.border}`,background:isToday?S.T.accent+"0a":"transparent"}}>
                 {sched
@@ -286,7 +294,7 @@ function WeeklyChoreBoard({chores,setChores,appSettings,S}){
 }
 
 // ── PERSONAL HOME SCREEN (Brad / Mary Beth / Bradyn) ─────────────────────────
-function PersonalHomeScreen({currentUser,mealPlan,nextWeekPlan,bills,chores,setChores,messages,appSettings,events,setEvents,S}){
+function PersonalHomeScreen({currentUser,mealPlan,nextWeekPlan,bills,chores,setChores,choreLog,setChoreLog,messages,appSettings,events,setEvents,S}){
   const today=new Date(),tn=todayName();
   const tomorrowName=DAYS[(DAYS.indexOf(tn)+1)%7];
   const u=USERS.find(x=>x.key===currentUser);
@@ -305,7 +313,7 @@ function PersonalHomeScreen({currentUser,mealPlan,nextWeekPlan,bills,chores,setC
     <WeeklyCelebrations events={events} S={S} setEvents={setEvents} canEdit currentUser={currentUser}/>
     <CountdownStrip events={events} S={S} setEvents={setEvents} canEdit currentUser={currentUser}/>
     <UpcomingEvents events={events} S={S} days={7} title="📅 Coming Up This Week" setEvents={setEvents} canEdit currentUser={currentUser}/>
-    <WeeklyChoreBoard chores={chores||[]} setChores={setChores} appSettings={appSettings} S={S}/>
+    <WeeklyChoreBoard chores={chores||[]} setChores={setChores} choreLog={choreLog} setChoreLog={setChoreLog} appSettings={appSettings} S={S}/>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:14}}>
       <div style={S.card}>
         <div style={S.h2}>Today and Tomorrow</div>

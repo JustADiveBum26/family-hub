@@ -256,9 +256,9 @@ function BradDashboard(props){
     </UserHeader>
     <div style={{maxWidth:1400,margin:"0 auto",padding:"16px 16px"}}>
       {tab!=="home"&&bills&&<BillsBanner bills={bills} S={S}/> }
-      {tab==="home"&&<PersonalHomeScreen currentUser="brad" mealPlan={mealPlan} nextWeekPlan={nextWeekPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} events={events} setEvents={setEvents} S={S}/> }
+      {tab==="home"&&<PersonalHomeScreen currentUser="brad" mealPlan={mealPlan} nextWeekPlan={nextWeekPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} choreLog={choreLog} setChoreLog={setChoreLog} messages={messages||[]} appSettings={appSettings} events={events} setEvents={setEvents} S={S}/> }
       {tab==="cal"&&<CalendarTab events={events} setEvents={setEvents} currentUser="brad" canEdit={true} S={S}/>}
-      {tab==="meals"&&<MealsTab mealPlans={mealPlans} setMealPlans={setMealPlans} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} mealFavs={mealFavs} setMealFavs={setMealFavs} shopStaples={shopStaples} setShopStaples={setShopStaples} shopSettings={shopSettings} profile={profile} S={S}/>}
+      {tab==="meals"&&<MealsTab mealPlans={mealPlans} setMealPlans={setMealPlans} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} mealFavs={mealFavs} setMealFavs={setMealFavs} shopStaples={shopStaples} setShopStaples={setShopStaples} shopSettings={shopSettings} profile={profile} expenses={expenses} S={S}/>}
       {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} choreLog={choreLog} setChoreLog={setChoreLog} appSettings={appSettings} S={S} currentUser="brad"/>}
       {tab==="todo"&&todoOn&&<TodoTab items={todos?.brad} onSave={saveTodos} S={S}/>}
       {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="brad" S={S}/>}
@@ -305,9 +305,9 @@ function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,n
     </UserHeader>
     <div style={{maxWidth:1300,margin:"0 auto",padding:"16px 16px"}}>
       {tab!=="home"&&bills&&<BillsBanner bills={bills} S={S}/> }
-      {tab==="home"&&<PersonalHomeScreen currentUser="maryBeth" mealPlan={mealPlan} nextWeekPlan={nextWeekPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} messages={messages||[]} appSettings={appSettings} events={events} setEvents={setEvents} S={S}/> }
+      {tab==="home"&&<PersonalHomeScreen currentUser="maryBeth" mealPlan={mealPlan} nextWeekPlan={nextWeekPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} choreLog={choreLog} setChoreLog={setChoreLog} messages={messages||[]} appSettings={appSettings} events={events} setEvents={setEvents} S={S}/> }
       {tab==="cal"&&<CalendarTab events={events} setEvents={setEvents} currentUser="maryBeth" canEdit={true} S={S}/>}
-      {tab==="meals"&&<MealsTab mealPlans={mealPlans} setMealPlans={setMealPlans} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} mealFavs={mealFavs} setMealFavs={setMealFavs} shopStaples={shopStaples} setShopStaples={setShopStaples} shopSettings={shopSettings} profile={profile} S={S}/>}
+      {tab==="meals"&&<MealsTab mealPlans={mealPlans} setMealPlans={setMealPlans} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} mealFavs={mealFavs} setMealFavs={setMealFavs} shopStaples={shopStaples} setShopStaples={setShopStaples} shopSettings={shopSettings} profile={profile} expenses={expenses} S={S}/>}
       {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} choreLog={choreLog} setChoreLog={setChoreLog} appSettings={appSettings} S={S} currentUser="maryBeth"/>}
       {tab==="todo"&&todoOn&&<TodoTab items={todos?.maryBeth} onSave={saveTodos} S={S}/>}
       {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="maryBeth" S={S}/>}

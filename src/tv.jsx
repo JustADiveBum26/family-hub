@@ -2,7 +2,7 @@
 // Reached from the "📺 TV Display Mode" button on the landing page or by
 // bookmarking the app URL with #tv. Read-only, big type, refreshes itself.
 import { useState, useEffect } from "react";
-import { DAYS, MEAL_TYPES, GOLD, BORDER, USERS, todayName, billPaid, weekKeyOf, dateOfWeekDay } from "./constants";
+import { DAYS, MEAL_TYPES, GOLD, BORDER, USERS, todayName, billPaid, weekKeyOf, dateOfWeekDay, todayISO } from "./constants";
 import { WeatherScroll } from "./shared";
 import { MonthCalendar, EventRow, CountdownStrip, WeeklyCelebrations, EventDetailPopup, eventsOnDay, todayKey } from "./calendar";
 
@@ -46,6 +46,13 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
     window.addEventListener("orientationchange",update);
     return()=>{window.removeEventListener("resize",update);window.removeEventListener("orientationchange",update);};
   },[]);
+  // Goodnight mode: dim the whole display during a configured overnight
+  // window (Settings > Feature Toggles) instead of leaving it full-brightness
+  // glaring into a dark room all night.
+  const gn=appSettings?.goodnightMode||{};
+  const gnStart=gn.start??21,gnEnd=gn.end??7;
+  const hour=now.getHours();
+  const inNight=!!gn.enabled&&(gnStart<gnEnd?(hour>=gnStart&&hour<gnEnd):(hour>=gnStart||hour<gnEnd));
   const tn=todayName();
   const tKey=todayKey();
   const tomorrowKey=(()=>{const d=new Date(now);d.setDate(d.getDate()+1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;})();
@@ -60,7 +67,7 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
     if(id==="bradyn"&&!appSettings?.showAdultChores?.bradyn)return false;
     return true;
   };
-  const todayChores=(chores||[]).filter(c=>showFor(c.assignee)&&c.days&&c.days.includes(tn)&&!(c.donedays||{})[tn]);
+  const todayChores=(chores||[]).filter(c=>showFor(c.assignee)&&c.days&&c.days.includes(tn)&&!(c.donedays||{})[todayISO()]);
   const tomorrowIsNextWeek=DAYS.indexOf(tn)===6;
   const tomorrowDayName=DAYS[(DAYS.indexOf(tn)+1)%7];
   const tonightDinner=mealPlan[tn]?.Dinner||"";
@@ -107,7 +114,7 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
     return()=>clearInterval(id);
   },[panels.length]);
   const activePanel=panels[panelIdx%panels.length];
-  return(<div style={{background:T.bg,height:vh,fontFamily:"Georgia,serif",color:T.text,padding:"12px 18px",boxSizing:"border-box",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+  return(<div style={{background:T.bg,height:vh,fontFamily:"Georgia,serif",color:T.text,padding:"12px 18px",boxSizing:"border-box",display:"flex",flexDirection:"column",overflow:"hidden",filter:inNight?"brightness(0.4) saturate(0.7)":"none",transition:"filter 3s ease"}}>
     {/* Header: identity, clock, weather — always stays at the top */}
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap",marginBottom:8,flexShrink:0}}>
       <div>
