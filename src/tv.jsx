@@ -115,8 +115,8 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
         <div style={{fontSize:22,color:T.text}}>Family <span style={{color:GOLD}}>Hub</span></div>
       </div>
       <div style={{textAlign:"center"}}>
-        <div style={{fontSize:36,fontWeight:"bold",color:T.text,lineHeight:1,fontVariantNumeric:"tabular-nums"}}>{now.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}</div>
-        <div style={{fontSize:14,color:GOLD,marginTop:2}}>{now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</div>
+        <div style={{fontSize:29,fontWeight:"bold",color:T.text,lineHeight:1,fontVariantNumeric:"tabular-nums"}}>{now.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}</div>
+        <div style={{fontSize:11,color:GOLD,marginTop:2}}>{now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</div>
       </div>
       <div style={{zoom:0.78}}><WeatherScroll big/></div>
       <button onClick={onExit} style={{...tvS.btnGhost,position:"fixed",top:8,right:8,opacity:0.85,zIndex:10,fontSize:13,padding:"7px 14px"}}>✕ Exit</button>
