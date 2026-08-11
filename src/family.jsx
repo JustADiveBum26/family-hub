@@ -953,6 +953,7 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
   const saveFavorite=(name,detail)=>saveFavs([...favs.filter(x=>x.name.toLowerCase()!==name.toLowerCase()),{id:Date.now(),name,ingredients:detail?.ingredients||[],recipe:detail?.recipe||""}]);
   const [favTarget,setFavTarget]=useState({day:"Monday",mt:"Dinner"});
   const [copyConfirm,setCopyConfirm]=useState(false);
+  const [showFavs,setShowFavs]=useState(false);
   const placeFav=f=>{
     saveMeals({...mealPlan,[favTarget.day]:{...mealPlan[favTarget.day],[favTarget.mt]:f.name}});
     if((f.ingredients&&f.ingredients.length)||f.recipe)saveDetails({...mealDetails,[wk+"__"+favTarget.day+"__"+favTarget.mt]:{ingredients:f.ingredients||[],recipe:f.recipe||""}});
@@ -1101,35 +1102,6 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
     </div>
     <div style={S.card}>
       <div style={{...S.h2,...S.row,flexWrap:"wrap",gap:8}}>
-        <span>★ Meal Favorites</span>
-        {copyConfirm
-          ?<div style={{display:"flex",gap:6}}><button style={{...S.btn("#FF9800"),padding:"5px 12px",fontSize:12}} onClick={copyLastWeek}>Yes, overwrite {weekTitle.toLowerCase()}</button><button style={{...S.btnGhost,padding:"5px 10px",fontSize:12}} onClick={()=>setCopyConfirm(false)}>Cancel</button></div>
-          :<button style={{...S.btnGhost,fontSize:12}} onClick={()=>setCopyConfirm(true)}>⟳ Copy Last Week's Menu</button>}
-      </div>
-      {favs.length===0&&<div style={{fontSize:13,color:S.T.sub}}>No favorites yet — open any meal on the grid and tap <strong style={{color:S.T.text}}>★ Save Favorite</strong>. Its ingredients and recipe come along with it.</div>}
-      {favs.length>0&&<>
-        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:10}}>
-          <span style={{fontSize:12,color:S.T.sub}}>Add to:</span>
-          <select style={{...S.select,width:130}} value={favTarget.day} onChange={e=>setFavTarget({...favTarget,day:e.target.value})}>{DAYS.map(d=><option key={d}>{d}</option>)}</select>
-          <select style={{...S.select,width:120}} value={favTarget.mt} onChange={e=>setFavTarget({...favTarget,mt:e.target.value})}>{MEAL_TYPES.map(m=><option key={m}>{m}</option>)}</select>
-          <span style={{fontSize:11,color:S.T.sub}}>({weekTitle.toLowerCase()})</span>
-        </div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          {[...favs].sort((a,b)=>a.name.localeCompare(b.name)).map(f=>(
-            <div key={f.id} style={{display:"flex",gap:6,alignItems:"center",background:S.T.bg,border:`1px solid ${S.T.border}`,borderRadius:10,padding:"7px 10px"}}>
-              <div>
-                <div style={{fontSize:13,color:S.T.text}}>{f.name}</div>
-                {(f.ingredients?.length>0||f.recipe)&&<div style={{fontSize:10,color:S.T.sub}}>{f.ingredients?.length||0} ingredients{f.recipe?" · recipe":""}</div>}
-              </div>
-              <button style={{...S.btn(),padding:"4px 10px",fontSize:11}} onClick={()=>placeFav(f)}>+ Add</button>
-              <button style={{...S.btnDanger,padding:"3px 7px",fontSize:11}} onClick={()=>saveFavs(favs.filter(x=>x.id!==f.id))}>✕</button>
-            </div>
-          ))}
-        </div>
-      </>}
-    </div>
-    <div style={S.card}>
-      <div style={{...S.h2,...S.row,flexWrap:"wrap",gap:8}}>
         <span>⭐ Shopping Staples</span>
         {staples.length>0&&<button style={{...S.btn("#4CAF50"),padding:"5px 12px",fontSize:12}} onClick={addAllStaples}>+ Add All to List</button>}
       </div>
@@ -1223,6 +1195,40 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
         {pendR.length>0&&<div style={S.card}><div style={S.h2}>Shopping Requests from Kids</div>{pendR.map(r=><div key={r.id} style={{padding:"8px 0",borderBottom:`1px solid ${S.T.border}`}}><div style={{...S.row,flexWrap:"wrap",gap:8}}><div><div style={{fontSize:14,color:S.T.text,fontWeight:"bold"}}>{r.qty&&r.qty!=="1"?r.qty+"x ":""}{r.item}</div><div style={{fontSize:11,color:S.T.sub,marginTop:1}}>{r.kidName}{r.notes?" — "+r.notes:""}</div></div><div style={{display:"flex",gap:6}}><button style={{...S.btn("#4CAF50"),padding:"5px 10px",fontSize:12}} onClick={()=>approveReq(r.id)}>Add</button><button style={S.btnDanger} onClick={()=>declineReq(r.id)}>X</button></div></div></div>)}</div>}
         {pendS.length===0&&pendR.length===0&&<div style={{...S.card,textAlign:"center",padding:28,color:S.T.sub}}><div style={{fontSize:22,marginBottom:6}}>All clear!</div><div style={{fontSize:13}}>No pending requests from the kids.</div></div>}
       </div>
+    </div>
+    <div style={S.card}>
+      <div style={{...S.h2,...S.row,flexWrap:"wrap",gap:8}}>
+        <span>★ Meal Favorites{favs.length>0?` (${favs.length})`:""}</span>
+        <button style={{...S.btnGhost,fontSize:12}} onClick={()=>setShowFavs(!showFavs)}>{showFavs?"▲ Hide":"▼ Show"}</button>
+      </div>
+      {showFavs&&<>
+        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
+          {copyConfirm
+            ?<div style={{display:"flex",gap:6}}><button style={{...S.btn("#FF9800"),padding:"5px 12px",fontSize:12}} onClick={copyLastWeek}>Yes, overwrite {weekTitle.toLowerCase()}</button><button style={{...S.btnGhost,padding:"5px 10px",fontSize:12}} onClick={()=>setCopyConfirm(false)}>Cancel</button></div>
+            :<button style={{...S.btnGhost,fontSize:12}} onClick={()=>setCopyConfirm(true)}>⟳ Copy Last Week's Menu</button>}
+        </div>
+        {favs.length===0&&<div style={{fontSize:13,color:S.T.sub}}>No favorites yet — open any meal on the grid and tap <strong style={{color:S.T.text}}>★ Save Favorite</strong>, or add some from Settings &gt; Recipe Library.</div>}
+        {favs.length>0&&<>
+          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:10}}>
+            <span style={{fontSize:12,color:S.T.sub}}>Add to:</span>
+            <select style={{...S.select,width:130}} value={favTarget.day} onChange={e=>setFavTarget({...favTarget,day:e.target.value})}>{DAYS.map(d=><option key={d}>{d}</option>)}</select>
+            <select style={{...S.select,width:120}} value={favTarget.mt} onChange={e=>setFavTarget({...favTarget,mt:e.target.value})}>{MEAL_TYPES.map(m=><option key={m}>{m}</option>)}</select>
+            <span style={{fontSize:11,color:S.T.sub}}>({weekTitle.toLowerCase()})</span>
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {[...favs].sort((a,b)=>a.name.localeCompare(b.name)).map(f=>(
+              <div key={f.id} style={{display:"flex",gap:6,alignItems:"center",background:S.T.bg,border:`1px solid ${S.T.border}`,borderRadius:10,padding:"7px 10px"}}>
+                <div>
+                  <div style={{fontSize:13,color:S.T.text}}>{f.name}</div>
+                  {(f.ingredients?.length>0||f.recipe)&&<div style={{fontSize:10,color:S.T.sub}}>{f.ingredients?.length||0} ingredients{f.recipe?" · recipe":""}</div>}
+                </div>
+                <button style={{...S.btn(),padding:"4px 10px",fontSize:11}} onClick={()=>placeFav(f)}>+ Add</button>
+                <button style={{...S.btnDanger,padding:"3px 7px",fontSize:11}} onClick={()=>saveFavs(favs.filter(x=>x.id!==f.id))}>✕</button>
+              </div>
+            ))}
+          </div>
+        </>}
+      </>}
     </div>
   </>);
 }
