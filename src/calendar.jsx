@@ -405,10 +405,22 @@ function CountdownStrip({events,S,big,setEvents,canEdit,currentUser}){
     seen.add(ev.id);return true;
   }).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
   const [popupDay,setPopupDay]=useState(null);
+  // Cap the strip at 3 visible at a time and rotate through the rest —
+  // otherwise a busy month wraps into extra rows and eats the TV screen.
+  const pageSize=3;
+  const totalPages=Math.max(1,Math.ceil(items.length/pageSize));
+  const [page,setPage]=useState(0);
+  useEffect(()=>{
+    if(totalPages<=1)return;
+    const id=setInterval(()=>setPage(p=>(p+1)%totalPages),6000);
+    return()=>clearInterval(id);
+  },[totalPages]);
   if(items.length===0)return null;
+  const safePage=page%totalPages;
+  const visible=items.slice(safePage*pageSize,safePage*pageSize+pageSize);
   return(<>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:big?14:10,marginBottom:14}}>
-      {items.map(ev=>{
+    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:big?14:10,marginBottom:totalPages>1?(big?6:4):14}}>
+      {visible.map(ev=>{
         const days=Math.max(0,Math.round((parseKey(ev.date)-parseKey(today))/864e5));
         const o=ownerOf(ev),c=catOf(ev);
         return(<div key={ev.id} onClick={()=>setPopupDay(ev.date)} style={{cursor:"pointer",background:o.color+"14",border:`1px solid ${o.color}44`,borderRadius:12,padding:big?"14px 18px":"9px 12px",textAlign:"center"}}>
@@ -419,6 +431,9 @@ function CountdownStrip({events,S,big,setEvents,canEdit,currentUser}){
         </div>);
       })}
     </div>
+    {totalPages>1&&<div style={{display:"flex",justifyContent:"center",gap:6,marginBottom:14}}>
+      {Array.from({length:totalPages}).map((_,i)=><div key={i} style={{width:i===safePage?(big?16:10):(big?7:5),height:big?7:5,borderRadius:4,background:i===safePage?S.T.accent:S.T.border,transition:"width 0.3s,background 0.3s"}}/>)}
+    </div>}
     <EventDetailPopup dayKey={popupDay} events={events} setEvents={setEvents} currentUser={currentUser} canEdit={canEdit} S={S} onClose={()=>setPopupDay(null)}/>
   </>);
 }
