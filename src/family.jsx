@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { store } from "./store";
 import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, POINT_VALUE, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate } from "./constants";
 import { DayPills } from "./shared";
+import { RECIPE_LIBRARY } from "./recipeLibrary";
 
 // ── CHORE LEADERBOARD — this week's points + a daily-completion streak ───────
 function ChoreLeaderboard({chores,choreLog,S}){
@@ -305,8 +306,88 @@ function TodoTab({items,onSave,S}){
   </div>);
 }
 
+// ── RECIPE LIBRARY — browse the 100 curated weeknight recipes, pick which to import ─
+function RecipeLibraryPanel({mealFavs,setMealFavs,S,onClose}){
+  const [search,setSearch]=useState("");
+  const [cat,setCat]=useState("All");
+  const [selected,setSelected]=useState(new Set());
+  const [expanded,setExpanded]=useState(null);
+  const [addedCount,setAddedCount]=useState(null);
+  const cats=["All",...new Set(RECIPE_LIBRARY.map(r=>r.cat))];
+  const favNames=new Set((mealFavs||[]).map(f=>f.name.toLowerCase()));
+  const filtered=RECIPE_LIBRARY.filter(r=>(cat==="All"||r.cat===cat)&&r.name.toLowerCase().includes(search.toLowerCase()));
+  const toggle=name=>{
+    if(favNames.has(name.toLowerCase()))return;
+    setSelected(s=>{const n=new Set(s);n.has(name)?n.delete(name):n.add(name);return n;});
+  };
+  const selectAllFiltered=()=>{
+    setSelected(s=>{
+      const n=new Set(s);
+      filtered.forEach(r=>{if(!favNames.has(r.name.toLowerCase()))n.add(r.name);});
+      return n;
+    });
+  };
+  const clearSelected=()=>setSelected(new Set());
+  const addSelected=()=>{
+    const toAdd=RECIPE_LIBRARY.filter(r=>selected.has(r.name)&&!favNames.has(r.name.toLowerCase()));
+    if(toAdd.length===0)return;
+    const newFavs=toAdd.map((r,i)=>({id:Date.now()+i,name:r.name,ingredients:r.ingredients.map((ing,ii)=>({id:Date.now()+i*100+ii,name:ing.name,qty:ing.qty})),recipe:r.recipe}));
+    const merged=[...(mealFavs||[]),...newFavs];
+    setMealFavs(merged);
+    store.save("fp2:mealFavs",merged);
+    setAddedCount(toAdd.length);
+    setSelected(new Set());
+  };
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
+    <div style={{background:S.T.card,border:`1px solid ${S.T.border}`,borderRadius:14,padding:24,maxWidth:720,width:"100%",maxHeight:"88vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+      <div style={{...S.row,marginBottom:14,flexWrap:"wrap",gap:8}}>
+        <div>
+          <div style={{fontSize:18,color:S.T.text,fontWeight:"bold"}}>📖 Recipe Library</div>
+          <div style={{fontSize:12,color:S.T.sub}}>100 easy weeknight recipes — pick the ones you want and add them to Favorites</div>
+        </div>
+        <button style={S.btnGhost} onClick={onClose}>Close</button>
+      </div>
+      {addedCount!=null&&<div style={{...S.alert("#4CAF50"),marginBottom:12}}><span style={{color:"#4CAF50",fontWeight:"bold"}}>✓ Added {addedCount} recipe{addedCount!==1?"s":""} to Favorites.</span></div>}
+      <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+        <input style={{...S.input,flex:1,minWidth:160}} placeholder="Search recipes..." value={search} onChange={e=>setSearch(e.target.value)}/>
+        <button style={S.btnGhost} onClick={selectAllFiltered}>Select All Shown</button>
+        {selected.size>0&&<button style={S.btnGhost} onClick={clearSelected}>Clear ({selected.size})</button>}
+      </div>
+      <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:12}}>
+        {cats.map(c=><button key={c} onClick={()=>setCat(c)} style={{padding:"3px 10px",borderRadius:8,fontSize:11,cursor:"pointer",fontFamily:"Georgia,serif",background:cat===c?GOLD+"33":"transparent",border:`1px solid ${cat===c?GOLD:S.T.border}`,color:cat===c?GOLD:S.T.sub}}>{c}</button>)}
+      </div>
+      <div style={{overflowY:"auto",flex:1,marginBottom:14}}>
+        {filtered.length===0&&<div style={{fontSize:13,color:S.T.sub,textAlign:"center",padding:20}}>No recipes match.</div>}
+        {filtered.map(r=>{
+          const already=favNames.has(r.name.toLowerCase());
+          const isSel=selected.has(r.name);
+          const isExp=expanded===r.name;
+          return(<div key={r.name} style={{borderBottom:`1px solid ${S.T.border}`,padding:"8px 0"}}>
+            <div style={{display:"flex",gap:10,alignItems:"center"}}>
+              <div onClick={()=>toggle(r.name)} style={{width:18,height:18,borderRadius:4,border:`2px solid ${already?"#4CAF50":S.T.border}`,background:isSel?S.T.accent:already?"#4CAF5022":"transparent",cursor:already?"default":"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#0d0d08"}}>{isSel?"✓":already?"✓":""}</div>
+              <div style={{flex:1,cursor:"pointer"}} onClick={()=>setExpanded(isExp?null:r.name)}>
+                <div style={{fontSize:13,color:S.T.text}}>{r.name}</div>
+                <div style={{fontSize:10,color:S.T.sub}}>{r.cat} · {r.ingredients.length} ingredients{already?" · Already in Favorites":""}</div>
+              </div>
+              <span style={{fontSize:11,color:S.T.sub,cursor:"pointer"}} onClick={()=>setExpanded(isExp?null:r.name)}>{isExp?"▲":"▼"}</span>
+            </div>
+            {isExp&&<div style={{marginTop:8,marginLeft:28,fontSize:12,color:S.T.sub}}>
+              <div style={{marginBottom:6}}><strong style={{color:S.T.text}}>Ingredients: </strong>{r.ingredients.map(ing=>`${ing.qty} ${ing.name}`).join(", ")}</div>
+              <div style={{whiteSpace:"pre-line",lineHeight:1.5}}><strong style={{color:S.T.text}}>Instructions:</strong>{"\n"}{r.recipe}</div>
+            </div>}
+          </div>);
+        })}
+      </div>
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end",paddingTop:12,borderTop:`1px solid ${S.T.border}`}}>
+        <button style={S.btnGhost} onClick={onClose}>Done</button>
+        <button style={{...S.btn("#4CAF50"),padding:"9px 20px"}} onClick={addSelected} disabled={selected.size===0}>Add {selected.size>0?selected.size+" ":""}Selected to Favorites</button>
+      </div>
+    </div>
+  </div>);
+}
+
 // ── SETTINGS TAB ─────────────────────────────────────────────────────────────
-function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings,setShopSettings,payAccounts,setPayAccounts,S,currentUser}){
+function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings,setShopSettings,payAccounts,setPayAccounts,mealFavs,setMealFavs,S,currentUser}){
   const [local,setLocal]=useState({...profile});
   const [saved,setSaved]=useState(false);
   const saveProfile=()=>{setProfile(local);store.save("fp2:profile",local);setSaved(true);setTimeout(()=>setSaved(false),2000);};
@@ -339,6 +420,7 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
   const [restoreConfirm,setRestoreConfirm]=useState(false);
   const [restoreDone,setRestoreDone]=useState(false);
   const [restoreError,setRestoreError]=useState("");
+  const [showRecipeLibrary,setShowRecipeLibrary]=useState(false);
   const pickRestoreFile=()=>{setRestoreError("");setRestoreDone(false);restoreInputRef.current?.click();};
   const onRestoreFileChosen=e=>{
     const file=e.target.files?.[0];
@@ -450,6 +532,12 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
             </div>}
         </div>}
       </div>
+    </div>}
+    {isParent&&<div style={S.card}>
+      <div style={S.h2}>📖 Recipe Library</div>
+      <div style={{fontSize:12,color:S.T.sub,marginBottom:12}}>Browse 100 easy weeknight family recipes — short ingredient lists, full instructions — and add whichever ones you want straight into Meal Favorites.</div>
+      <button style={S.btn()} onClick={()=>setShowRecipeLibrary(true)}>Browse Recipe Library</button>
+      {showRecipeLibrary&&<RecipeLibraryPanel mealFavs={mealFavs} setMealFavs={setMealFavs} S={S} onClose={()=>setShowRecipeLibrary(false)}/>}
     </div>}
     {isParent&&<div style={S.card}>
       <div style={S.h2}>Feature Toggles</div>
