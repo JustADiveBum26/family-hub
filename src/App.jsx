@@ -47,12 +47,12 @@ export default function App(){
   const timerRef=useRef(null);
 
   const loadAll=useCallback(async()=>{
-    const [p,a,d,e,g,t,ps,bl,mp,sl,ms,sr,au,ch,mg,bh,as,md,ss,pa,bn,evts,mps,mf,td,stp,cl,al]=await Promise.all([
+    const [p,a,d,e,g,t,ps,bl,sl,ms,sr,au,ch,mg,bh,as,md,ss,pa,bn,evts,mps,mf,td,stp,cl,al]=await Promise.all([
       store.load("fp2:profile",D.profile),store.load("fp2:accounts",D.accounts),
       store.load("fp2:debts",D.debts),store.load("fp2:expenses",D.expenses),
       store.load("fp2:goals",D.goals),store.load("fp2:transactions",D.transactions),
       store.load("fp2:pslf",D.pslf),store.load("fp2:bills",D.bills),
-      store.load("fp2:mealPlan",D.mealPlan),store.load("fp2:shopList",D.shopList),
+      store.load("fp2:shopList",D.shopList),
       store.load("fp2:mealSuggestions",D.mealSuggestions),store.load("fp2:shopRequests",D.shopRequests),
       store.load("fp2:auth",D.auth),store.load("fp2:chores",D.chores),
       store.load("fp2:messages",D.messages),store.load("fp2:billHistory",D.billHistory),
@@ -69,15 +69,8 @@ export default function App(){
     ]);
     setProfile(p);setAccounts(a);setDebts(d);setExpenses(e);setGoals(g);setTransactions(t);setPslf(ps);
     setBills(bl);setBillHistory(bh||[]);
-    // Meal plans are keyed by week (Monday's date). First run after upgrading
-    // migrates the old single-week plan into the current week.
-    if(mps&&Object.keys(mps).length>0){
-      setMealPlans(mps);
-    }else{
-      const seeded={[weekKeyOf()]:normalizeWeek(mp)};
-      setMealPlans(seeded);
-      store.save("fp2:mealPlans",seeded);
-    }
+    // Meal plans are keyed by week (Monday's date).
+    setMealPlans(mps&&Object.keys(mps).length>0?mps:{});
     setShopList(sl);setMealSuggestions(ms);setShopRequests(sr);
     setAuth(au||D.auth);setChores(ch||[]);setMessages(mg||[]);
     setMealDetails(md||{});
@@ -103,11 +96,6 @@ export default function App(){
     timerRef.current=setInterval(()=>{if(Date.now()-lastActivity.current>=TIMEOUT_MS)setCurrentUser(null);},15000);
     return()=>{events.forEach(ev=>window.removeEventListener(ev,resetActivity));clearInterval(timerRef.current);};
   },[currentUser,resetActivity]);
-
-  const saveAll=useCallback((updates={})=>{
-    const s={profile,accounts,debts,expenses,goals,transactions,pslf,...updates};
-    Object.entries({"fp2:profile":s.profile,"fp2:accounts":s.accounts,"fp2:debts":s.debts,"fp2:expenses":s.expenses,"fp2:goals":s.goals,"fp2:transactions":s.transactions,"fp2:pslf":s.pslf}).forEach(([k,v])=>store.save(k,v));
-  },[profile,accounts,debts,expenses,goals,transactions,pslf]);
 
   const totalAssets=accounts.reduce((s,a)=>s+a.balance,0);
   const totalCC=debts.filter(d=>d.type==="Credit Card").reduce((s,d)=>s+d.balance,0);
@@ -164,7 +152,7 @@ export default function App(){
     {loginTarget&&<LoginModal user={loginTarget} auth={auth} onSuccess={pwd=>handleLoginSuccess(loginTarget,pwd)} onClose={()=>setLoginTarget(null)}/>}
     {!currentUser&&tvMode&&<TVDisplay mealPlan={mealPlan} nextWeekPlan={nextWeekPlan} events={events} shopList={shopList} bills={bills} messages={messages} chores={chores} appSettings={appSettings} onExit={exitTv} onLogin={k=>{exitTv();setLoginTarget(k);}} onRefresh={loadAll}/>}
     {!currentUser&&!tvMode&&<PublicHomeScreen mealPlan={mealPlan} shopList={shopList} setShopList={setShopList} bills={bills} expenses={expenses} onLogin={handleLogin} appSettings={appSettings} messages={messages} shopSettings={shopSettings} events={events} onTv={enterTv}/>}
-    {currentUser==="brad"&&<BradDashboard {...sharedProps} accounts={accounts} setAccounts={setAccounts} debts={debts} setDebts={setDebts} expenses={expenses} setExpenses={setExpenses} goals={goals} setGoals={setGoals} transactions={transactions} setTransactions={setTransactions} pslf={pslf} setPslf={setPslf} scenario={scenario} setScenario={setScenario} reviewTxns={reviewTxns} setReviewTxns={setReviewTxns} uploadLoading={uploadLoading} handleUpload={handleUpload} confirmTxns={confirmTxns} fileRef={fileRef} saveAll={saveAll} auth={auth} setAuth={setAuth} totalAssets={totalAssets} totalDebtAmt={totalDebtAmt} netWorth={netWorth} totalCC={totalCC} combinedLiquid={combinedLiquid} cushion={cushion} dti={dti} mortgageRate={mortgageRate} monthlyMortgage={monthlyMortgage} loanAmt={loanAmt} surplus={surplus} takeHome={takeHome} totalExpenses={totalExpenses} slPayment={slPayment} downNeeded={downNeeded} closing={closing} homePrice={homePrice} onLogout={handleLogout}/>}
+    {currentUser==="brad"&&<BradDashboard {...sharedProps} accounts={accounts} setAccounts={setAccounts} debts={debts} setDebts={setDebts} expenses={expenses} setExpenses={setExpenses} goals={goals} setGoals={setGoals} transactions={transactions} setTransactions={setTransactions} pslf={pslf} setPslf={setPslf} scenario={scenario} setScenario={setScenario} reviewTxns={reviewTxns} setReviewTxns={setReviewTxns} uploadLoading={uploadLoading} handleUpload={handleUpload} confirmTxns={confirmTxns} fileRef={fileRef} auth={auth} setAuth={setAuth} totalAssets={totalAssets} totalDebtAmt={totalDebtAmt} netWorth={netWorth} totalCC={totalCC} combinedLiquid={combinedLiquid} cushion={cushion} dti={dti} mortgageRate={mortgageRate} monthlyMortgage={monthlyMortgage} loanAmt={loanAmt} surplus={surplus} takeHome={takeHome} totalExpenses={totalExpenses} slPayment={slPayment} downNeeded={downNeeded} closing={closing} homePrice={homePrice} onLogout={handleLogout}/>}
     {currentUser==="maryBeth"&&<MaryBethDashboard {...sharedProps} expenses={expenses} debts={debts} onLogout={handleLogout} setChores={setChores}/>}
     {currentUser==="bradyn"&&<BradynDashboard mealPlan={mealPlan} shopList={shopList} setShopList={setShopList} shopRequests={shopRequests} setShopRequests={setShopRequests} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} mealDetails={mealDetails} setMealDetails={setMealDetails} chores={chores} setChores={setChores} messages={messages} setMessages={setMessages} appSettings={appSettings} shopSettings={shopSettings} bradynLedger={bradynLedger} setBradynLedger={setBradynLedger} events={events} setEvents={setEvents} choreLog={choreLog} setChoreLog={setChoreLog} allowance={allowance} setAllowance={setAllowance} onLogout={handleLogout}/>}
     {currentUser==="parker"&&<ParkerTab mealPlan={mealPlan} shopRequests={shopRequests} setShopRequests={setShopRequests} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} chores={chores} setChores={setChores} messages={messages} setMessages={setMessages} appSettings={appSettings} events={events} setEvents={setEvents} choreLog={choreLog} setChoreLog={setChoreLog} allowance={allowance} setAllowance={setAllowance} onLogout={handleLogout}/>}

@@ -92,8 +92,10 @@ function PslfTab({pslf,setPslf,debts,S}){
   const upd=(f,v)=>{const n={...pslf,[f]:v};setPslf(n);store.save("fp2:pslf",n);};
   const sl=debts.find(d=>d.pslf),rem=120-pslf.qualifyingPayments;
   const checklist=[{id:"idr",label:"Enrolled in IDR plan",detail:"SAVE, PAYE, IBR, or ICR"},{id:"emp",label:"Full-time qualifying employer",detail:"Federal, state, local, tribal, or eligible nonprofit"},{id:"ecf",label:"Employment Certification submitted this year",detail:"Submit annually at StudentAid.gov"},{id:"pay",label:"Making on-time qualifying payments",detail:"Every payment must be on-time"},{id:"cnt",label:"Verified payment count at StudentAid.gov",detail:"Log in and confirm"},{id:"loans",label:"Only DIRECT loans",detail:"Not FFEL or Perkins"},{id:"stay",label:"Not leaving federal employment within 24 months",detail:"Leaving resets PSLF"},{id:"nox",label:"NOT making extra student loan payments",detail:"Extra payments waste money on PSLF track"}];
-  const [checks,setChecks]=useState(pslf.checks||{});
-  const toggleCheck=id=>{const n={...checks,[id]:!checks[id]};setChecks(n);upd("checks",n);};
+  // Derived straight from the pslf prop (not local state) so it can't render
+  // stale/empty before store.load's async data replaces the initial default.
+  const checks=pslf.checks||{};
+  const toggleCheck=id=>{const n={...checks,[id]:!checks[id]};upd("checks",n);};
   const allGood=checklist.every(c=>checks[c.id]);
   return(<><div style={{...S.alert(allGood?"#4CAF50":"#FF9800"),marginBottom:14}}><span style={{color:allGood?"#4CAF50":"#FF9800",fontWeight:"bold"}}>{allGood?"✓ PSLF ON TRACK":"REVIEW CHECKLIST"} — </span><span style={{color:S.T.sub,fontSize:13}}>{pslf.qualifyingPayments} payments · {rem} remaining · {pslf.pslfMonths||24} months to forgiveness of {sl?fmt(sl.balance):"$120,000+"}</span></div>
     <div style={S.grid2}><div style={S.card}><div style={S.h2}>PSLF Status</div>{[{l:"Qualifying Payments",k:"qualifyingPayments",t:"number"},{l:"Total Required",k:"totalPayments",t:"number"},{l:"Months to Forgiveness",k:"pslfMonths",t:"number"},{l:"Employer",k:"employer",t:"text"},{l:"IDR Plan",k:"idrPlan",t:"text"},{l:"Next Cert. Due",k:"certDue",t:"date"}].map(f=><div key={f.k} style={{marginBottom:10}}><div style={S.label}>{f.l}</div><input style={S.input} type={f.t} value={pslf[f.k]||""} onChange={e=>upd(f.k,f.t==="number"?+e.target.value:e.target.value)}/></div>)}<Bar value={pslf.qualifyingPayments} max={pslf.totalPayments} color="#2196F3" height={10}/><div style={{fontSize:11,color:S.T.sub,marginTop:4}}>{((pslf.qualifyingPayments/pslf.totalPayments)*100).toFixed(0)}% complete</div></div>
@@ -101,15 +103,20 @@ function PslfTab({pslf,setPslf,debts,S}){
     <div style={S.card}><div style={S.h2}>Notes</div><textarea style={{...S.input,height:80,resize:"vertical"}} placeholder="Track anything important about your PSLF status..." value={pslf.notes||""} onChange={e=>upd("notes",e.target.value)}/></div></>);
 }
 
-function DashboardTab({profile,accounts,debts,goals,expenses,transactions,totalAssets,totalDebtAmt,netWorth,combinedLiquid,totalCC,cushion,dti,mortgageRate,monthlyMortgage,loanAmt,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,setTab,bills,mealPlan,mealSuggestions,shopRequests,S}){
-  const ccProg=Math.max(0,(30000-totalCC)/30000*100),pslfProg=Math.max(0,(36-profile.pslfMonths)/36*100);
+function DashboardTab({profile,pslf,accounts,debts,goals,expenses,transactions,totalAssets,totalDebtAmt,netWorth,combinedLiquid,totalCC,cushion,dti,mortgageRate,monthlyMortgage,loanAmt,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,setTab,bills,mealPlan,mealSuggestions,shopRequests,scenario,setScenario,S}){
+  const [showScenarios,setShowScenarios]=useState(false);
+  // PSLF months-to-forgiveness lives in one place — the dedicated PSLF tab's
+  // tracker (pslf.pslfMonths) — so this dashboard can't silently drift from
+  // it the way it would if it kept its own copy in profile.pslfMonths.
+  const pslfMonthsLeft=pslf.pslfMonths;
+  const ccProg=Math.max(0,(30000-totalCC)/30000*100),pslfProg=Math.max(0,(36-pslfMonthsLeft)/36*100);
   const savProg=Math.min(combinedLiquid/(downNeeded+closing+totalCC)*100,100),scoreProg=(profile.creditScore-580)/(850-580)*100;
   const recentTxns=transactions.slice(-5).reverse(),today=new Date(),todayName=DAYS[today.getDay()===0?6:today.getDay()-1];
   const pendKid=(mealSuggestions||[]).filter(s=>s.status==="pending").length+(shopRequests||[]).filter(r=>r.status==="pending").length;
   const upBills=(bills||[]).filter(b=>!billPaid(b)&&Math.ceil((new Date(b.dueDate+"T12:00:00")-today)/(864e5))>=0&&Math.ceil((new Date(b.dueDate+"T12:00:00")-today)/(864e5))<=7).sort((a,c)=>new Date(a.dueDate)-new Date(c.dueDate));
   return(<>
     {dti>40&&<div style={S.alert("#FF9800")}><span style={{color:"#FF9800",fontWeight:"bold"}}>DTI WARNING </span><span style={{color:S.T.sub,fontSize:13}}>DTI is {dti.toFixed(1)}% — close to the 43% limit.</span></div>}
-    {profile.pslfMonths<=24&&<div style={S.alert(GOLD)}><span style={{color:GOLD,fontWeight:"bold"}}>PSLF: {profile.pslfMonths} months left — </span><span style={{color:S.T.sub,fontSize:13}}>Don't change IDR plan or leave federal employment.</span></div>}
+    {pslfMonthsLeft<=24&&<div style={S.alert(GOLD)}><span style={{color:GOLD,fontWeight:"bold"}}>PSLF: {pslfMonthsLeft} months left — </span><span style={{color:S.T.sub,fontSize:13}}>Don't change IDR plan or leave federal employment.</span></div>}
     {cushion<10000&&<div style={S.alert("#f44336")}><span style={{color:"#f44336",fontWeight:"bold"}}>CUSHION ALERT — </span><span style={{color:S.T.sub,fontSize:13}}>After closing ~{fmt(cushion)} left.</span></div>}
     <div style={S.card}><div style={{display:"flex",justifyContent:"space-around",alignItems:"center",flexWrap:"wrap",gap:16,padding:"6px 0"}}>
       <Ring pct={savProg} color={GOLD} label={`${savProg.toFixed(0)}%`} sub="Savings vs Need"/>
@@ -130,10 +137,18 @@ function DashboardTab({profile,accounts,debts,goals,expenses,transactions,totalA
       <div style={S.card}><div style={S.h2}>Goals Snapshot</div>{goals.map(g=>{const p=Math.min(g.saved/g.target*100,100);return <div key={g.id} style={{marginBottom:10}}><div style={{...S.row,marginBottom:4}}><span style={{fontSize:13,color:S.T.text}}>{g.icon} {g.name}</span><span style={{fontSize:12,color:g.color,fontFamily:"monospace"}}>{fmt(g.saved)} / {fmt(g.target)}</span></div><Bar value={g.saved} max={g.target} color={g.color}/></div>;})}<button style={{...S.btnGhost,marginTop:6,fontSize:12}} onClick={()=>setTab("goals")}>Manage Goals →</button></div>
     </div>
     {recentTxns.length>0&&<div style={S.card}><div style={S.h2}>Recent Transactions</div>{recentTxns.map(t=><div key={t.id} style={{...S.row,padding:"6px 0",borderBottom:`1px solid ${S.T.border}`,flexWrap:"wrap",gap:8}}><div><div style={{fontSize:13,color:S.T.text}}>{t.description}</div><div style={{fontSize:11,color:S.T.sub}}>{t.date} · <span style={S.tag("#888")}>{t.category}</span></div></div><span style={{color:t.amount<0?"#f44336":"#4CAF50",fontFamily:"monospace",fontWeight:"bold"}}>{t.amount<0?"−":"+"}{fmt(Math.abs(t.amount))}</span></div>)}</div>}
+    <div style={S.card}>
+      <div style={{...S.h2,...S.row}}>
+        <span>⚗ Scenario Lab</span>
+        <button style={{...S.btnGhost,fontSize:12}} onClick={()=>setShowScenarios(!showScenarios)}>{showScenarios?"▲ Hide":"▼ Show"}</button>
+      </div>
+      {!showScenarios&&<div style={{fontSize:12,color:S.T.sub}}>Model "what-if" scenarios (extra payments, income changes, down payment %) without touching your real data.</div>}
+      {showScenarios&&<ScenariosTab scenario={scenario} setScenario={setScenario} debts={debts} profile={profile} combinedLiquid={combinedLiquid} totalCC={totalCC} mortgageRate={mortgageRate} homePrice={homePrice} slPayment={slPayment} S={S}/>}
+    </div>
   </>);
 }
 
 export {
   AcctRow, AccountsTab, DebtsTab, BudgetTab, GoalsTab, StatementsTab,
-  ScenariosTab, PslfTab, DashboardTab,
+  PslfTab, DashboardTab,
 };

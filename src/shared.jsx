@@ -1,7 +1,7 @@
 // ── Shared UI components (login, home screens, widgets) ───────────────────────
 import { useState, useEffect } from "react";
 import { store } from "./store";
-import { DAYS, DSHORT, MEAL_TYPES, GOLD, BORDER, THEMES, USERS, APP_VERSION, fmt, todayName, billPaid, weekKeyOf, dateOfWeekDay, S, isoDateForDayName, logChoreDone, unlogChoreDone } from "./constants";
+import { DAYS, DSHORT, MEAL_TYPES, GOLD, BORDER, THEMES, USERS, APP_VERSION, SHOP_CATS, SHOP_STORES, fmt, todayName, billPaid, weekKeyOf, dateOfWeekDay, S, isoDateForDayName, logChoreDone, unlogChoreDone } from "./constants";
 import { MonthCalendar, UpcomingEvents, CountdownStrip, WeeklyCelebrations, EventDetailPopup } from "./calendar";
 
 // ── SAVE STATUS — quiet unless there's actually something to worry about ──────
@@ -44,8 +44,8 @@ function ShoppingListView({shopList,setShopList,shopSettings,onClose}){
   const saveShop=u=>{setShopList(u);store.save("fp2:shopList",u);};
   const toggle=id=>saveShop(shopList.map(i=>i.id===id?{...i,checked:!i.checked}:i));
   const clearDone=()=>saveShop(shopList.filter(i=>!i.checked));
-  const cats=shopSettings?.categories||["Grocery","Dairy","Produce","Meat","Snacks","Beverages","Household","Personal Care","Other"];
-  const stores=shopSettings?.stores||["Walmart","Kroger","Target","Costco","Aldi","Other"];
+  const cats=shopSettings?.categories||SHOP_CATS;
+  const stores=shopSettings?.stores||SHOP_STORES;
   const unchecked=shopList.filter(i=>!i.checked);
   const checked=shopList.filter(i=>i.checked);
   const doneCount=checked.length;
@@ -429,7 +429,7 @@ function DayPills({selected,onToggle,S}){
 }
 
 export {
-  Ring, Bar, PinPad, ShoppingListView, LoginModal, WeatherScroll, FAMILY_CITIES, BillsBanner,
+  Ring, Bar, PinPad, ShoppingListView, LoginModal, WeatherScroll, BillsBanner,
   PinnedAnnouncements, WeeklyChoreBoard, PersonalHomeScreen, UserHeader,
   ThemePicker, PublicHomeScreen, DayPills, SaveStatusBadge, VersionBadge,
 };

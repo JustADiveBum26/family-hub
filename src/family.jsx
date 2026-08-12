@@ -1,7 +1,7 @@
 // ── Family features: chores, message board, settings, bills, meals, ledger ────
 import { useState, useEffect, useRef } from "react";
 import { store } from "./store";
-import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, POINT_VALUE, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate } from "./constants";
+import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, SHOP_CATS, SHOP_STORES, POINT_VALUE, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate } from "./constants";
 import { DayPills } from "./shared";
 import { RECIPE_LIBRARY } from "./recipeLibrary";
 
@@ -387,7 +387,8 @@ function RecipeLibraryPanel({mealFavs,setMealFavs,S,onClose}){
 }
 
 // ── SETTINGS TAB ─────────────────────────────────────────────────────────────
-function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings,setShopSettings,payAccounts,setPayAccounts,mealFavs,setMealFavs,S,currentUser}){
+function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings,setShopSettings,payAccounts,setPayAccounts,auth,setAuth,S,currentUser}){
+  const [showAdmin,setShowAdmin]=useState(false);
   const [local,setLocal]=useState({...profile});
   const [saved,setSaved]=useState(false);
   const saveProfile=()=>{setProfile(local);store.save("fp2:profile",local);setSaved(true);setTimeout(()=>setSaved(false),2000);};
@@ -420,7 +421,6 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
   const [restoreConfirm,setRestoreConfirm]=useState(false);
   const [restoreDone,setRestoreDone]=useState(false);
   const [restoreError,setRestoreError]=useState("");
-  const [showRecipeLibrary,setShowRecipeLibrary]=useState(false);
   const pickRestoreFile=()=>{setRestoreError("");setRestoreDone(false);restoreInputRef.current?.click();};
   const onRestoreFileChosen=e=>{
     const file=e.target.files?.[0];
@@ -534,12 +534,6 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
       </div>
     </div>}
     {isParent&&<div style={S.card}>
-      <div style={S.h2}>📖 Recipe Library</div>
-      <div style={{fontSize:12,color:S.T.sub,marginBottom:12}}>Browse 100 easy weeknight family recipes — short ingredient lists, full instructions — and add whichever ones you want straight into Meal Favorites.</div>
-      <button style={S.btn()} onClick={()=>setShowRecipeLibrary(true)}>Browse Recipe Library</button>
-      {showRecipeLibrary&&<RecipeLibraryPanel mealFavs={mealFavs} setMealFavs={setMealFavs} S={S} onClose={()=>setShowRecipeLibrary(false)}/>}
-    </div>}
-    {isParent&&<div style={S.card}>
       <div style={S.h2}>Feature Toggles</div>
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
         <div style={{...S.row,padding:"10px 0",borderBottom:`1px solid ${S.T.border}`}}>
@@ -567,6 +561,14 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
           </div>}
         </div>
       </div>
+    </div>}
+    {currentUser==="brad"&&<div style={S.card}>
+      <div style={{...S.h2,...S.row}}>
+        <span>🔐 Admin</span>
+        <button style={{...S.btnGhost,fontSize:12}} onClick={()=>setShowAdmin(!showAdmin)}>{showAdmin?"▲ Hide":"▼ Show"}</button>
+      </div>
+      {!showAdmin&&<div style={{fontSize:12,color:S.T.sub}}>Kids' PIN codes, password resets, and your own password.</div>}
+      {showAdmin&&<AdminPanel auth={auth} setAuth={setAuth} S={S}/>}
     </div>}
   </div>);
 }
@@ -706,24 +708,30 @@ function BillsTab({bills,setBills,billHistory,setBillHistory,profile,payAccounts
   // Auto-roll recurring bills forward: once a "repeats monthly" bill is fully
   // paid (and thus archived to History), create next month's copy so it
   // doesn't have to be manually re-added every month — same pattern as
-  // BradynLedger's month rollover.
-  useEffect(()=>{
+  // BradynLedger's month rollover. Runs both on load (catches bills paid in a
+  // prior session) and right when a bill gets marked paid this session.
+  const rollForwardRecurring=list=>{
     const toCreate=[];
-    bills.forEach(b=>{
+    list.forEach(b=>{
       if(!b.recurring||!billPaid(b))return;
       const rid=b.recurringId||b.id;
       const nextDue=addMonthToDate(b.dueDate);
-      const exists=bills.some(x=>(x.recurringId||x.id)===rid&&x.dueDate===nextDue);
+      const exists=list.some(x=>(x.recurringId||x.id)===rid&&x.dueDate===nextDue);
       if(!exists)toCreate.push({...b,id:Date.now()+Math.random(),recurringId:rid,dueDate:nextDue,bradPaid:false,bradPaidDate:null,maryBethPaid:false,maryBethPaidDate:null,paidFromBrad:"",paidFromMB:""});
     });
-    if(toCreate.length>0)save([...bills,...toCreate]);
+    return toCreate.length>0?[...list,...toCreate]:list;
+  };
+  useEffect(()=>{
+    const rolled=rollForwardRecurring(bills);
+    if(rolled!==bills)save(rolled);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
   const togglePaid=(id,person)=>{
     const bill=bills.find(b=>b.id===id);if(!bill)return;
     const f=person==="brad"?"bradPaid":"maryBethPaid",df=person==="brad"?"bradPaidDate":"maryBethPaidDate";
     const nowPaid=!bill[f];
-    save(bills.map(b=>b.id===id?{...b,[f]:nowPaid,[df]:nowPaid?new Date().toLocaleDateString():null}:b));
+    const updated=bills.map(b=>b.id===id?{...b,[f]:nowPaid,[df]:nowPaid?new Date().toLocaleDateString():null}:b);
+    save(nowPaid&&bill.recurring?rollForwardRecurring(updated):updated);
     if(nowPaid){
       const isShared=!bill.owner||bill.owner==="shared";
       const amt=isShared?bill.amount/2:bill.amount;
@@ -821,7 +829,7 @@ function BillsTab({bills,setBills,billHistory,setBillHistory,profile,payAccounts
 function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList,saveDetails,saveShop,onClearMeal,onSaveFavorite,shopSettings,S}){
   const [newIngs,setNewIngs]=useState([{id:1,name:"",qty:"1"},{id:2,name:"",qty:"1"},{id:3,name:"",qty:"1"},{id:4,name:"",qty:"1"},{id:5,name:"",qty:"1"}]);
   const [favSaved,setFavSaved]=useState(false);
-  const stores=shopSettings?.stores||["Walmart","Kroger","Target","Costco","Aldi","Other"];
+  const stores=shopSettings?.stores||SHOP_STORES;
   const [ingStore,setIngStore]=useState("");
   const blankIng=()=>({id:Date.now()+Math.random(),name:"",qty:"1"});
   const updateNewIng=(i,field,val)=>setNewIngs(rows=>rows.map((r,ri)=>ri===i?{...r,[field]:val}:r));
@@ -927,8 +935,8 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
   const [editCell,setEditCell]=useState(null),[cellVal,setCellVal]=useState("");
   const [showAdd,setShowAdd]=useState(false),[newItem,setNewItem]=useState({name:"",qty:"1",category:"Grocery",store:"",notes:"",price:""});
   const [addMode,setAddMode]=useState("single");
-  const cats=shopSettings?.categories||["Grocery","Dairy","Produce","Meat","Snacks","Beverages","Household","Personal Care","Other"];
-  const stores=shopSettings?.stores||["Walmart","Kroger","Target","Costco","Aldi","Other"];
+  const cats=shopSettings?.categories||SHOP_CATS;
+  const stores=shopSettings?.stores||SHOP_STORES;
   const blankRow=()=>({id:Date.now()+Math.random(),name:"",qty:"1",category:cats[0]||"Grocery",store:"",price:""});
   const [bulkRows,setBulkRows]=useState([blankRow(),blankRow(),blankRow(),blankRow(),blankRow()]);
   const updateRow=(i,field,val)=>setBulkRows(rows=>rows.map((r,ri)=>ri===i?{...r,[field]:val}:r));
@@ -954,6 +962,7 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
   const [favTarget,setFavTarget]=useState({day:"Monday",mt:"Dinner"});
   const [copyConfirm,setCopyConfirm]=useState(false);
   const [showFavs,setShowFavs]=useState(false);
+  const [showRecipeLibrary,setShowRecipeLibrary]=useState(false);
   const placeFav=f=>{
     saveMeals({...mealPlan,[favTarget.day]:{...mealPlan[favTarget.day],[favTarget.mt]:f.name}});
     if((f.ingredients&&f.ingredients.length)||f.recipe)saveDetails({...mealDetails,[wk+"__"+favTarget.day+"__"+favTarget.mt]:{ingredients:f.ingredients||[],recipe:f.recipe||""}});
@@ -1199,15 +1208,19 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
     <div style={S.card}>
       <div style={{...S.h2,...S.row,flexWrap:"wrap",gap:8}}>
         <span>★ Meal Favorites{favs.length>0?` (${favs.length})`:""}</span>
-        <button style={{...S.btnGhost,fontSize:12}} onClick={()=>setShowFavs(!showFavs)}>{showFavs?"▲ Hide":"▼ Show"}</button>
+        <div style={{display:"flex",gap:6}}>
+          <button style={{...S.btnGhost,fontSize:12}} onClick={()=>setShowRecipeLibrary(true)}>📖 Browse Recipe Library</button>
+          <button style={{...S.btnGhost,fontSize:12}} onClick={()=>setShowFavs(!showFavs)}>{showFavs?"▲ Hide":"▼ Show"}</button>
+        </div>
       </div>
+      {showRecipeLibrary&&<RecipeLibraryPanel mealFavs={mealFavs} setMealFavs={setMealFavs} S={S} onClose={()=>setShowRecipeLibrary(false)}/>}
       {showFavs&&<>
         <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
           {copyConfirm
             ?<div style={{display:"flex",gap:6}}><button style={{...S.btn("#FF9800"),padding:"5px 12px",fontSize:12}} onClick={copyLastWeek}>Yes, overwrite {weekTitle.toLowerCase()}</button><button style={{...S.btnGhost,padding:"5px 10px",fontSize:12}} onClick={()=>setCopyConfirm(false)}>Cancel</button></div>
             :<button style={{...S.btnGhost,fontSize:12}} onClick={()=>setCopyConfirm(true)}>⟳ Copy Last Week's Menu</button>}
         </div>
-        {favs.length===0&&<div style={{fontSize:13,color:S.T.sub}}>No favorites yet — open any meal on the grid and tap <strong style={{color:S.T.text}}>★ Save Favorite</strong>, or add some from Settings &gt; Recipe Library.</div>}
+        {favs.length===0&&<div style={{fontSize:13,color:S.T.sub}}>No favorites yet — open any meal on the grid and tap <strong style={{color:S.T.text}}>★ Save Favorite</strong>, or browse the Recipe Library above.</div>}
         {favs.length>0&&<>
           <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:10}}>
             <span style={{fontSize:12,color:S.T.sub}}>Add to:</span>
@@ -1368,7 +1381,7 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
           </div>
         </div>);
         return(
-        <div key={item.id} style={{...S.card,borderLeft:`4px solid ${item.paid?"#4CAF50":isOver?"#f44336":isSoon?"#FF9800":"#FF9800"}`,marginBottom:8}}>
+        <div key={item.id} style={{...S.card,borderLeft:`4px solid ${item.paid?"#4CAF50":isOver?"#f44336":isSoon?"#FF9800":S.T.border}`,marginBottom:8}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
             <div style={{flex:1}}>
               <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:4,flexWrap:"wrap"}}>
@@ -1524,6 +1537,6 @@ function AllowanceOverview({log,setLog,chores,setChores,S}){
 }
 
 export {
-  ChoresTab, KidChoreView, ChoreLeaderboard, MessageBoard, SettingsTab, AdminPanel, BillCard,
+  ChoresTab, KidChoreView, ChoreLeaderboard, MessageBoard, SettingsTab, BillCard,
   SecHead, BillsTab, MealDetailModal, MealsTab, BradynLedger, TodoTab, AllowanceCard, AllowanceOverview,
 };

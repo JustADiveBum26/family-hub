@@ -8,15 +8,16 @@ const ACCT_TYPES=["Checking","Savings","HYSA","Investment","Brokerage","TSP","Ro
 const DEBT_TYPES=["Credit Card","Student Loan","Auto","Mortgage","Personal Loan","Medical","Other"];
 const BILL_CATS=["Utilities","Housing","Insurance","Subscriptions","Medical","Auto","Food","Other"];
 const SHOP_CATS=["Grocery","Dairy","Produce","Meat","Snacks","Beverages","Household","Personal Care","Other"];
+const SHOP_STORES=["Walmart","Kroger","Target","Costco","Aldi","Other"];
 const CHORE_MASTER=["Make bed","Dishes / unload dishwasher","Take out trash","Vacuum","Sweep / mop","Clean bathroom","Laundry","Feed pets","Wipe counters","Take out recycling","Pick up living room","Homework done","Practice instrument","Walk dog","Set table","Clear table","Yard work","Clean room"];
-const GOLD="#C9A84C",DARK="#0d0d08",MID="#141410",BORDER="#2a2a18";
+const GOLD="#C9A84C",BORDER="#2a2a18";
 const TIMEOUT_MS=5*60*1000;
 // $ credited per chore point when a kid redeems completed chores into their
 // allowance balance (AllowanceCard in family.jsx).
 const POINT_VALUE=0.10;
 // Bumped by hand alongside each commit's "vNN: ..." message, so the number
 // shown in the app (VersionBadge in shared.jsx) always matches git history.
-const APP_VERSION="58";
+const APP_VERSION="59";
 
 const THEMES={
   dark:{bg:"#0d0d08",card:"#141410",border:"#2a2a18",text:"#e8e0c8",sub:"#888",accent:GOLD,name:"Dark Gold"},
@@ -34,24 +35,22 @@ const USERS=[
   {key:"ryder",label:"Ryder",emoji:"🌟",type:"pin",color:"#ff6b35"},
 ];
 
-const blankMealPlan=()=>Object.fromEntries(DAYS.map(d=>[d,{Breakfast:"",Lunch:"",Dinner:""}]));
-
 const D={
   profile:{myName:"Brad",fianceName:"Mary Beth",myIncome:100000,fIncome:100000,creditScore:710,pslfMonths:24},
   accounts:[{id:1,name:"Checking",owner:"me",type:"Checking",balance:5000,institution:"Bank"},{id:2,name:"HYSA",owner:"me",type:"HYSA",balance:90000,institution:"Ally",apy:4.5},{id:3,name:"TSP",owner:"me",type:"TSP",balance:25000,institution:"TSP",monthlyContrib:500},{id:4,name:"Roth IRA",owner:"me",type:"Roth IRA",balance:8000,institution:"Fidelity",monthlyContrib:200},{id:5,name:"Checking",owner:"fiance",type:"Checking",balance:5000,institution:"Bank"},{id:6,name:"HYSA",owner:"fiance",type:"HYSA",balance:45000,institution:"Marcus",apy:4.5}],
   debts:[{id:1,name:"Card 1",type:"Credit Card",balance:15000,rate:22,minPayment:300,owner:"me"},{id:2,name:"Card 2",type:"Credit Card",balance:10000,rate:19,minPayment:200,owner:"me"},{id:3,name:"Card 3",type:"Credit Card",balance:5000,rate:24,minPayment:100,owner:"me"},{id:4,name:"Student Loans",type:"Student Loan",balance:120000,rate:0,minPayment:400,owner:"me",pslf:true},{id:5,name:"Car Lease",type:"Auto",balance:8000,rate:0,minPayment:300,owner:"me"}],
   expenses:[{id:1,category:"Housing",items:[{id:11,name:"Rent",amount:2000,due:1},{id:12,name:"Renters Insurance",amount:30,due:15}]},{id:2,category:"Food",items:[{id:21,name:"Groceries",amount:600,due:0},{id:22,name:"Dining Out",amount:300,due:0}]},{id:3,category:"Transport",items:[{id:31,name:"Car Lease",amount:300,due:5},{id:32,name:"Gas",amount:150,due:0}]},{id:4,category:"Subscriptions",items:[{id:41,name:"Netflix",amount:18,due:12},{id:42,name:"Spotify",amount:11,due:8},{id:43,name:"Gym",amount:50,due:1}]},{id:5,category:"Healthcare",items:[{id:51,name:"Health Insurance",amount:200,due:1}]},{id:6,category:"Utilities",items:[{id:61,name:"Electric",amount:100,due:20},{id:62,name:"Internet",amount:60,due:15}]}],
   goals:[{id:1,name:"House Down Payment",icon:"🏡",target:100000,saved:50000,date:"2025-12-01",color:GOLD},{id:2,name:"Emergency Fund",icon:"🛡",target:25000,saved:10000,date:"2025-06-01",color:"#2196F3"},{id:3,name:"Wedding",icon:"💍",target:10000,saved:2000,date:"2026-06-01",color:"#E91E63"},{id:4,name:"Vacation",icon:"✈️",target:5000,saved:500,date:"2025-09-01",color:"#4CAF50"},{id:5,name:"Retirement",icon:"🌅",target:50000,saved:33000,date:"2030-01-01",color:"#9C27B0"}],
-  transactions:[],milestones:[{id:1,date:new Date().toISOString().slice(0,10),text:"Started Family Hub",type:"start"}],
+  transactions:[],
   pslf:{totalPayments:120,qualifyingPayments:96,pslfMonths:24,certDue:"2025-09-01",employer:"Federal Agency",idrPlan:"SAVE",notes:""},
-  bills:[],mealPlan:blankMealPlan(),shopList:[],mealSuggestions:[],shopRequests:[],
+  bills:[],shopList:[],mealSuggestions:[],shopRequests:[],
   auth:{brad:null,maryBeth:null,bradyn:null,parker:null,ryder:null},
   chores:[],messages:[],billHistory:[],choreLog:[],allowance:{},
   appSettings:{showPoints:false,showAdultChores:{brad:false,maryBeth:false,bradyn:false},userThemes:{},todoEnabled:{brad:true,maryBeth:true}},
   todos:{brad:[],maryBeth:[]},
   shopSettings:{
-    categories:["Grocery","Dairy","Produce","Meat","Snacks","Beverages","Household","Personal Care","Other"],
-    stores:["Walmart","Kroger","Target","Costco","Aldi","Other"],
+    categories:SHOP_CATS,
+    stores:SHOP_STORES,
   },
   payAccounts:{
     brad:["Chase Checking","Ally HYSA","Cash"],
@@ -144,10 +143,10 @@ function makeS(theme,scale=1.15){
 const S=makeS("dark");
 
 export {
-  DAYS, DSHORT, MEAL_TYPES, CATS, ACCT_TYPES, DEBT_TYPES, BILL_CATS, SHOP_CATS,
-  CHORE_MASTER, GOLD, DARK, MID, BORDER, TIMEOUT_MS, POINT_VALUE, APP_VERSION, THEMES, USERS,
-  blankMealPlan, D, fmt, calcMortgage, scoreToRate, calcPayoff, todayName, billPaid,
+  DAYS, DSHORT, MEAL_TYPES, CATS, ACCT_TYPES, DEBT_TYPES, BILL_CATS, SHOP_CATS, SHOP_STORES,
+  CHORE_MASTER, GOLD, BORDER, TIMEOUT_MS, POINT_VALUE, APP_VERSION, THEMES, USERS,
+  D, fmt, calcMortgage, scoreToRate, calcPayoff, todayName, billPaid,
   weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek,
   todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate,
-  getTheme, makeS, S,
+  makeS, S,
 };

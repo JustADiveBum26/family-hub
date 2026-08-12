@@ -1,10 +1,10 @@
 // ── Per-user dashboards ────────────────────────────────────────────────────────
 import { useState } from "react";
 import { store } from "./store";
-import { DAYS, MEAL_TYPES, GOLD, fmt, makeS } from "./constants";
+import { DAYS, MEAL_TYPES, SHOP_CATS, SHOP_STORES, fmt, makeS } from "./constants";
 import { ShoppingListView, UserHeader, ThemePicker, PersonalHomeScreen, BillsBanner, WeatherScroll } from "./shared";
-import { ChoresTab, KidChoreView, MessageBoard, SettingsTab, AdminPanel, BillsTab, MealDetailModal, MealsTab, BradynLedger, TodoTab, AllowanceCard, AllowanceOverview } from "./family";
-import { AccountsTab, DebtsTab, BudgetTab, GoalsTab, StatementsTab, ScenariosTab, PslfTab, DashboardTab } from "./finance";
+import { ChoresTab, KidChoreView, MessageBoard, SettingsTab, BillsTab, MealDetailModal, MealsTab, BradynLedger, TodoTab, AllowanceCard, AllowanceOverview } from "./family";
+import { AccountsTab, DebtsTab, BudgetTab, GoalsTab, StatementsTab, PslfTab, DashboardTab } from "./finance";
 import { CalendarTab, WeeklyCelebrations } from "./calendar";
 
 function BradynDashboard({mealPlan,shopList,setShopList,shopRequests,setShopRequests,mealSuggestions,setMealSuggestions,mealDetails,setMealDetails,chores,setChores,messages,setMessages,appSettings,shopSettings,bradynLedger,setBradynLedger,events,setEvents,choreLog,setChoreLog,allowance,setAllowance,onLogout}){
@@ -32,8 +32,8 @@ function BradynDashboard({mealPlan,shopList,setShopList,shopRequests,setShopRequ
   const saveDetails=u=>{setMealDetails(u);store.save("fp2:mealDetails",u);};
   const sendSugg=()=>{if(!sugg.meal)return;saveSugg([...mealSuggestions,{...sugg,id:Date.now(),kidName:"Bradyn",status:"pending",date:new Date().toLocaleDateString()}]);setSugg({meal:"",suggestDate:"",mealType:"Dinner",notes:""});setShowS(false);};
   const addShopItem=()=>{if(!newItem.name)return;saveShop([...shopList,{...newItem,id:Date.now(),addedBy:"Bradyn",checked:false}]);setNewItem({name:"",qty:"1",category:"Grocery",store:"",notes:""});setShowAdd(false);};
-  const cats=shopSettings?.categories||["Grocery","Dairy","Produce","Meat","Snacks","Beverages","Household","Personal Care","Other"];
-  const stores=shopSettings?.stores||["Walmart","Kroger","Target","Costco","Aldi","Other"];
+  const cats=shopSettings?.categories||SHOP_CATS;
+  const stores=shopSettings?.stores||SHOP_STORES;
   const C={bg:"#090e1a",card:"#0f1628",border:"#1e2d4a",accent:"#00d4ff",text:"#c8d8f0",sub:"#4a6a8a"};
         const bS={page:{background:C.bg,minHeight:"100vh",fontFamily:"Georgia,serif",color:C.text,fontSize:17},card:{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:24,marginBottom:16},cardSm:{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:18,marginBottom:12},h2:{fontSize:18,color:C.accent,fontWeight:"normal",borderBottom:`1px solid ${C.border}`,paddingBottom:10,marginBottom:18},btn:(c=C.accent)=>({background:c,border:"none",borderRadius:6,padding:"13px 22px",color:c===C.accent?C.bg:"#fff",fontFamily:"Georgia,serif",fontSize:16,cursor:"pointer",fontWeight:"bold",whiteSpace:"nowrap"}),btnGhost:{background:"transparent",border:`1px solid ${C.border}`,borderRadius:6,padding:"10px 17px",color:C.sub,fontFamily:"Georgia,serif",fontSize:15,cursor:"pointer"},btnDanger:{background:"transparent",border:"1px solid #f4433644",borderRadius:6,padding:"7px 13px",color:"#f44336",fontFamily:"Georgia,serif",fontSize:15,cursor:"pointer"},label:{fontSize:12,color:C.sub,textTransform:"uppercase",letterSpacing:"0.15em",marginBottom:6,fontFamily:"monospace"},input:{background:C.bg,border:`1px solid ${C.border}`,borderRadius:6,padding:"10px 14px",color:C.text,fontFamily:"Georgia,serif",fontSize:16,width:"100%",boxSizing:"border-box",outline:"none"},select:{background:C.bg,border:`1px solid ${C.border}`,borderRadius:6,padding:"10px 14px",color:C.text,fontFamily:"Georgia,serif",fontSize:16,width:"100%",boxSizing:"border-box",outline:"none"},row:{display:"flex",justifyContent:"space-between",alignItems:"center"},tag:co=>({background:co+"22",color:co,border:`1px solid ${co}44`,borderRadius:4,padding:"4px 10px",fontSize:13,fontFamily:"monospace"}),alert:co=>({background:co+"18",border:`1px solid ${co}44`,borderRadius:8,padding:"15px 20px",marginBottom:15}),T:{accent:C.accent,text:C.text,sub:C.sub,border:C.border,bg:C.bg}};
   const TABS=[{id:"home",label:"Home",icon:"🏠"},{id:"cal",label:"Calendar",icon:"📅"},{id:"chores",label:"Tasks",icon:"✅"},{id:"ledger",label:"Ledger",icon:"💵"},{id:"allowance",label:"Piggy Bank",icon:"💰"},{id:"board",label:"Board",icon:"📢"}];
@@ -222,7 +222,7 @@ function RyderTab({mealPlan,shopRequests,setShopRequests,mealSuggestions,setMeal
 
 // ── BRAD DASHBOARD ────────────────────────────────────────────────────────────
 function BradDashboard(props){
-  const {onLogout,auth,setAuth,netWorth,accounts,setAccounts,debts,setDebts,expenses,setExpenses,goals,setGoals,transactions,setTransactions,pslf,setPslf,scenario,setScenario,reviewTxns,setReviewTxns,uploadLoading,handleUpload,confirmTxns,fileRef,saveAll,profile,setProfile,mealPlan,nextWeekPlan,mealPlans,setMealPlans,mealFavs,setMealFavs,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,totalAssets,totalDebtAmt,totalCC,combinedLiquid,cushion,dti,mortgageRate,monthlyMortgage,loanAmt,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger,events,setEvents,todos,setTodos,shopStaples,setShopStaples,choreLog,setChoreLog,allowance,setAllowance}=props;
+  const {onLogout,auth,setAuth,netWorth,accounts,setAccounts,debts,setDebts,expenses,setExpenses,goals,setGoals,transactions,setTransactions,pslf,setPslf,scenario,setScenario,reviewTxns,setReviewTxns,uploadLoading,handleUpload,confirmTxns,fileRef,profile,setProfile,mealPlan,nextWeekPlan,mealPlans,setMealPlans,mealFavs,setMealFavs,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,totalAssets,totalDebtAmt,totalCC,combinedLiquid,cushion,dti,mortgageRate,monthlyMortgage,loanAmt,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger,events,setEvents,todos,setTodos,shopStaples,setShopStaples,choreLog,setChoreLog,allowance,setAllowance}=props;
   const [tab,setTab]=useState("home");
   const [showShopView,setShowShopView]=useState(false);
   const [userTheme,setUserTheme]=useState(appSettings?.userThemes?.brad||"dark");
@@ -235,8 +235,8 @@ function BradDashboard(props){
   const GROUPS=[
     {g:"Home",tabs:[{id:"home",label:"Home",icon:"🏠"}]},
     {g:"Family",tabs:[{id:"cal",label:"Calendar",icon:"📅"},{id:"meals",label:"Meals & Food",icon:"🍽"},{id:"chores",label:"Tasks",icon:"✅"},...(todoOn?[{id:"todo",label:"My To-Do",icon:"📝"}]:[]),{id:"board",label:"Board",icon:"📢"},{id:"bills",label:"Expenses",icon:"🧾"},{id:"bradynledger",label:"Bradyn & Me",icon:"💵"},{id:"allowance",label:"Allowance",icon:"💰"}]},
-    {g:"Finance",tabs:[{id:"dashboard",label:"Dashboard",icon:"◈"},{id:"accounts",label:"Accounts",icon:"🏦"},{id:"debts",label:"Debts",icon:"💳"},{id:"budget",label:"Budget",icon:"📊"},{id:"goals",label:"Goals",icon:"🎯"},{id:"statements",label:"Statements",icon:"📄"},{id:"scenarios",label:"Scenarios",icon:"⚗"},{id:"pslf",label:"PSLF",icon:"🎓"}]},
-    {g:"Settings",tabs:[{id:"settings",label:"Settings",icon:"⚙️"},{id:"admin",label:"Admin",icon:"🔐"}]},
+    {g:"Finance",tabs:[{id:"dashboard",label:"Dashboard",icon:"◈"},{id:"accounts",label:"Accounts",icon:"🏦"},{id:"debts",label:"Debts",icon:"💳"},{id:"budget",label:"Budget",icon:"📊"},{id:"goals",label:"Goals",icon:"🎯"},{id:"statements",label:"Statements",icon:"📄"},{id:"pslf",label:"PSLF",icon:"🎓"}]},
+    {g:"Settings",tabs:[{id:"settings",label:"Settings",icon:"⚙️"}]},
   ];
   return(<div style={S.page}>
     {showShopView&&<ShoppingListView shopList={shopList} setShopList={setShopList} shopSettings={shopSettings} onClose={()=>setShowShopView(false)}/>}
@@ -265,16 +265,14 @@ function BradDashboard(props){
       {tab==="bills"&&<BillsTab bills={bills} setBills={setBills} billHistory={billHistory} setBillHistory={setBillHistory} profile={profile} payAccounts={payAccounts} S={S}/>}
       {tab==="bradynledger"&&<BradynLedger ledger={bradynLedger||[]} setLedger={setBradynLedger} currentUser="brad" S={S}/>}
       {tab==="allowance"&&<AllowanceOverview log={allowance} setLog={setAllowance} chores={chores} setChores={setChores} S={S}/>}
-      {tab==="dashboard"&&<DashboardTab profile={profile} accounts={accounts} debts={debts} goals={goals} expenses={expenses} transactions={transactions} totalAssets={totalAssets} totalDebtAmt={totalDebtAmt} netWorth={netWorth} combinedLiquid={combinedLiquid} totalCC={totalCC} cushion={cushion} dti={dti} mortgageRate={mortgageRate} monthlyMortgage={monthlyMortgage} loanAmt={loanAmt} surplus={surplus} takeHome={takeHome} totalExpenses={totalExpenses} slPayment={slPayment} downNeeded={downNeeded} closing={closing} homePrice={homePrice} setTab={setTab} bills={bills} mealPlan={mealPlan} mealSuggestions={mealSuggestions} shopRequests={shopRequests} S={S}/>}
+      {tab==="dashboard"&&<DashboardTab profile={profile} pslf={pslf} accounts={accounts} debts={debts} goals={goals} expenses={expenses} transactions={transactions} totalAssets={totalAssets} totalDebtAmt={totalDebtAmt} netWorth={netWorth} combinedLiquid={combinedLiquid} totalCC={totalCC} cushion={cushion} dti={dti} mortgageRate={mortgageRate} monthlyMortgage={monthlyMortgage} loanAmt={loanAmt} surplus={surplus} takeHome={takeHome} totalExpenses={totalExpenses} slPayment={slPayment} downNeeded={downNeeded} closing={closing} homePrice={homePrice} setTab={setTab} bills={bills} mealPlan={mealPlan} mealSuggestions={mealSuggestions} shopRequests={shopRequests} scenario={scenario} setScenario={setScenario} S={S}/>}
       {tab==="accounts"&&<AccountsTab accounts={accounts} setAccounts={setAccounts} profile={profile} S={S}/>}
       {tab==="debts"&&<DebtsTab debts={debts} setDebts={setDebts} profile={profile} S={S}/>}
       {tab==="budget"&&<BudgetTab expenses={expenses} setExpenses={setExpenses} transactions={transactions} takeHome={takeHome} slPayment={slPayment} S={S}/>}
       {tab==="goals"&&<GoalsTab goals={goals} setGoals={setGoals} S={S}/>}
       {tab==="statements"&&<StatementsTab transactions={transactions} setTransactions={setTransactions} handleUpload={handleUpload} uploadLoading={uploadLoading} reviewTxns={reviewTxns} setReviewTxns={setReviewTxns} confirmTxns={confirmTxns} fileRef={fileRef} S={S}/>}
-      {tab==="scenarios"&&<ScenariosTab scenario={scenario} setScenario={setScenario} debts={debts} profile={profile} combinedLiquid={combinedLiquid} totalCC={totalCC} surplus={surplus} mortgageRate={mortgageRate} loanAmt={loanAmt} homePrice={homePrice} slPayment={slPayment} S={S}/>}
       {tab==="pslf"&&<PslfTab pslf={pslf} setPslf={setPslf} debts={debts} S={S}/>}
-      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} shopSettings={shopSettings} setShopSettings={setShopSettings} payAccounts={payAccounts} setPayAccounts={setPayAccounts} mealFavs={mealFavs} setMealFavs={setMealFavs} S={S} currentUser="brad"/>}
-      {tab==="admin"&&<AdminPanel auth={auth} setAuth={setAuth} S={S}/>}
+      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} shopSettings={shopSettings} setShopSettings={setShopSettings} payAccounts={payAccounts} setPayAccounts={setPayAccounts} auth={auth} setAuth={setAuth} S={S} currentUser="brad"/>}
     </div>
   </div>);
 }
@@ -313,7 +311,7 @@ function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,n
       {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="maryBeth" S={S}/>}
       {tab==="bills"&&<BillsTab bills={bills} setBills={setBills} billHistory={billHistory} setBillHistory={setBillHistory} profile={profile} payAccounts={payAccounts} S={S}/>}
       {tab==="allowance"&&<AllowanceOverview log={allowance} setLog={setAllowance} chores={chores} setChores={setChores} S={S}/>}
-      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} shopSettings={shopSettings} setShopSettings={setShopSettings} payAccounts={payAccounts} setPayAccounts={setPayAccounts} mealFavs={mealFavs} setMealFavs={setMealFavs} S={S} currentUser="maryBeth"/>}
+      {tab==="settings"&&<SettingsTab profile={profile} setProfile={setProfile} appSettings={appSettings} setAppSettings={setAppSettings} shopSettings={shopSettings} setShopSettings={setShopSettings} payAccounts={payAccounts} setPayAccounts={setPayAccounts} S={S} currentUser="maryBeth"/>}
     </div>
   </div>);
 }
