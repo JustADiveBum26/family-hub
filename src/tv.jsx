@@ -1,7 +1,7 @@
 // ── TV WALL DISPLAY — kiosk view for the drop-zone flat screen ────────────────
 // Reached from the "📺 TV Display Mode" button on the landing page or by
 // bookmarking the app URL with #tv. Read-only, big type, refreshes itself.
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { DAYS, MEAL_TYPES, GOLD, BORDER, USERS, todayName, billPaid, weekKeyOf, dateOfWeekDay, todayISO, makeS } from "./constants";
 import { WeatherScroll } from "./shared";
 import { MonthCalendar, EventRow, CountdownStrip, WeeklyCelebrations, EventDetailPopup, eventsOnDay, todayKey } from "./calendar";
@@ -53,6 +53,20 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
   const gnStart=gn.start??21,gnEnd=gn.end??7;
   const hour=now.getHours();
   const inNight=!!gn.enabled&&(gnStart<gnEnd?(hour>=gnStart&&hour<gnEnd):(hour>=gnStart||hour<gnEnd));
+  // The screen goes fully black during the goodnight window — not just
+  // dimmed — and only lights back up on a tap/click, auto-returning to
+  // black after a short period of no interaction.
+  const WAKE_MS=30000;
+  const [awake,setAwake]=useState(false);
+  const wakeTimerRef=useRef(null);
+  useEffect(()=>{if(inNight)setAwake(false);},[inNight]);
+  const wake=()=>{
+    setAwake(true);
+    clearTimeout(wakeTimerRef.current);
+    wakeTimerRef.current=setTimeout(()=>setAwake(false),WAKE_MS);
+  };
+  useEffect(()=>()=>clearTimeout(wakeTimerRef.current),[]);
+  const asleep=inNight&&!awake;
   const tn=todayName();
   const tKey=todayKey();
   const tomorrowKey=(()=>{const d=new Date(now);d.setDate(d.getDate()+1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;})();
@@ -114,7 +128,8 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
     return()=>clearInterval(id);
   },[panels.length]);
   const activePanel=panels[panelIdx%panels.length];
-  return(<div style={{background:T.bg,height:vh,fontFamily:"Georgia,serif",color:T.text,padding:"12px 18px",boxSizing:"border-box",display:"flex",flexDirection:"column",overflow:"hidden",filter:inNight?"brightness(0.4) saturate(0.7)":"none",transition:"filter 3s ease"}}>
+  return(<div onClick={asleep?wake:undefined} onTouchStart={asleep?wake:undefined} style={{background:T.bg,height:vh,fontFamily:"Georgia,serif",color:T.text,padding:"12px 18px",boxSizing:"border-box",display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
+    {asleep&&<div style={{position:"absolute",inset:0,background:"#000",zIndex:9999,cursor:"pointer"}}/>}
     {/* Header: identity, clock, weather — always stays at the top */}
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap",marginBottom:8,flexShrink:0}}>
       <div>

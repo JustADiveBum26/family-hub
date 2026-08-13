@@ -546,7 +546,7 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
         </div>}
         <div style={{padding:"10px 0"}}>
           <div style={{...S.row,marginBottom:appSettings.goodnightMode?.enabled?10:0}}>
-            <div><div style={{fontSize:14,color:S.T.text}}>TV Goodnight Mode</div><div style={{fontSize:12,color:S.T.sub}}>Auto-dim the TV wall display overnight</div></div>
+            <div><div style={{fontSize:14,color:S.T.text}}>TV Goodnight Mode</div><div style={{fontSize:12,color:S.T.sub}}>Screen goes fully black overnight — tap to wake for 30 seconds</div></div>
             <button onClick={()=>saveSettings({...appSettings,goodnightMode:{...appSettings.goodnightMode,enabled:!appSettings.goodnightMode?.enabled}})} style={{...S.btn(appSettings.goodnightMode?.enabled?"#4CAF50":S.T.border),padding:"7px 16px",fontSize:12}}>{appSettings.goodnightMode?.enabled?"ON":"OFF"}</button>
           </div>
           {appSettings.goodnightMode?.enabled&&<div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
