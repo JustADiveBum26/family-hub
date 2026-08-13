@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { store } from "./store";
 import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, SHOP_CATS, SHOP_STORES, POINT_VALUE, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate } from "./constants";
-import { DayPills } from "./shared";
+import { DayPills, QuickAddChip, SavedListCard, ApprovalRow, EditFormCard } from "./shared";
 import { RECIPE_LIBRARY } from "./recipeLibrary";
 
 // ── CHORE LEADERBOARD — this week's points + a daily-completion streak ───────
@@ -57,7 +57,6 @@ function ChoresTab({chores,setChores,choreLog,setChoreLog,appSettings,S,currentU
   const firstUser=visibleUsers.length>0?visibleUsers[0].key:"bradyn";
   const showPoints=appSettings.showPoints;
   const toggleDay=d=>setForm(f=>({...f,days:f.days.includes(d)?f.days.filter(x=>x!==d):[...f.days,d]}));
-  const toggleEditDay=d=>setEditForm(f=>({...f,days:(f.days||[]).includes(d)?(f.days||[]).filter(x=>x!==d):[...(f.days||[]),d]}));
   const addChore=()=>{
     const task=(form.customTask||form.task||"").trim();
     if(!task)return;
@@ -115,13 +114,13 @@ function ChoresTab({chores,setChores,choreLog,setChoreLog,appSettings,S,currentU
             <div style={{...S.label,marginBottom:4}}>RECURRING</div>
             {recurring2.map(c=>{
               if(editingId===c.id)return(<div key={c.id} style={{padding:"8px 0",borderBottom:`1px solid ${S.T.border}`}}>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-                  <div><div style={S.label}>Who</div><select style={S.select} value={editForm.assignee} onChange={e=>setEditForm({...editForm,assignee:e.target.value})}>{visibleUsers.map(u2=><option key={u2.key} value={u2.key}>{u2.label}</option>)}</select></div>
-                  <div><div style={S.label}>Task</div><input style={S.input} value={editForm.task} onChange={e=>setEditForm({...editForm,task:e.target.value})}/></div>
-                  {showPoints&&<div><div style={S.label}>Points</div><input style={S.input} type="number" value={editForm.points} onChange={e=>setEditForm({...editForm,points:+e.target.value})}/></div>}
-                  <div style={{gridColumn:"1/-1"}}><div style={S.label}>Days</div><DayPills selected={editForm.days||[]} onToggle={toggleEditDay} S={S}/></div>
-                </div>
-                <div style={{display:"flex",gap:6}}><button style={{...S.btn("#4CAF50"),padding:"5px 12px",fontSize:12}} onClick={()=>saveEdit(c.id)}>Save</button><button style={{...S.btnGhost,padding:"5px 10px",fontSize:12}} onClick={()=>setEditingId(null)}>Cancel</button></div>
+                <EditFormCard S={S} compact columns="1fr 1fr" values={editForm} onChange={(k,v)=>setEditForm({...editForm,[k]:v})} onSave={()=>saveEdit(c.id)} onCancel={()=>setEditingId(null)}
+                  fields={[
+                    {key:"assignee",label:"Who",type:"select",options:visibleUsers.map(u2=>({value:u2.key,label:u2.label}))},
+                    {key:"task",label:"Task"},
+                    {key:"points",label:"Points",type:"number",hidden:()=>!showPoints},
+                    {key:"days",label:"Days",type:"days",full:true},
+                  ]}/>
               </div>);
               const doneToday=(c.donedays||{})[todayISO()];
               const schedToday=c.days.includes(tn);
@@ -141,13 +140,13 @@ function ChoresTab({chores,setChores,choreLog,setChoreLog,appSettings,S,currentU
             <div style={{...S.label,marginBottom:4}}>ONE-TIME TASKS</div>
             {todo.map(c=>{
               if(editingId===c.id)return(<div key={c.id} style={{padding:"8px 0",borderBottom:`1px solid ${S.T.border}`}}>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-                  <div><div style={S.label}>Who</div><select style={S.select} value={editForm.assignee} onChange={e=>setEditForm({...editForm,assignee:e.target.value})}>{visibleUsers.map(u2=><option key={u2.key} value={u2.key}>{u2.label}</option>)}</select></div>
-                  <div><div style={S.label}>Task</div><input style={S.input} value={editForm.task} onChange={e=>setEditForm({...editForm,task:e.target.value})}/></div>
-                  <div><div style={S.label}>Due Date</div><input style={S.input} type="date" value={editForm.due} onChange={e=>setEditForm({...editForm,due:e.target.value})}/></div>
-                  {showPoints&&<div><div style={S.label}>Points</div><input style={S.input} type="number" value={editForm.points} onChange={e=>setEditForm({...editForm,points:+e.target.value})}/></div>}
-                </div>
-                <div style={{display:"flex",gap:6}}><button style={{...S.btn("#4CAF50"),padding:"5px 12px",fontSize:12}} onClick={()=>saveEdit(c.id)}>Save</button><button style={{...S.btnGhost,padding:"5px 10px",fontSize:12}} onClick={()=>setEditingId(null)}>Cancel</button></div>
+                <EditFormCard S={S} compact columns="1fr 1fr" values={editForm} onChange={(k,v)=>setEditForm({...editForm,[k]:v})} onSave={()=>saveEdit(c.id)} onCancel={()=>setEditingId(null)}
+                  fields={[
+                    {key:"assignee",label:"Who",type:"select",options:visibleUsers.map(u2=>({value:u2.key,label:u2.label}))},
+                    {key:"task",label:"Task"},
+                    {key:"due",label:"Due Date",type:"date"},
+                    {key:"points",label:"Points",type:"number",hidden:()=>!showPoints},
+                  ]}/>
               </div>);
               return(<div key={c.id} style={{display:"flex",gap:8,padding:"7px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"center"}}>
                 <div onClick={()=>toggleDone(c.id)} style={{width:18,height:18,borderRadius:4,border:`2px solid ${S.T.border}`,cursor:"pointer",flexShrink:0}}/>
@@ -238,10 +237,7 @@ function MessageBoard({messages,setMessages,currentUser,S}){
   return(<div>
     {isParent&&pending.length>0&&<div style={{...S.alert(S.T.accent),marginBottom:14}}>
       <div style={{color:S.T.accent,fontWeight:"bold",marginBottom:8}}>Pending Approval ({pending.length})</div>
-      {pending.map(m=><div key={m.id} style={{...S.row,padding:"8px 0",borderBottom:`1px solid ${S.T.border}`,flexWrap:"wrap",gap:8}}>
-        <div><span style={{fontSize:13,color:S.T.text}}>{m.authorEmoji} {m.authorLabel}: </span><span style={{fontSize:13,color:S.T.sub}}>{m.text}</span></div>
-        <div style={{display:"flex",gap:6}}><button style={{...S.btn("#4CAF50"),padding:"5px 12px",fontSize:12}} onClick={()=>approve(m.id)}>✓ Approve</button><button style={S.btnDanger} onClick={()=>del(m.id)}>✕</button></div>
-      </div>)}
+      {pending.map(m=><ApprovalRow key={m.id} S={S} title={<><span style={{fontSize:13,color:S.T.text}}>{m.authorEmoji} {m.authorLabel}: </span><span style={{fontSize:13,color:S.T.sub}}>{m.text}</span></>} approveLabel="✓ Approve" onApprove={()=>approve(m.id)} onReject={()=>del(m.id)}/>)}
     </div>}
     <div style={S.card}>
       <div style={S.h2}>Family Board</div>
@@ -560,6 +556,10 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
             <select style={{...S.select,width:90}} value={appSettings.goodnightMode?.end??7} onChange={e=>saveSettings({...appSettings,goodnightMode:{...appSettings.goodnightMode,end:+e.target.value}})}>{Array.from({length:24},(_,h)=><option key={h} value={h}>{h===0?"12 AM":h<12?h+" AM":h===12?"12 PM":(h-12)+" PM"}</option>)}</select>
           </div>}
         </div>
+        {currentUser==="brad"&&<div style={{...S.row,padding:"10px 0"}}>
+          <div><div style={{fontSize:14,color:S.T.text}}>Finance Suite</div><div style={{fontSize:12,color:S.T.sub}}>Show the Finance tab (accounts, debts, budget, goals, statements, PSLF) — a self-contained area, separate from the rest of the app</div></div>
+          <button onClick={()=>saveSettings({...appSettings,financeEnabled:!(appSettings.financeEnabled!==false)})} style={{...S.btn(appSettings.financeEnabled!==false?"#4CAF50":S.T.border),padding:"7px 16px",fontSize:12}}>{appSettings.financeEnabled!==false?"ON":"OFF"}</button>
+        </div>}
       </div>
     </div>}
     {currentUser==="brad"&&<div style={S.card}>
@@ -613,24 +613,17 @@ function BillCard({bill,today,togglePaid,setPaidFrom,del,profile,payAccounts,S,e
   const isBradOnly=bill.owner==="brad",isMBOnly=bill.owner==="maryBeth";
   const share=isShared?bill.amount/2:bill.amount;
   if(editingId===bill.id)return(<div style={{...S.card,borderLeft:`4px solid ${S.T.accent}`,marginBottom:8}}>
-    <div style={{fontSize:13,color:S.T.accent,fontWeight:"bold",marginBottom:10}}>Edit Expense</div>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:12}}>
-      <div><div style={S.label}>Expense Name</div><input style={S.input} value={editForm.name} onChange={e=>setEditForm({...editForm,name:e.target.value})}/></div>
-      <div><div style={S.label}>Payee</div><input style={S.input} value={editForm.payee} onChange={e=>setEditForm({...editForm,payee:e.target.value})}/></div>
-      <div><div style={S.label}>Category</div><select style={S.select} value={editForm.category} onChange={e=>setEditForm({...editForm,category:e.target.value})}>{BILL_CATS.map(c=><option key={c}>{c}</option>)}</select></div>
-      <div><div style={S.label}>Who Pays</div><select style={S.select} value={editForm.owner} onChange={e=>setEditForm({...editForm,owner:e.target.value})}><option value="shared">Shared 50/50</option><option value="brad">{profile.myName} Only</option><option value="maryBeth">{profile.fianceName} Only</option></select></div>
-      <div><div style={S.label}>Amount</div><input style={S.input} type="number" value={editForm.amount} onChange={e=>setEditForm({...editForm,amount:e.target.value})}/></div>
-      <div><div style={S.label}>Due Date</div><input style={S.input} type="date" value={editForm.dueDate} onChange={e=>setEditForm({...editForm,dueDate:e.target.value})}/></div>
-      <div><div style={S.label}>Notes</div><input style={S.input} value={editForm.notes} onChange={e=>setEditForm({...editForm,notes:e.target.value})}/></div>
-    </div>
-    <label style={{display:"flex",gap:8,alignItems:"center",marginBottom:12,cursor:"pointer",fontSize:13,color:S.T.text}}>
-      <input type="checkbox" checked={!!editForm.recurring} onChange={e=>setEditForm({...editForm,recurring:e.target.checked})} style={{width:16,height:16,cursor:"pointer"}}/>
-      Repeats monthly — auto-create next month's bill once this one's paid
-    </label>
-    <div style={{display:"flex",gap:8}}>
-      <button style={{...S.btn("#4CAF50"),padding:"8px 18px",fontSize:13}} onClick={()=>saveEdit(bill.id)}>Save Changes</button>
-      <button style={S.btnGhost} onClick={cancelEdit}>Cancel</button>
-    </div>
+    <EditFormCard S={S} title="Edit Expense" values={editForm} onChange={(k,v)=>setEditForm({...editForm,[k]:v})} onSave={()=>saveEdit(bill.id)} onCancel={cancelEdit}
+      fields={[
+        {key:"name",label:"Expense Name"},
+        {key:"payee",label:"Payee"},
+        {key:"category",label:"Category",type:"select",options:BILL_CATS.map(c=>({value:c,label:c}))},
+        {key:"owner",label:"Who Pays",type:"select",options:[{value:"shared",label:"Shared 50/50"},{value:"brad",label:profile.myName+" Only"},{value:"maryBeth",label:profile.fianceName+" Only"}]},
+        {key:"amount",label:"Amount",type:"number"},
+        {key:"dueDate",label:"Due Date",type:"date"},
+        {key:"notes",label:"Notes"},
+        {key:"recurring",label:"Repeats monthly — auto-create next month's bill once this one's paid",type:"checkbox",full:true},
+      ]}/>
   </div>);
   const full=isShared?(bill.bradPaid&&bill.maryBethPaid):isBradOnly?bill.bradPaid:bill.maryBethPaid;
   const edge=full?"#4CAF50":isOver?"#f44336":isSoon?"#FF9800":S.T.border;
@@ -929,6 +922,10 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
   // family can plan next week and look back at past menus.
   const curWk=weekKeyOf();
   const [wk,setWk]=useState(curWk);
+  // Meals had grown into the single most overloaded tab (grid + staples +
+  // shopping list + approvals + favorites + a 100-recipe library all on one
+  // scrolling page) — split into sub-sections instead.
+  const [mealScreen,setMealScreen]=useState("week");
   const mealPlan=normalizeWeek(mealPlans[wk]);
   const isCur=wk===curWk,isNext=wk===weekKeyOffset(curWk,1),isPast=wk<curWk;
   const weekTitle=isCur?"This Week":isNext?"Next Week":isPast?"Past Week":"Week of "+weekLabel(wk).split(" – ")[0];
@@ -1069,7 +1066,12 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
   };
   return(<>
     <MealDetailModal detailSlot={detailSlot} setDetailSlot={setDetailSlot} mealPlan={mealPlan} mealDetails={mealDetails} shopList={shopList} saveDetails={saveDetails} saveShop={saveShop} onClearMeal={clearCell} onSaveFavorite={saveFavorite} shopSettings={shopSettings} S={S}/>
-    {(pendS.length>0||pendR.length>0)&&<div style={{...S.alert(GOLD),marginBottom:14}}><span style={{color:GOLD,fontWeight:"bold"}}>★ {pendS.length+pendR.length} pending request{pendS.length+pendR.length!==1?"s":""} from the kids — </span><span style={{color:S.T.sub,fontSize:13}}>scroll down to review</span></div>}
+    {showRecipeLibrary&&<RecipeLibraryPanel mealFavs={mealFavs} setMealFavs={setMealFavs} S={S} onClose={()=>setShowRecipeLibrary(false)}/>}
+    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
+      {[{id:"week",label:"This Week",icon:"📅"},{id:"shopping",label:"Shopping",icon:"🛒"},{id:"favorites",label:"Favorites & Recipes",icon:"★"}].map(sec=><button key={sec.id} onClick={()=>setMealScreen(sec.id)} style={{padding:"7px 14px",borderRadius:8,fontSize:12,cursor:"pointer",fontFamily:"Georgia,serif",background:mealScreen===sec.id?GOLD+"22":"transparent",border:`1px solid ${mealScreen===sec.id?GOLD:S.T.border}`,color:mealScreen===sec.id?GOLD:S.T.sub,fontWeight:mealScreen===sec.id?"bold":"normal"}}>{sec.icon} {sec.label}{sec.id==="week"&&(pendS.length+pendR.length)>0?` (${pendS.length+pendR.length})`:""}</button>)}
+    </div>
+    {mealScreen==="week"&&<>
+    {(pendS.length>0||pendR.length>0)&&<div style={{...S.alert(GOLD),marginBottom:14}}><span style={{color:GOLD,fontWeight:"bold"}}>★ {pendS.length+pendR.length} pending request{pendS.length+pendR.length!==1?"s":""} from the kids — </span><span style={{color:S.T.sub,fontSize:13}}>review below</span></div>}
     <div style={S.card}>
       <div style={{...S.row,flexWrap:"wrap",gap:8,marginBottom:10}}>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
@@ -1109,33 +1111,26 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
         </td>);})}</tr>)}</tbody>
       </table></div>
     </div>
-    <div style={S.card}>
-      <div style={{...S.h2,...S.row,flexWrap:"wrap",gap:8}}>
-        <span>⭐ Shopping Staples</span>
-        {staples.length>0&&<button style={{...S.btn("#4CAF50"),padding:"5px 12px",fontSize:12}} onClick={addAllStaples}>+ Add All to List</button>}
-      </div>
+    {pendS.length>0&&<div style={S.card}><div style={S.h2}>Meal Suggestions from Kids</div>{pendS.map(s=><ApprovalRow key={s.id} S={S} title={<div style={{fontSize:14,color:S.T.text,fontWeight:"bold"}}>{s.meal}</div>} subtitle={`${s.kidName} — ${s.suggestDate?new Date(s.suggestDate+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):s.dayPreference} ${s.mealType}${s.notes?" — "+s.notes:""}`} approveLabel="Add" onApprove={()=>approveSugg(s.id)} onReject={()=>declineSugg(s.id)}/>)}</div>}
+    {pendR.length>0&&<div style={S.card}><div style={S.h2}>Shopping Requests from Kids</div>{pendR.map(r=><ApprovalRow key={r.id} S={S} title={<div style={{fontSize:14,color:S.T.text,fontWeight:"bold"}}>{r.qty&&r.qty!=="1"?r.qty+"x ":""}{r.item}</div>} subtitle={`${r.kidName}${r.notes?" — "+r.notes:""}`} approveLabel="Add" onApprove={()=>approveReq(r.id)} onReject={()=>declineReq(r.id)}/>)}</div>}
+    {pendS.length===0&&pendR.length===0&&<div style={{...S.card,textAlign:"center",padding:28,color:S.T.sub}}><div style={{fontSize:22,marginBottom:6}}>All clear!</div><div style={{fontSize:13}}>No pending requests from the kids.</div></div>}
+    </>}
+    {mealScreen==="shopping"&&<>
+    <SavedListCard icon="⭐" title="Shopping Staples" S={S}
+      headerExtra={staples.length>0&&<button style={{...S.btn("#4CAF50"),padding:"5px 12px",fontSize:12}} onClick={addAllStaples}>+ Add All to List</button>}
+      emptyText="No staples saved yet — add the things you buy every week (milk, eggs, bread...) so you can add them all to the list with one tap."
+      items={[...staples].sort((a,b)=>a.name.localeCompare(b.name))}
+      renderItem={s=>{
+        const onList=onStapleList(s.name);
+        return <QuickAddChip key={s.id} S={S} label={s.name} sublabel={`${s.category}${s.store?" · "+s.store:""}`} actionLabel={onList?"On List":"+ Add"} actionColor={onList?"#4CAF50":S.T.accent} actionDisabled={onList} onAction={()=>addStapleToList(s)} onRemove={()=>removeStaple(s.id)}/>;
+      }}>
       <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
         <input style={{...S.input,flex:1,minWidth:120}} placeholder="e.g. Milk" value={newStaple.name} onChange={e=>setNewStaple({...newStaple,name:e.target.value})} onKeyDown={e=>e.key==="Enter"&&addStaple()}/>
         <select style={{...S.select,width:130}} value={newStaple.category} onChange={e=>setNewStaple({...newStaple,category:e.target.value})}>{cats.map(c=><option key={c}>{c}</option>)}</select>
         <select style={{...S.select,width:130}} value={newStaple.store} onChange={e=>setNewStaple({...newStaple,store:e.target.value})}><option value="">Any store</option>{stores.map(s=><option key={s}>{s}</option>)}</select>
         <button style={S.btn()} onClick={addStaple}>+ Save Staple</button>
       </div>
-      {staples.length===0&&<div style={{fontSize:13,color:S.T.sub}}>No staples saved yet — add the things you buy every week (milk, eggs, bread...) so you can add them all to the list with one tap.</div>}
-      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-        {[...staples].sort((a,b)=>a.name.localeCompare(b.name)).map(s=>{
-          const onList=onStapleList(s.name);
-          return(<div key={s.id} style={{display:"flex",gap:6,alignItems:"center",background:S.T.bg,border:`1px solid ${S.T.border}`,borderRadius:10,padding:"7px 10px"}}>
-            <div>
-              <div style={{fontSize:13,color:S.T.text}}>{s.name}</div>
-              <div style={{fontSize:10,color:S.T.sub}}>{s.category}{s.store?" · "+s.store:""}</div>
-            </div>
-            <button style={{...S.btn(onList?"#4CAF50":S.T.accent),padding:"4px 10px",fontSize:11,opacity:onList?0.6:1}} onClick={()=>addStapleToList(s)}>{onList?"On List":"+ Add"}</button>
-            <button style={{...S.btnDanger,padding:"3px 7px",fontSize:11}} onClick={()=>removeStaple(s.id)}>✕</button>
-          </div>);
-        })}
-      </div>
-    </div>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
+    </SavedListCard>
       <div style={S.card}>
         <div style={{...S.h2,...S.row,flexWrap:"wrap",gap:8}}>
           <span>Shopping List</span>
@@ -1199,50 +1194,29 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
         </div>)}
         {checked.length>0&&<div style={{marginTop:8}}><div style={{...S.label,marginBottom:4}}>DONE</div>{checked.map(item=><div key={item.id} style={{display:"flex",gap:8,padding:"4px 0",alignItems:"center",opacity:0.45}}><div onClick={()=>toggleItem(item.id)} style={{width:17,height:17,borderRadius:3,border:"2px solid #4CAF50",background:"#4CAF50",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#0d0d08",fontSize:10,fontWeight:"bold"}}>✓</div><span style={{fontSize:12,color:S.T.sub,textDecoration:"line-through",flex:1}}>{item.name}</span><button style={S.btnDanger} onClick={()=>delItem(item.id)}>X</button></div>)}<button style={{...S.btnGhost,marginTop:6,fontSize:11}} onClick={()=>saveShop(shopList.filter(i=>!i.checked))}>Clear Done</button></div>}
       </div>
-      <div>
-        {pendS.length>0&&<div style={S.card}><div style={S.h2}>Meal Suggestions from Kids</div>{pendS.map(s=><div key={s.id} style={{padding:"8px 0",borderBottom:`1px solid ${S.T.border}`}}><div style={{...S.row,flexWrap:"wrap",gap:8}}><div><div style={{fontSize:14,color:S.T.text,fontWeight:"bold"}}>{s.meal}</div><div style={{fontSize:11,color:S.T.sub,marginTop:1}}>{s.kidName} — {s.suggestDate?new Date(s.suggestDate+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):s.dayPreference} {s.mealType}{s.notes?" — "+s.notes:""}</div></div><div style={{display:"flex",gap:6}}><button style={{...S.btn("#4CAF50"),padding:"5px 10px",fontSize:12}} onClick={()=>approveSugg(s.id)}>Add</button><button style={S.btnDanger} onClick={()=>declineSugg(s.id)}>X</button></div></div></div>)}</div>}
-        {pendR.length>0&&<div style={S.card}><div style={S.h2}>Shopping Requests from Kids</div>{pendR.map(r=><div key={r.id} style={{padding:"8px 0",borderBottom:`1px solid ${S.T.border}`}}><div style={{...S.row,flexWrap:"wrap",gap:8}}><div><div style={{fontSize:14,color:S.T.text,fontWeight:"bold"}}>{r.qty&&r.qty!=="1"?r.qty+"x ":""}{r.item}</div><div style={{fontSize:11,color:S.T.sub,marginTop:1}}>{r.kidName}{r.notes?" — "+r.notes:""}</div></div><div style={{display:"flex",gap:6}}><button style={{...S.btn("#4CAF50"),padding:"5px 10px",fontSize:12}} onClick={()=>approveReq(r.id)}>Add</button><button style={S.btnDanger} onClick={()=>declineReq(r.id)}>X</button></div></div></div>)}</div>}
-        {pendS.length===0&&pendR.length===0&&<div style={{...S.card,textAlign:"center",padding:28,color:S.T.sub}}><div style={{fontSize:22,marginBottom:6}}>All clear!</div><div style={{fontSize:13}}>No pending requests from the kids.</div></div>}
+    </>}
+    {mealScreen==="favorites"&&<>
+    <SavedListCard icon="★" title="Meal Favorites" count={favs.length} S={S} collapsed={!showFavs}
+      headerExtra={<div style={{display:"flex",gap:6}}>
+        <button style={{...S.btnGhost,fontSize:12}} onClick={()=>setShowRecipeLibrary(true)}>📖 Browse Recipe Library</button>
+        <button style={{...S.btnGhost,fontSize:12}} onClick={()=>setShowFavs(!showFavs)}>{showFavs?"▲ Hide":"▼ Show"}</button>
+      </div>}
+      emptyText={<>No favorites yet — open any meal on the grid and tap <strong style={{color:S.T.text}}>★ Save Favorite</strong>, or browse the Recipe Library above.</>}
+      items={[...favs].sort((a,b)=>a.name.localeCompare(b.name))}
+      renderItem={f=><QuickAddChip key={f.id} S={S} label={f.name} sublabel={(f.ingredients?.length>0||f.recipe)?`${f.ingredients?.length||0} ingredients${f.recipe?" · recipe":""}`:null} actionLabel="+ Add" onAction={()=>placeFav(f)} onRemove={()=>saveFavs(favs.filter(x=>x.id!==f.id))}/>}>
+      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
+        {copyConfirm
+          ?<div style={{display:"flex",gap:6}}><button style={{...S.btn("#FF9800"),padding:"5px 12px",fontSize:12}} onClick={copyLastWeek}>Yes, overwrite {weekTitle.toLowerCase()}</button><button style={{...S.btnGhost,padding:"5px 10px",fontSize:12}} onClick={()=>setCopyConfirm(false)}>Cancel</button></div>
+          :<button style={{...S.btnGhost,fontSize:12}} onClick={()=>setCopyConfirm(true)}>⟳ Copy Last Week's Menu</button>}
       </div>
-    </div>
-    <div style={S.card}>
-      <div style={{...S.h2,...S.row,flexWrap:"wrap",gap:8}}>
-        <span>★ Meal Favorites{favs.length>0?` (${favs.length})`:""}</span>
-        <div style={{display:"flex",gap:6}}>
-          <button style={{...S.btnGhost,fontSize:12}} onClick={()=>setShowRecipeLibrary(true)}>📖 Browse Recipe Library</button>
-          <button style={{...S.btnGhost,fontSize:12}} onClick={()=>setShowFavs(!showFavs)}>{showFavs?"▲ Hide":"▼ Show"}</button>
-        </div>
-      </div>
-      {showRecipeLibrary&&<RecipeLibraryPanel mealFavs={mealFavs} setMealFavs={setMealFavs} S={S} onClose={()=>setShowRecipeLibrary(false)}/>}
-      {showFavs&&<>
-        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
-          {copyConfirm
-            ?<div style={{display:"flex",gap:6}}><button style={{...S.btn("#FF9800"),padding:"5px 12px",fontSize:12}} onClick={copyLastWeek}>Yes, overwrite {weekTitle.toLowerCase()}</button><button style={{...S.btnGhost,padding:"5px 10px",fontSize:12}} onClick={()=>setCopyConfirm(false)}>Cancel</button></div>
-            :<button style={{...S.btnGhost,fontSize:12}} onClick={()=>setCopyConfirm(true)}>⟳ Copy Last Week's Menu</button>}
-        </div>
-        {favs.length===0&&<div style={{fontSize:13,color:S.T.sub}}>No favorites yet — open any meal on the grid and tap <strong style={{color:S.T.text}}>★ Save Favorite</strong>, or browse the Recipe Library above.</div>}
-        {favs.length>0&&<>
-          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:10}}>
-            <span style={{fontSize:12,color:S.T.sub}}>Add to:</span>
-            <select style={{...S.select,width:130}} value={favTarget.day} onChange={e=>setFavTarget({...favTarget,day:e.target.value})}>{DAYS.map(d=><option key={d}>{d}</option>)}</select>
-            <select style={{...S.select,width:120}} value={favTarget.mt} onChange={e=>setFavTarget({...favTarget,mt:e.target.value})}>{MEAL_TYPES.map(m=><option key={m}>{m}</option>)}</select>
-            <span style={{fontSize:11,color:S.T.sub}}>({weekTitle.toLowerCase()})</span>
-          </div>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            {[...favs].sort((a,b)=>a.name.localeCompare(b.name)).map(f=>(
-              <div key={f.id} style={{display:"flex",gap:6,alignItems:"center",background:S.T.bg,border:`1px solid ${S.T.border}`,borderRadius:10,padding:"7px 10px"}}>
-                <div>
-                  <div style={{fontSize:13,color:S.T.text}}>{f.name}</div>
-                  {(f.ingredients?.length>0||f.recipe)&&<div style={{fontSize:10,color:S.T.sub}}>{f.ingredients?.length||0} ingredients{f.recipe?" · recipe":""}</div>}
-                </div>
-                <button style={{...S.btn(),padding:"4px 10px",fontSize:11}} onClick={()=>placeFav(f)}>+ Add</button>
-                <button style={{...S.btnDanger,padding:"3px 7px",fontSize:11}} onClick={()=>saveFavs(favs.filter(x=>x.id!==f.id))}>✕</button>
-              </div>
-            ))}
-          </div>
-        </>}
-      </>}
-    </div>
+      {favs.length>0&&<div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:10}}>
+        <span style={{fontSize:12,color:S.T.sub}}>Add to:</span>
+        <select style={{...S.select,width:130}} value={favTarget.day} onChange={e=>setFavTarget({...favTarget,day:e.target.value})}>{DAYS.map(d=><option key={d}>{d}</option>)}</select>
+        <select style={{...S.select,width:120}} value={favTarget.mt} onChange={e=>setFavTarget({...favTarget,mt:e.target.value})}>{MEAL_TYPES.map(m=><option key={m}>{m}</option>)}</select>
+        <span style={{fontSize:11,color:S.T.sub}}>({weekTitle.toLowerCase()})</span>
+      </div>}
+    </SavedListCard>
+    </>}
   </>);
 }
 
@@ -1256,6 +1230,14 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
   const save=u=>{setLedger(u);store.save("fp2:bradynLedger",u);};
   const startEdit=item=>{setEditingId(item.id);setEditForm({name:item.name,type:item.type,defaultAmount:String(item.defaultAmount),paymentsRemaining:item.paymentsRemaining!=null?String(item.paymentsRemaining):"",dueDate:item.dueDate||"",notes:item.notes||""});};
   const cancelEdit=()=>setEditingId(null);
+  const editFields=[
+    {key:"name",label:"Name"},
+    {key:"type",label:"Type",type:"select",options:[{value:"recurring",label:"Recurring Monthly"},{value:"oneTime",label:"One-Time"}]},
+    {key:"defaultAmount",label:v=>v.type==="recurring"?"Default Monthly Amount":"Amount",type:"number"},
+    {key:"paymentsRemaining",label:"Payments Remaining (optional)",type:"number",hidden:v=>v.type!=="recurring"},
+    {key:"dueDate",label:"Due Date",type:"date"},
+    {key:"notes",label:"Notes"},
+  ];
   const saveEdit=id=>{
     if(!editForm.name||!editForm.defaultAmount)return;
     const newDefault=+editForm.defaultAmount;
@@ -1366,19 +1348,7 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
         const isOver=dl!=null&&dl<0&&!item.paid;
         const isSoon=dl!=null&&dl>=0&&dl<=3&&!item.paid;
         if(editingId===item.id)return(<div key={item.id} style={{...S.card,borderLeft:`4px solid ${S.T.accent}`,marginBottom:8}}>
-          <div style={{fontSize:13,color:S.T.accent,fontWeight:"bold",marginBottom:10}}>Edit Item</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:12}}>
-            <div><div style={S.label}>Name</div><input style={S.input} value={editForm.name} onChange={e=>setEditForm({...editForm,name:e.target.value})}/></div>
-            <div><div style={S.label}>Type</div><select style={S.select} value={editForm.type} onChange={e=>setEditForm({...editForm,type:e.target.value})}><option value="recurring">Recurring Monthly</option><option value="oneTime">One-Time</option></select></div>
-            <div><div style={S.label}>{editForm.type==="recurring"?"Default Monthly Amount":"Amount"}</div><input style={S.input} type="number" value={editForm.defaultAmount} onChange={e=>setEditForm({...editForm,defaultAmount:e.target.value})}/></div>
-            {editForm.type==="recurring"&&<div><div style={S.label}>Payments Remaining (optional)</div><input style={S.input} type="number" value={editForm.paymentsRemaining} onChange={e=>setEditForm({...editForm,paymentsRemaining:e.target.value})}/></div>}
-            <div><div style={S.label}>Due Date</div><input style={S.input} type="date" value={editForm.dueDate} onChange={e=>setEditForm({...editForm,dueDate:e.target.value})}/></div>
-            <div><div style={S.label}>Notes</div><input style={S.input} value={editForm.notes} onChange={e=>setEditForm({...editForm,notes:e.target.value})}/></div>
-          </div>
-          <div style={{display:"flex",gap:8}}>
-            <button style={{...S.btn("#4CAF50"),padding:"8px 18px",fontSize:13}} onClick={()=>saveEdit(item.id)}>Save Changes</button>
-            <button style={S.btnGhost} onClick={cancelEdit}>Cancel</button>
-          </div>
+          <EditFormCard S={S} title="Edit Item" values={editForm} onChange={(k,v)=>setEditForm({...editForm,[k]:v})} onSave={()=>saveEdit(item.id)} onCancel={cancelEdit} fields={editFields}/>
         </div>);
         return(
         <div key={item.id} style={{...S.card,borderLeft:`4px solid ${item.paid?"#4CAF50":isOver?"#f44336":isSoon?"#FF9800":S.T.border}`,marginBottom:8}}>
@@ -1430,19 +1400,7 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
         const isOver=dl!=null&&dl<0&&!item.paid;
         const isSoon=dl!=null&&dl>=0&&dl<=3&&!item.paid;
         if(editingId===item.id)return(<div key={item.id} style={{...S.card,borderLeft:`4px solid ${S.T.accent}`,marginBottom:8}}>
-          <div style={{fontSize:13,color:S.T.accent,fontWeight:"bold",marginBottom:10}}>Edit Item</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:12}}>
-            <div><div style={S.label}>Name</div><input style={S.input} value={editForm.name} onChange={e=>setEditForm({...editForm,name:e.target.value})}/></div>
-            <div><div style={S.label}>Type</div><select style={S.select} value={editForm.type} onChange={e=>setEditForm({...editForm,type:e.target.value})}><option value="recurring">Recurring Monthly</option><option value="oneTime">One-Time</option></select></div>
-            <div><div style={S.label}>{editForm.type==="recurring"?"Default Monthly Amount":"Amount"}</div><input style={S.input} type="number" value={editForm.defaultAmount} onChange={e=>setEditForm({...editForm,defaultAmount:e.target.value})}/></div>
-            {editForm.type==="recurring"&&<div><div style={S.label}>Payments Remaining (optional)</div><input style={S.input} type="number" value={editForm.paymentsRemaining} onChange={e=>setEditForm({...editForm,paymentsRemaining:e.target.value})}/></div>}
-            <div><div style={S.label}>Due Date</div><input style={S.input} type="date" value={editForm.dueDate} onChange={e=>setEditForm({...editForm,dueDate:e.target.value})}/></div>
-            <div><div style={S.label}>Notes</div><input style={S.input} value={editForm.notes} onChange={e=>setEditForm({...editForm,notes:e.target.value})}/></div>
-          </div>
-          <div style={{display:"flex",gap:8}}>
-            <button style={{...S.btn("#4CAF50"),padding:"8px 18px",fontSize:13}} onClick={()=>saveEdit(item.id)}>Save Changes</button>
-            <button style={S.btnGhost} onClick={cancelEdit}>Cancel</button>
-          </div>
+          <EditFormCard S={S} title="Edit Item" values={editForm} onChange={(k,v)=>setEditForm({...editForm,[k]:v})} onSave={()=>saveEdit(item.id)} onCancel={cancelEdit} fields={editFields}/>
         </div>);
         return(
         <div key={item.id} style={{...S.card,borderLeft:`4px solid ${item.paid?"#4CAF50":isOver?"#f44336":"#FF9800"}`,marginBottom:8}}>

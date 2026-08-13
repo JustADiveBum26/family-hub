@@ -2,23 +2,23 @@
 // Reached from the "📺 TV Display Mode" button on the landing page or by
 // bookmarking the app URL with #tv. Read-only, big type, refreshes itself.
 import { useState, useEffect } from "react";
-import { DAYS, MEAL_TYPES, GOLD, BORDER, USERS, todayName, billPaid, weekKeyOf, dateOfWeekDay, todayISO } from "./constants";
+import { DAYS, MEAL_TYPES, GOLD, BORDER, USERS, todayName, billPaid, weekKeyOf, dateOfWeekDay, todayISO, makeS } from "./constants";
 import { WeatherScroll } from "./shared";
 import { MonthCalendar, EventRow, CountdownStrip, WeeklyCelebrations, EventDetailPopup, eventsOnDay, todayKey } from "./calendar";
 
 const T={bg:"#0d0d08",card:"#141410",border:"#2a2a18",text:"#e8e0c8",sub:"#888",accent:GOLD};
-// Big-type style object shaped like makeS output so shared components render correctly.
+// Built on makeS() (base scale) so the TV always has every key shared
+// components expect — a hand-forked copy previously fell behind makeS() as it
+// grew (missing grid2/grid2mob/grid3/grid4/page) and could silently break a
+// shared component that started relying on one of them. A few keys still get
+// TV-specific overrides for bigger, across-the-room-readable type.
 const tvS={
+  ...makeS("dark",1),
   T,
   card:{background:T.card,border:`1px solid ${T.border}`,borderRadius:14,padding:20,marginBottom:14},
   cardSm:{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:16,marginBottom:10},
   h2:{fontSize:20,color:T.accent,fontWeight:"normal",borderBottom:`1px solid ${T.border}`,paddingBottom:8,marginBottom:12,letterSpacing:"0.05em"},
   label:{fontSize:13,color:T.sub,textTransform:"uppercase",letterSpacing:"0.15em",marginBottom:6,fontFamily:"monospace"},
-  row:{display:"flex",justifyContent:"space-between",alignItems:"center"},
-  btn:(c=T.accent)=>({background:c,border:"none",borderRadius:6,padding:"10px 20px",color:"#0d0d08",fontFamily:"Georgia,serif",fontSize:15,cursor:"pointer",fontWeight:"bold"}),
-  btnGhost:{background:"transparent",border:`1px solid ${T.border}`,borderRadius:6,padding:"8px 15px",color:T.sub,fontFamily:"Georgia,serif",fontSize:14,cursor:"pointer"},
-  btnDanger:{background:"transparent",border:"1px solid #f4433644",borderRadius:6,padding:"6px 11px",color:"#f44336",fontFamily:"Georgia,serif",fontSize:14,cursor:"pointer"},
-  input:{},select:{},
   tag:c=>({background:c+"22",color:c,border:`1px solid ${c}44`,borderRadius:5,padding:"4px 12px",fontSize:15,fontFamily:"monospace"}),
   alert:c=>({background:c+"18",border:`1px solid ${c}44`,borderRadius:10,padding:"14px 18px",marginBottom:12}),
 };

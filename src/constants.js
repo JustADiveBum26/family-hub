@@ -17,7 +17,7 @@ const TIMEOUT_MS=5*60*1000;
 const POINT_VALUE=0.10;
 // Bumped by hand alongside each commit's "vNN: ..." message, so the number
 // shown in the app (VersionBadge in shared.jsx) always matches git history.
-const APP_VERSION="59";
+const APP_VERSION="60";
 
 const THEMES={
   dark:{bg:"#0d0d08",card:"#141410",border:"#2a2a18",text:"#e8e0c8",sub:"#888",accent:GOLD,name:"Dark Gold"},
@@ -142,11 +142,38 @@ function makeS(theme,scale=1.15){
 }
 const S=makeS("dark");
 
+// ── KID THEME FACTORY — Parker and Ryder's dashboards were near-identical
+// ~900-char hand-rolled style objects (translucent tinted cards over a
+// gradient page background, bold accent-colored headers), differing only by
+// color. This factory captures that one shared shape. Bradyn's dashboard
+// predates it with a genuinely different flat/solid palette (closer to the
+// adult makeS() look), so it intentionally stays its own hand-rolled object
+// rather than being forced into this shape.
+function makeKidS({pageBg,accentRgb,accent,text,sub,bg}){
+  const tint=a=>`rgba(${accentRgb},${a})`;
+  return{
+    page:{background:pageBg,minHeight:"100vh",fontFamily:"Georgia,serif",color:text,fontSize:17},
+    card:{background:tint(0.1),border:`1px solid ${tint(0.25)}`,borderRadius:12,padding:24,marginBottom:16},
+    cardSm:{background:tint(0.07),border:`1px solid ${tint(0.15)}`,borderRadius:10,padding:18,marginBottom:12},
+    h2:{fontSize:18,color:accent,fontWeight:"bold",marginBottom:16},
+    btn:(c=accent)=>({background:c,border:"none",borderRadius:10,padding:"13px 22px",color:"#fff",fontSize:16,cursor:"pointer",fontWeight:"bold",fontFamily:"Georgia,serif",whiteSpace:"nowrap"}),
+    btnGhost:{background:"transparent",border:`1px solid ${tint(0.3)}`,borderRadius:8,padding:"10px 15px",color:sub,cursor:"pointer",fontFamily:"Georgia,serif",fontSize:15},
+    btnDanger:{background:"transparent",border:"1px solid #f4433644",borderRadius:6,padding:"7px 13px",color:"#f44336",fontFamily:"Georgia,serif",fontSize:15,cursor:"pointer"},
+    label:{fontSize:12,color:sub,textTransform:"uppercase",letterSpacing:"0.15em",marginBottom:6,fontFamily:"monospace"},
+    input:{background:"rgba(255,255,255,0.08)",border:`1px solid ${tint(0.4)}`,borderRadius:8,padding:"10px 14px",color:text,fontFamily:"Georgia,serif",fontSize:16,width:"100%",boxSizing:"border-box",outline:"none"},
+    select:{background:"rgba(255,255,255,0.06)",border:`1px solid ${tint(0.4)}`,borderRadius:8,padding:"10px 14px",color:text,fontFamily:"Georgia,serif",fontSize:16,width:"100%",boxSizing:"border-box",outline:"none"},
+    row:{display:"flex",justifyContent:"space-between",alignItems:"center"},
+    tag:c=>({background:c+"22",color:c,border:`1px solid ${c}44`,borderRadius:4,padding:"4px 10px",fontSize:13,fontFamily:"monospace"}),
+    alert:c=>({background:c+"18",border:`1px solid ${c}44`,borderRadius:8,padding:"14px 18px",marginBottom:14}),
+    T:{accent,text,sub,border:tint(0.25),bg},
+  };
+}
+
 export {
   DAYS, DSHORT, MEAL_TYPES, CATS, ACCT_TYPES, DEBT_TYPES, BILL_CATS, SHOP_CATS, SHOP_STORES,
   CHORE_MASTER, GOLD, BORDER, TIMEOUT_MS, POINT_VALUE, APP_VERSION, THEMES, USERS,
   D, fmt, calcMortgage, scoreToRate, calcPayoff, todayName, billPaid,
   weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek,
   todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate,
-  makeS, S,
+  makeS, makeKidS, S,
 };

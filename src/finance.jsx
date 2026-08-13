@@ -1,7 +1,7 @@
 // ── Finance suite: accounts, debts, budget, goals, statements, PSLF ───────────
 import { useState, useEffect } from "react";
 import { store } from "./store";
-import { CATS, ACCT_TYPES, DEBT_TYPES, DAYS, GOLD, fmt, calcMortgage, calcPayoff, billPaid } from "./constants";
+import { CATS, ACCT_TYPES, DEBT_TYPES, GOLD, fmt, calcMortgage, calcPayoff } from "./constants";
 import { Ring, Bar } from "./shared";
 
 // ── ACCOUNT ROW (top-level — must not be inside AccountsTab) ─────────────────
@@ -103,7 +103,7 @@ function PslfTab({pslf,setPslf,debts,S}){
     <div style={S.card}><div style={S.h2}>Notes</div><textarea style={{...S.input,height:80,resize:"vertical"}} placeholder="Track anything important about your PSLF status..." value={pslf.notes||""} onChange={e=>upd("notes",e.target.value)}/></div></>);
 }
 
-function DashboardTab({profile,pslf,accounts,debts,goals,expenses,transactions,totalAssets,totalDebtAmt,netWorth,combinedLiquid,totalCC,cushion,dti,mortgageRate,monthlyMortgage,loanAmt,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,setTab,bills,mealPlan,mealSuggestions,shopRequests,scenario,setScenario,S}){
+function DashboardTab({profile,pslf,debts,netWorth,combinedLiquid,totalCC,cushion,dti,mortgageRate,monthlyMortgage,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,scenario,setScenario,S}){
   const [showScenarios,setShowScenarios]=useState(false);
   // PSLF months-to-forgiveness lives in one place — the dedicated PSLF tab's
   // tracker (pslf.pslfMonths) — so this dashboard can't silently drift from
@@ -111,9 +111,6 @@ function DashboardTab({profile,pslf,accounts,debts,goals,expenses,transactions,t
   const pslfMonthsLeft=pslf.pslfMonths;
   const ccProg=Math.max(0,(30000-totalCC)/30000*100),pslfProg=Math.max(0,(36-pslfMonthsLeft)/36*100);
   const savProg=Math.min(combinedLiquid/(downNeeded+closing+totalCC)*100,100),scoreProg=(profile.creditScore-580)/(850-580)*100;
-  const recentTxns=transactions.slice(-5).reverse(),today=new Date(),todayName=DAYS[today.getDay()===0?6:today.getDay()-1];
-  const pendKid=(mealSuggestions||[]).filter(s=>s.status==="pending").length+(shopRequests||[]).filter(r=>r.status==="pending").length;
-  const upBills=(bills||[]).filter(b=>!billPaid(b)&&Math.ceil((new Date(b.dueDate+"T12:00:00")-today)/(864e5))>=0&&Math.ceil((new Date(b.dueDate+"T12:00:00")-today)/(864e5))<=7).sort((a,c)=>new Date(a.dueDate)-new Date(c.dueDate));
   return(<>
     {dti>40&&<div style={S.alert("#FF9800")}><span style={{color:"#FF9800",fontWeight:"bold"}}>DTI WARNING </span><span style={{color:S.T.sub,fontSize:13}}>DTI is {dti.toFixed(1)}% — close to the 43% limit.</span></div>}
     {pslfMonthsLeft<=24&&<div style={S.alert(GOLD)}><span style={{color:GOLD,fontWeight:"bold"}}>PSLF: {pslfMonthsLeft} months left — </span><span style={{color:S.T.sub,fontSize:13}}>Don't change IDR plan or leave federal employment.</span></div>}
@@ -127,16 +124,7 @@ function DashboardTab({profile,pslf,accounts,debts,goals,expenses,transactions,t
       <Ring pct={Math.min(netWorth/200000*100,100)} color={netWorth>0?GOLD:"#f44336"} label={fmt(netWorth)} sub="Net Worth"/>
     </div></div>
     <div style={S.grid4}>{[{label:"Combined Liquid",val:fmt(combinedLiquid),sub:"Savings available",color:GOLD},{label:"Total CC Debt",val:fmt(totalCC),sub:`${debts.filter(d=>d.type==="Credit Card").length} cards`,color:totalCC>0?"#f44336":"#4CAF50"},{label:"Post-Close Cushion",val:fmt(cushion),sub:"After down+closing+CC",color:cushion>15000?"#4CAF50":cushion>5000?"#FF9800":"#f44336"},{label:"Monthly Surplus",val:fmt(surplus),sub:"After expenses+loans",color:surplus>0?"#4CAF50":"#f44336"}].map((k,i)=><div key={i} style={{...S.card,borderLeft:`3px solid ${k.color}`,marginBottom:0}}><div style={S.label}>{k.label}</div><div style={{fontSize:20,color:k.color,fontWeight:"bold",fontFamily:"monospace"}}>{k.val}</div><div style={{fontSize:11,color:S.T.sub,marginTop:4}}>{k.sub}</div></div>)}</div>
-    <div style={S.grid3}>
-      <div style={S.card}><div style={S.h2}>Tonight & This Week</div><div style={{fontSize:18,color:GOLD,marginBottom:8}}>{mealPlan[todayName]?.Dinner||"Not planned"}</div>{DAYS.map(d=>{const dinner=mealPlan[d]?.Dinner||"",isToday=d===todayName;return <div key={d} style={{display:"flex",gap:8,padding:"3px 0",borderBottom:`1px solid ${S.T.border}`}}><span style={{fontSize:10,color:isToday?GOLD:S.T.sub,fontFamily:"monospace",minWidth:28}}>{d.slice(0,3)}</span><span style={{fontSize:12,color:dinner?isToday?S.T.text:S.T.sub:"#333"}}>{dinner||"—"}</span></div>;})}<button style={{...S.btnGhost,marginTop:8,fontSize:12}} onClick={()=>setTab("meals")}>Plan Meals →</button></div>
-      <div style={S.card}><div style={S.h2}>Expenses Due Soon</div>{upBills.length===0?<div style={{color:S.T.sub,fontSize:13,padding:"8px 0"}}>No expenses due in 7 days</div>:upBills.slice(0,4).map(b=>{const dl=Math.ceil((new Date(b.dueDate+"T12:00:00")-today)/(864e5)),paid=b.bradPaid&&b.maryBethPaid;return(<div key={b.id} style={{...S.row,padding:"6px 0",borderBottom:`1px solid ${S.T.border}`}}><div><div style={{fontSize:13,color:S.T.text}}>{b.name}</div><div style={{fontSize:11,color:S.T.sub}}>{dl===0?"Today":dl===1?"Tomorrow":`${dl} days`}</div></div><div style={{textAlign:"right"}}><div style={{fontFamily:"monospace",color:GOLD,fontWeight:"bold"}}>{fmt(b.amount/2)} ea</div><div style={{fontSize:10,color:paid?"#4CAF50":"#FF9800"}}>{paid?"✓ Paid":"Pending"}</div></div></div>);})} <button style={{...S.btnGhost,marginTop:8,fontSize:12}} onClick={()=>setTab("bills")}>Manage Expenses →</button></div>
-      <div style={S.card}><div style={S.h2}>Kids Requests</div>{pendKid===0?<div style={{color:S.T.sub,fontSize:13,padding:"8px 0"}}>No pending requests.</div>:<div style={{...S.alert(GOLD),margin:"0 0 8px"}}><span style={{color:GOLD,fontWeight:"bold"}}>{pendKid} pending</span><span style={{color:S.T.sub,fontSize:12}}> — needs review</span></div>}{(mealSuggestions||[]).filter(s=>s.status==="pending").slice(0,2).map(s=><div key={s.id} style={{padding:"4px 0",borderBottom:`1px solid ${S.T.border}`}}><div style={{fontSize:12,color:S.T.text}}>🍴 {s.meal} <span style={{color:S.T.sub}}>— {s.kidName}</span></div></div>)}{(shopRequests||[]).filter(r=>r.status==="pending").slice(0,2).map(r=><div key={r.id} style={{padding:"4px 0",borderBottom:`1px solid ${S.T.border}`}}><div style={{fontSize:12,color:S.T.text}}>🛒 {r.item} <span style={{color:S.T.sub}}>— {r.kidName}</span></div></div>)}<button style={{...S.btnGhost,marginTop:8,fontSize:12}} onClick={()=>setTab("meals")}>Review →</button></div>
-    </div>
-    <div style={S.grid2}>
-      <div style={S.card}><div style={S.h2}>Monthly Cash Flow</div>{[{label:"Take-Home (~65%)",val:takeHome,color:"#4CAF50",sign:"+"},{label:"Living Expenses",val:totalExpenses,color:"#f44336",sign:"−"},{label:"Student Loan (IDR/PSLF)",val:slPayment,color:"#f44336",sign:"−"},{label:"Future Mortgage",val:monthlyMortgage,color:"#888",sign:"~"}].map((r,i)=><div key={i} style={{...S.row,padding:"6px 0",borderBottom:`1px solid ${S.T.border}`}}><span style={{fontSize:13,color:S.T.sub}}>{r.sign} {r.label}</span><span style={{color:r.color,fontFamily:"monospace",fontWeight:"bold"}}>{fmt(r.val)}</span></div>)}<div style={{...S.row,marginTop:10,paddingTop:10,borderTop:`1px solid ${S.T.border}`}}><span style={{color:GOLD,fontWeight:"bold"}}>Monthly Surplus</span><span style={{color:GOLD,fontFamily:"monospace",fontSize:18,fontWeight:"bold"}}>{fmt(surplus)}</span></div></div>
-      <div style={S.card}><div style={S.h2}>Goals Snapshot</div>{goals.map(g=>{const p=Math.min(g.saved/g.target*100,100);return <div key={g.id} style={{marginBottom:10}}><div style={{...S.row,marginBottom:4}}><span style={{fontSize:13,color:S.T.text}}>{g.icon} {g.name}</span><span style={{fontSize:12,color:g.color,fontFamily:"monospace"}}>{fmt(g.saved)} / {fmt(g.target)}</span></div><Bar value={g.saved} max={g.target} color={g.color}/></div>;})}<button style={{...S.btnGhost,marginTop:6,fontSize:12}} onClick={()=>setTab("goals")}>Manage Goals →</button></div>
-    </div>
-    {recentTxns.length>0&&<div style={S.card}><div style={S.h2}>Recent Transactions</div>{recentTxns.map(t=><div key={t.id} style={{...S.row,padding:"6px 0",borderBottom:`1px solid ${S.T.border}`,flexWrap:"wrap",gap:8}}><div><div style={{fontSize:13,color:S.T.text}}>{t.description}</div><div style={{fontSize:11,color:S.T.sub}}>{t.date} · <span style={S.tag("#888")}>{t.category}</span></div></div><span style={{color:t.amount<0?"#f44336":"#4CAF50",fontFamily:"monospace",fontWeight:"bold"}}>{t.amount<0?"−":"+"}{fmt(Math.abs(t.amount))}</span></div>)}</div>}
+    <div style={S.card}><div style={S.h2}>Monthly Cash Flow</div>{[{label:"Take-Home (~65%)",val:takeHome,color:"#4CAF50",sign:"+"},{label:"Living Expenses",val:totalExpenses,color:"#f44336",sign:"−"},{label:"Student Loan (IDR/PSLF)",val:slPayment,color:"#f44336",sign:"−"},{label:"Future Mortgage",val:monthlyMortgage,color:"#888",sign:"~"}].map((r,i)=><div key={i} style={{...S.row,padding:"6px 0",borderBottom:`1px solid ${S.T.border}`}}><span style={{fontSize:13,color:S.T.sub}}>{r.sign} {r.label}</span><span style={{color:r.color,fontFamily:"monospace",fontWeight:"bold"}}>{fmt(r.val)}</span></div>)}<div style={{...S.row,marginTop:10,paddingTop:10,borderTop:`1px solid ${S.T.border}`}}><span style={{color:GOLD,fontWeight:"bold"}}>Monthly Surplus</span><span style={{color:GOLD,fontFamily:"monospace",fontSize:18,fontWeight:"bold"}}>{fmt(surplus)}</span></div></div>
     <div style={S.card}>
       <div style={{...S.h2,...S.row}}>
         <span>⚗ Scenario Lab</span>
@@ -148,7 +136,34 @@ function DashboardTab({profile,pslf,accounts,debts,goals,expenses,transactions,t
   </>);
 }
 
-export {
-  AcctRow, AccountsTab, DebtsTab, BudgetTab, GoalsTab, StatementsTab,
-  PslfTab, DashboardTab,
-};
+// ── FINANCE HUB — everything above lives behind one nav tab (opt-in via
+// Settings) with its own internal section switcher, instead of 7 separate
+// top-level tabs, so a household that doesn't use Finance isn't staring at
+// nav clutter, and one that does gets it as a self-contained area. Kept
+// entirely separate from the rest of the app — no data crosses back out.
+const FINANCE_SECTIONS=[
+  {id:"overview",label:"Overview",icon:"◈"},
+  {id:"accounts",label:"Accounts",icon:"🏦"},
+  {id:"debts",label:"Debts",icon:"💳"},
+  {id:"budget",label:"Budget",icon:"📊"},
+  {id:"goals",label:"Goals",icon:"🎯"},
+  {id:"statements",label:"Statements",icon:"📄"},
+  {id:"pslf",label:"PSLF",icon:"🎓"},
+];
+function FinanceHub({profile,pslf,setPslf,accounts,setAccounts,debts,setDebts,expenses,setExpenses,transactions,setTransactions,goals,setGoals,reviewTxns,setReviewTxns,uploadLoading,handleUpload,confirmTxns,fileRef,netWorth,combinedLiquid,totalCC,cushion,dti,mortgageRate,monthlyMortgage,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,scenario,setScenario,S}){
+  const [screen,setScreen]=useState("overview");
+  return(<div>
+    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
+      {FINANCE_SECTIONS.map(sec=><button key={sec.id} onClick={()=>setScreen(sec.id)} style={{padding:"7px 14px",borderRadius:8,fontSize:12,cursor:"pointer",fontFamily:"Georgia,serif",background:screen===sec.id?GOLD+"22":"transparent",border:`1px solid ${screen===sec.id?GOLD:S.T.border}`,color:screen===sec.id?GOLD:S.T.sub,fontWeight:screen===sec.id?"bold":"normal"}}>{sec.icon} {sec.label}</button>)}
+    </div>
+    {screen==="overview"&&<DashboardTab profile={profile} pslf={pslf} debts={debts} netWorth={netWorth} combinedLiquid={combinedLiquid} totalCC={totalCC} cushion={cushion} dti={dti} mortgageRate={mortgageRate} monthlyMortgage={monthlyMortgage} surplus={surplus} takeHome={takeHome} totalExpenses={totalExpenses} slPayment={slPayment} downNeeded={downNeeded} closing={closing} homePrice={homePrice} scenario={scenario} setScenario={setScenario} S={S}/>}
+    {screen==="accounts"&&<AccountsTab accounts={accounts} setAccounts={setAccounts} profile={profile} S={S}/>}
+    {screen==="debts"&&<DebtsTab debts={debts} setDebts={setDebts} profile={profile} S={S}/>}
+    {screen==="budget"&&<BudgetTab expenses={expenses} setExpenses={setExpenses} transactions={transactions} takeHome={takeHome} slPayment={slPayment} S={S}/>}
+    {screen==="goals"&&<GoalsTab goals={goals} setGoals={setGoals} S={S}/>}
+    {screen==="statements"&&<StatementsTab transactions={transactions} setTransactions={setTransactions} handleUpload={handleUpload} uploadLoading={uploadLoading} reviewTxns={reviewTxns} setReviewTxns={setReviewTxns} confirmTxns={confirmTxns} fileRef={fileRef} S={S}/>}
+    {screen==="pslf"&&<PslfTab pslf={pslf} setPslf={setPslf} debts={debts} S={S}/>}
+  </div>);
+}
+
+export { FinanceHub };

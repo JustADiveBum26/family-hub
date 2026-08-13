@@ -4,6 +4,92 @@ import { store } from "./store";
 import { DAYS, DSHORT, MEAL_TYPES, GOLD, BORDER, THEMES, USERS, APP_VERSION, SHOP_CATS, SHOP_STORES, fmt, todayName, billPaid, weekKeyOf, dateOfWeekDay, S, isoDateForDayName, logChoreDone, unlogChoreDone } from "./constants";
 import { MonthCalendar, UpcomingEvents, CountdownStrip, WeeklyCelebrations, EventDetailPopup } from "./calendar";
 
+// ── QUICK-ADD CHIP — a saved item that can be one-tap added elsewhere, with
+// delete. Shopping Staples and Meal Favorites used to hand-roll this exact
+// chip shape separately.
+function QuickAddChip({label,sublabel,actionLabel,actionColor,actionDisabled,onAction,onRemove,S}){
+  return(<div style={{display:"flex",gap:6,alignItems:"center",background:S.T.bg,border:`1px solid ${S.T.border}`,borderRadius:10,padding:"7px 10px"}}>
+    <div>
+      <div style={{fontSize:13,color:S.T.text}}>{label}</div>
+      {sublabel&&<div style={{fontSize:10,color:S.T.sub}}>{sublabel}</div>}
+    </div>
+    <button style={{...S.btn(actionColor||S.T.accent),padding:"4px 10px",fontSize:11,opacity:actionDisabled?0.6:1}} onClick={onAction} disabled={actionDisabled}>{actionLabel}</button>
+    {onRemove&&<button style={{...S.btnDanger,padding:"3px 7px",fontSize:11}} onClick={onRemove}>✕</button>}
+  </div>);
+}
+
+// ── SAVED-LIST CARD — a header (icon/title/count + optional extra controls)
+// over a wrapping row of QuickAddChips, with a shared empty state and an
+// optional collapsed mode. Shopping Staples and Meal Favorites both used to
+// hand-roll this same card shape independently.
+function SavedListCard({icon,title,count,headerExtra,emptyText,items,renderItem,collapsed,children,S}){
+  return(<div style={S.card}>
+    <div style={{...S.h2,...S.row,flexWrap:"wrap",gap:8}}>
+      <span>{icon} {title}{count>0?` (${count})`:""}</span>
+      {headerExtra}
+    </div>
+    {!collapsed&&<>
+      {children}
+      {items.length===0&&emptyText&&<div style={{fontSize:13,color:S.T.sub}}>{emptyText}</div>}
+      {items.length>0&&<div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{items.map(renderItem)}</div>}
+    </>}
+  </div>);
+}
+
+// ── APPROVAL ROW — a pending item with Approve/Add + reject buttons. Message
+// Board's pending posts, kid meal suggestions, and kid shopping requests all
+// used to hand-roll this exact row independently. Each list keeps its own
+// header/wrapper (an alert banner vs. a card, different context per list) —
+// only the row itself was genuinely duplicated.
+function ApprovalRow({title,subtitle,onApprove,approveLabel="Approve",onReject,S}){
+  return(<div style={{...S.row,padding:"8px 0",borderBottom:`1px solid ${S.T.border}`,flexWrap:"wrap",gap:8}}>
+    <div>
+      {title}
+      {subtitle&&<div style={{fontSize:11,color:S.T.sub,marginTop:1}}>{subtitle}</div>}
+    </div>
+    <div style={{display:"flex",gap:6}}>
+      <button style={{...S.btn("#4CAF50"),padding:"5px 12px",fontSize:12}} onClick={onApprove}>{approveLabel}</button>
+      <button style={S.btnDanger} onClick={onReject}>✕</button>
+    </div>
+  </div>);
+}
+
+// ── EDIT FORM CARD — a field-driven inline edit form (title + grid of
+// inputs + Save/Cancel). ChoresTab (recurring and one-time chores), BillCard,
+// and BradynLedger (recurring and one-time items) each hand-rolled this same
+// shape with only the field list differing. Deliberately has no outer
+// card/border of its own — callers already wrap it differently (a plain
+// divider row for Chores nested inside a per-kid card, a full accent-bordered
+// card of their own for Bills/Ledger), so only the actual duplicated part
+// (title + fields + buttons) is shared.
+function EditFormCard({title,fields,values,onChange,onSave,onCancel,S,columns="repeat(auto-fit,minmax(150px,1fr))",compact}){
+  const btnPad=compact?"5px 12px":"8px 18px",btnFont=compact?12:13,cancelPad=compact?"5px 10px":undefined,cancelFont=compact?12:undefined;
+  return(<div>
+    {title&&<div style={{fontSize:13,color:S.T.accent,fontWeight:"bold",marginBottom:10}}>{title}</div>}
+    <div style={{display:"grid",gridTemplateColumns:columns,gap:10,marginBottom:12}}>
+      {fields.map(f=>{
+        if(f.hidden&&f.hidden(values))return null;
+        const label=typeof f.label==="function"?f.label(values):f.label;
+        const val=values[f.key];
+        return(<div key={f.key} style={f.full?{gridColumn:"1/-1"}:undefined}>
+          {f.type!=="checkbox"&&<div style={S.label}>{label}</div>}
+          {f.type==="select"
+            ?<select style={S.select} value={val??""} onChange={e=>onChange(f.key,e.target.value)}>{f.options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select>
+            :f.type==="days"
+            ?<DayPills selected={val||[]} onToggle={d=>onChange(f.key,(val||[]).includes(d)?(val||[]).filter(x=>x!==d):[...(val||[]),d])} S={S}/>
+            :f.type==="checkbox"
+            ?<label style={{display:"flex",gap:8,alignItems:"center",cursor:"pointer",fontSize:13,color:S.T.text}}><input type="checkbox" checked={!!val} onChange={e=>onChange(f.key,e.target.checked)} style={{width:16,height:16,cursor:"pointer"}}/>{label}</label>
+            :<input style={S.input} type={f.type||"text"} value={val??""} onChange={e=>onChange(f.key,f.type==="number"?+e.target.value:e.target.value)}/>}
+        </div>);
+      })}
+    </div>
+    <div style={{display:"flex",gap:compact?6:8}}>
+      <button style={{...S.btn("#4CAF50"),padding:btnPad,fontSize:btnFont}} onClick={onSave}>Save{compact?"":" Changes"}</button>
+      <button style={{...S.btnGhost,padding:cancelPad,fontSize:cancelFont}} onClick={onCancel}>Cancel</button>
+    </div>
+  </div>);
+}
+
 // ── SAVE STATUS — quiet unless there's actually something to worry about ──────
 // Stays invisible during normal saving/saved cycles; only surfaces once
 // store.js has a save it couldn't get through, so a lost connection doesn't
@@ -430,6 +516,7 @@ function DayPills({selected,onToggle,S}){
 
 export {
   Ring, Bar, PinPad, ShoppingListView, LoginModal, WeatherScroll, BillsBanner,
+  QuickAddChip, SavedListCard, ApprovalRow, EditFormCard,
   PinnedAnnouncements, WeeklyChoreBoard, PersonalHomeScreen, UserHeader,
   ThemePicker, PublicHomeScreen, DayPills, SaveStatusBadge, VersionBadge,
 };
