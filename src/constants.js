@@ -173,7 +173,7 @@ export {
   DAYS, DSHORT, MEAL_TYPES, CATS, ACCT_TYPES, DEBT_TYPES, BILL_CATS, SHOP_CATS, SHOP_STORES,
   CHORE_MASTER, GOLD, BORDER, TIMEOUT_MS, POINT_VALUE, APP_VERSION, THEMES, USERS,
   D, fmt, calcMortgage, scoreToRate, calcPayoff, todayName, billPaid,
-  weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek,
+  weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, localISO,
   todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate,
   makeS, makeKidS, S,
 };

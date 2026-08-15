@@ -1,7 +1,7 @@
 // ── Family features: chores, message board, settings, bills, meals, ledger ────
 import { useState, useEffect, useRef } from "react";
 import { store } from "./store";
-import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, SHOP_CATS, SHOP_STORES, POINT_VALUE, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate } from "./constants";
+import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, SHOP_CATS, SHOP_STORES, POINT_VALUE, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, localISO, todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate } from "./constants";
 import { DayPills, QuickAddChip, SavedListCard, ApprovalRow, EditFormCard } from "./shared";
 import { RECIPE_LIBRARY } from "./recipeLibrary";
 
@@ -819,11 +819,20 @@ function BillsTab({bills,setBills,billHistory,setBillHistory,profile,payAccounts
 
 // ── MEALS TAB ─────────────────────────────────────────────────────────────────
 // ── MEAL DETAIL MODAL (top-level component — must NOT be inside MealsTab) ─────
-function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList,saveDetails,saveShop,onClearMeal,onSaveFavorite,shopSettings,S}){
+function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,wk,shopList,saveDetails,saveShop,onClearMeal,onSaveFavorite,onMoveMeal,shopSettings,S}){
   const [newIngs,setNewIngs]=useState([{id:1,name:"",qty:"1"},{id:2,name:"",qty:"1"},{id:3,name:"",qty:"1"},{id:4,name:"",qty:"1"},{id:5,name:"",qty:"1"}]);
   const [favSaved,setFavSaved]=useState(false);
   const stores=shopSettings?.stores||SHOP_STORES;
   const [ingStore,setIngStore]=useState("");
+  const [nameVal,setNameVal]=useState("");
+  const [showMove,setShowMove]=useState(false);
+  const [moveDate,setMoveDate]=useState("");
+  const [moveMt,setMoveMt]=useState("");
+  useEffect(()=>{
+    if(!detailSlot)return;
+    setNameVal(detailSlot.label||(detailSlot.day?mealPlan[detailSlot.day]?.[detailSlot.mt]:"")||"");
+    setShowMove(false);
+  },[detailSlot?.day,detailSlot?.mt,detailSlot?.label]);
   const blankIng=()=>({id:Date.now()+Math.random(),name:"",qty:"1"});
   const updateNewIng=(i,field,val)=>setNewIngs(rows=>rows.map((r,ri)=>ri===i?{...r,[field]:val}:r));
   const addNewIngRow=()=>setNewIngs(rows=>[...rows,blankIng()]);
@@ -850,6 +859,7 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList
   const key=detailSlot.key||slotKey(detailSlot.day,detailSlot.mt);
   const headerTop=detailSlot.day?detailSlot.day.toUpperCase()+" — "+detailSlot.mt.toUpperCase():(detailSlot.sublabel||"MEAL SUGGESTION");
   const mealName=detailSlot.label||(detailSlot.day?mealPlan[detailSlot.day]?.[detailSlot.mt]:"")||"";
+  const slotDateISO=detailSlot.day?localISO(dateOfWeekDay(wk,DAYS.indexOf(detailSlot.day))):"";
   const detail=getDetail(key);
   const shopNames=new Set(shopList.filter(i=>!i.checked).map(i=>i.name.toLowerCase()));
   const close=()=>{setDetailSlot(null);setNewIngs([blankIng(),blankIng(),blankIng(),blankIng(),blankIng()]);};
@@ -858,9 +868,28 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,shopList
   return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={close}>
     <div style={{background:S.T.card,border:`1px solid ${S.T.border}`,borderRadius:14,padding:24,maxWidth:580,width:"100%",maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
       <div style={{...S.row,marginBottom:16,flexWrap:"wrap",gap:8}}>
-        <div>
-          <div style={{fontSize:10,color:S.T.sub,fontFamily:"monospace",letterSpacing:"0.15em"}}>{headerTop}</div>
-          <div style={{fontSize:18,color:S.T.text,fontWeight:"bold"}}>{mealName||"No meal set"}</div>
+        <div style={{flex:1,minWidth:220}}>
+          <div style={{fontSize:10,color:S.T.sub,fontFamily:"monospace",letterSpacing:"0.15em",marginBottom:4}}>{headerTop}</div>
+          {detailSlot.day&&onMoveMeal
+            ?<>
+              <input style={{...S.input,fontSize:16,fontWeight:"bold",padding:"6px 9px",marginBottom:6,maxWidth:320}} value={nameVal} onChange={e=>setNameVal(e.target.value)} onBlur={()=>{if(nameVal!==mealName)onMoveMeal(detailSlot.day,detailSlot.mt,nameVal,slotDateISO,detailSlot.mt);}} onKeyDown={e=>{if(e.key==="Enter")e.target.blur();}} placeholder="Meal name"/>
+              <div>
+                <span onClick={()=>{if(!showMove){setMoveDate(slotDateISO);setMoveMt(detailSlot.mt);}setShowMove(v=>!v);}} style={{fontSize:12,color:S.T.accent,cursor:"pointer",textDecoration:"underline",textDecorationStyle:"dotted"}}>📅 {showMove?"Cancel":"Change Date"}</span>
+                {showMove&&<div style={{marginTop:8,padding:10,background:S.T.bg,borderRadius:8,display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}} onClick={e=>e.stopPropagation()}>
+                  <div>
+                    <div style={{...S.label,marginBottom:4}}>New Date</div>
+                    <input autoFocus style={{...S.input,padding:"6px 8px",width:160}} type="date" value={moveDate} onChange={e=>setMoveDate(e.target.value)}/>
+                  </div>
+                  <div>
+                    <div style={{...S.label,marginBottom:4}}>Meal</div>
+                    <select style={{...S.select,padding:"6px 8px",width:120}} value={moveMt} onChange={e=>setMoveMt(e.target.value)}>{MEAL_TYPES.map(m=><option key={m} value={m}>{m}</option>)}</select>
+                  </div>
+                  <button style={{...S.btn(),padding:"6px 14px",fontSize:12}} disabled={!moveDate} onClick={()=>{onMoveMeal(detailSlot.day,detailSlot.mt,nameVal,moveDate,moveMt);setShowMove(false);}}>Move</button>
+                </div>}
+              </div>
+            </>
+            :<div style={{fontSize:18,color:S.T.text,fontWeight:"bold"}}>{mealName||"No meal set"}</div>
+          }
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
           <select style={{...S.select,padding:"6px 8px",fontSize:12}} value={ingStore} onChange={e=>setIngStore(e.target.value)} title="Store for items added from this recipe">
@@ -997,6 +1026,53 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
   const saveDetails=u=>{setMealDetails(u);store.save("fp2:mealDetails",u);};
   const saveCell=()=>{if(!editCell)return;saveMeals({...mealPlan,[editCell.day]:{...mealPlan[editCell.day],[editCell.mt]:cellVal}});setEditCell(null);setCellVal("");};
   const clearCell=(day,mt)=>{saveMeals({...mealPlan,[day]:{...mealPlan[day],[mt]:""}});};
+  // Rename and/or move a meal to a new calendar date (and optionally meal type) in
+  // one step, used by the "Change Date" picker in the detail modal. A date outside
+  // the currently viewed week moves the meal into that week's plan and switches the
+  // grid over to it. If the destination slot is already occupied, swap the two
+  // meals instead of silently overwriting so nothing gets lost; recipe/ingredient
+  // details travel along with whichever slot they belong to.
+  const moveMealToDate=(day,mt,newName,targetDateISO,targetMt)=>{
+    if(!targetDateISO)return;
+    const targetDateObj=new Date(targetDateISO+"T12:00:00");
+    const targetDay=DAYS[targetDateObj.getDay()===0?6:targetDateObj.getDay()-1];
+    const targetWk=weekKeyOf(targetDateObj);
+    const sameWeek=targetWk===wk;
+    if(sameWeek&&targetDay===day&&targetMt===mt){
+      saveMeals({...mealPlan,[day]:{...mealPlan[day],[mt]:newName}});
+      setDetailSlot({day,mt,key:slotKey(day,mt)});
+      return;
+    }
+    const targetWeekPlan=sameWeek?mealPlan:normalizeWeek(mealPlans[targetWk]);
+    const destVal=targetWeekPlan[targetDay]?.[targetMt]||"";
+    if(destVal&&!window.confirm(`${targetDay} ${targetMt} (${targetDateObj.toLocaleDateString("en-US",{month:"short",day:"numeric"})}) already has "${destVal}". Swap the two meals?`))return;
+    if(sameWeek){
+      let updatedPlan={...mealPlan};
+      if(day===targetDay){
+        updatedPlan[day]={...mealPlan[day],[mt]:destVal,[targetMt]:newName};
+      }else{
+        updatedPlan[day]={...mealPlan[day],[mt]:destVal};
+        updatedPlan[targetDay]={...mealPlan[targetDay],[targetMt]:newName};
+      }
+      saveMeals(updatedPlan);
+    }else{
+      const u={...mealPlans,
+        [wk]:{...mealPlan,[day]:{...mealPlan[day],[mt]:destVal}},
+        [targetWk]:{...targetWeekPlan,[targetDay]:{...targetWeekPlan[targetDay],[targetMt]:newName}},
+      };
+      setMealPlans(u);store.save("fp2:mealPlans",u);
+    }
+    const oldKey=detailKeyFor(wk,day,mt),destKey=detailKeyFor(targetWk,targetDay,targetMt),newKey=targetWk+"__"+targetDay+"__"+targetMt,backKey=wk+"__"+day+"__"+mt;
+    const oldDetail=mealDetails[oldKey],destDetail=mealDetails[destKey];
+    const updatedDetails={...mealDetails};
+    delete updatedDetails[oldKey];
+    if(destKey!==oldKey)delete updatedDetails[destKey];
+    if(oldDetail)updatedDetails[newKey]=oldDetail;else delete updatedDetails[newKey];
+    if(destDetail)updatedDetails[backKey]=destDetail;else delete updatedDetails[backKey];
+    saveDetails(updatedDetails);
+    setDetailSlot({day:targetDay,mt:targetMt,key:newKey});
+    if(!sameWeek)setWk(targetWk);
+  };
   const addItem=()=>{if(!newItem.name)return;saveShop([...shopList,{...newItem,price:+newItem.price||0,id:Date.now(),addedBy:"Parents",checked:false}]);setNewItem({name:"",qty:"1",category:"Grocery",store:"",notes:"",price:""});setShowAdd(false);};
   const toggleItem=id=>saveShop(shopList.map(i=>i.id===id?{...i,checked:!i.checked}:i));
   const delItem=id=>saveShop(shopList.filter(i=>i.id!==id));
@@ -1042,7 +1118,8 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
   const groupedUnchecked=Object.fromEntries(Object.entries(groupedByStore).map(([s,items])=>[s,cats.reduce((acc,cat)=>{const ci=items.filter(i=>i.category===cat);if(ci.length>0)acc[cat]=ci;return acc;},{})]));
   // Recipe/ingredient details are stored per week. Recipes saved before dated
   // weeks existed used day-only keys — keep using those until a weeked one exists.
-  const slotKey=(day,mt)=>{const wkKey=wk+"__"+day+"__"+mt;if(mealDetails[wkKey])return wkKey;const legacy=day+"__"+mt;return mealDetails[legacy]?legacy:wkKey;};
+  const detailKeyFor=(weekKey,day,mt)=>{const wkKey=weekKey+"__"+day+"__"+mt;if(mealDetails[wkKey])return wkKey;const legacy=day+"__"+mt;return mealDetails[legacy]?legacy:wkKey;};
+  const slotKey=(day,mt)=>detailKeyFor(wk,day,mt);
   const hasDetail=(day,mt)=>{const d=mealDetails[slotKey(day,mt)];return d&&(d.ingredients?.length>0||d.recipe?.trim());};
   // Every ingredient saved against a planned meal this week, minus anything
   // already unchecked on the shopping list — so "Add This Week's Ingredients"
@@ -1065,7 +1142,7 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
     saveShop([...shopList,...weekIngredientsToAdd.map(ing=>({id:Date.now()+Math.random(),name:ing.name,qty:ing.qty||"1",category:"Grocery",store:"",addedBy:"Meal Plan",checked:false,notes:""}))]);
   };
   return(<>
-    <MealDetailModal detailSlot={detailSlot} setDetailSlot={setDetailSlot} mealPlan={mealPlan} mealDetails={mealDetails} shopList={shopList} saveDetails={saveDetails} saveShop={saveShop} onClearMeal={clearCell} onSaveFavorite={saveFavorite} shopSettings={shopSettings} S={S}/>
+    <MealDetailModal detailSlot={detailSlot} setDetailSlot={setDetailSlot} mealPlan={mealPlan} mealDetails={mealDetails} wk={wk} shopList={shopList} saveDetails={saveDetails} saveShop={saveShop} onClearMeal={clearCell} onSaveFavorite={saveFavorite} onMoveMeal={moveMealToDate} shopSettings={shopSettings} S={S}/>
     {showRecipeLibrary&&<RecipeLibraryPanel mealFavs={mealFavs} setMealFavs={setMealFavs} S={S} onClose={()=>setShowRecipeLibrary(false)}/>}
     <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
       {[{id:"week",label:"This Week",icon:"📅"},{id:"shopping",label:"Shopping",icon:"🛒"},{id:"favorites",label:"Favorites & Recipes",icon:"★"}].map(sec=><button key={sec.id} onClick={()=>setMealScreen(sec.id)} style={{padding:"7px 14px",borderRadius:8,fontSize:12,cursor:"pointer",fontFamily:"Georgia,serif",background:mealScreen===sec.id?GOLD+"22":"transparent",border:`1px solid ${mealScreen===sec.id?GOLD:S.T.border}`,color:mealScreen===sec.id?GOLD:S.T.sub,fontWeight:mealScreen===sec.id?"bold":"normal"}}>{sec.icon} {sec.label}{sec.id==="week"&&(pendS.length+pendR.length)>0?` (${pendS.length+pendR.length})`:""}</button>)}
