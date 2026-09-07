@@ -149,13 +149,13 @@ function ChoresTab({chores,setChores,choreLog,setChoreLog,appSettings,S,currentU
                   ]}/>
               </div>);
               return(<div key={c.id} style={{display:"flex",gap:8,padding:"7px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"center"}}>
-                <div onClick={()=>toggleDone(c.id)} style={{width:18,height:18,borderRadius:4,border:`2px solid ${S.T.border}`,cursor:"pointer",flexShrink:0}}/>
+                <div onClick={()=>toggleDone(c.id)} style={{width:26,height:26,borderRadius:5,border:`2px solid ${S.T.border}`,cursor:"pointer",flexShrink:0}}/>
                 <div style={{flex:1}}><div style={{fontSize:13,color:S.T.text}}>{c.task}</div>{c.due&&<div style={{fontSize:11,color:S.T.sub}}>Due: {c.due}</div>}{showPoints&&<div style={{fontSize:11,color:S.T.accent}}>{c.points} pts</div>}</div>
                 {isParent&&<div style={{display:"flex",gap:4}}><button style={{...S.btnGhost,padding:"2px 7px",fontSize:10}} onClick={()=>startEdit(c)}>Edit</button><button style={S.btnDanger} onClick={()=>del(c.id)}>X</button></div>}
               </div>);
             })}
             {done.length>0&&<div style={{marginTop:6}}><div style={{...S.label,fontSize:10,marginBottom:3}}>DONE</div>{done.map(c=><div key={c.id} style={{display:"flex",gap:8,padding:"4px 0",alignItems:"center",opacity:0.45}}>
-              <div onClick={()=>toggleDone(c.id)} style={{width:18,height:18,borderRadius:4,border:"2px solid #4CAF50",background:"#4CAF50",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#0d0d08",fontSize:11,fontWeight:"bold"}}>✓</div>
+              <div onClick={()=>toggleDone(c.id)} style={{width:26,height:26,borderRadius:5,border:"2px solid #4CAF50",background:"#4CAF50",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#0d0d08",fontSize:14,fontWeight:"bold"}}>✓</div>
               <span style={{fontSize:12,color:S.T.sub,textDecoration:"line-through",flex:1}}>{c.task}</span>
               {isParent&&<button style={S.btnDanger} onClick={()=>del(c.id)}>X</button>}
             </div>)}</div>}
@@ -286,14 +286,14 @@ function TodoTab({items,onSave,S}){
     </div>
     {pending.length===0&&done.length===0&&<div style={{fontSize:13,color:S.T.sub,textAlign:"center",padding:"12px 0"}}>Nothing on your list yet.</div>}
     {pending.map(i=><div key={i.id} style={{display:"flex",gap:10,padding:"8px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"center"}}>
-      <input type="checkbox" checked={false} onChange={()=>toggle(i.id)} style={{width:18,height:18,cursor:"pointer",flexShrink:0}}/>
+      <input type="checkbox" checked={false} onChange={()=>toggle(i.id)} style={{width:22,height:22,cursor:"pointer",flexShrink:0}}/>
       <div style={{flex:1,fontSize:14,color:S.T.text}}>{i.text}</div>
       <button onClick={()=>del(i.id)} style={S.btnDanger}>X</button>
     </div>)}
     {done.length>0&&<>
       <div style={{...S.label,marginTop:16}}>Done ({done.length})</div>
       {done.map(i=><div key={i.id} style={{display:"flex",gap:10,padding:"6px 0",alignItems:"center",opacity:0.55}}>
-        <input type="checkbox" checked={true} onChange={()=>toggle(i.id)} style={{width:18,height:18,cursor:"pointer",flexShrink:0}}/>
+        <input type="checkbox" checked={true} onChange={()=>toggle(i.id)} style={{width:22,height:22,cursor:"pointer",flexShrink:0}}/>
         <div style={{flex:1,fontSize:13,color:S.T.text,textDecoration:"line-through"}}>{i.text}</div>
         <button onClick={()=>del(i.id)} style={S.btnDanger}>X</button>
       </div>)}
@@ -360,12 +360,12 @@ function RecipeLibraryPanel({mealFavs,setMealFavs,S,onClose}){
           const isExp=expanded===r.name;
           return(<div key={r.name} style={{borderBottom:`1px solid ${S.T.border}`,padding:"8px 0"}}>
             <div style={{display:"flex",gap:10,alignItems:"center"}}>
-              <div onClick={()=>toggle(r.name)} style={{width:18,height:18,borderRadius:4,border:`2px solid ${already?"#4CAF50":S.T.border}`,background:isSel?S.T.accent:already?"#4CAF5022":"transparent",cursor:already?"default":"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#0d0d08"}}>{isSel?"✓":already?"✓":""}</div>
-              <div style={{flex:1,cursor:"pointer"}} onClick={()=>setExpanded(isExp?null:r.name)}>
+              <div onClick={()=>toggle(r.name)} style={{width:26,height:26,borderRadius:5,border:`2px solid ${already?"#4CAF50":S.T.border}`,background:isSel?S.T.accent:already?"#4CAF5022":"transparent",cursor:already?"default":"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"#0d0d08"}}>{isSel?"✓":already?"✓":""}</div>
+              <div style={{flex:1,cursor:"pointer",padding:"4px 0"}} onClick={()=>setExpanded(isExp?null:r.name)}>
                 <div style={{fontSize:13,color:S.T.text}}>{r.name}</div>
                 <div style={{fontSize:10,color:S.T.sub}}>{r.cat} · {r.ingredients.length} ingredients{already?" · Already in Favorites":""}</div>
               </div>
-              <span style={{fontSize:11,color:S.T.sub,cursor:"pointer"}} onClick={()=>setExpanded(isExp?null:r.name)}>{isExp?"▲":"▼"}</span>
+              <span style={{fontSize:14,color:S.T.sub,cursor:"pointer",padding:"6px 10px",lineHeight:1}} onClick={()=>setExpanded(isExp?null:r.name)}>{isExp?"▲":"▼"}</span>
             </div>
             {isExp&&<div style={{marginTop:8,marginLeft:28,fontSize:12,color:S.T.sub}}>
               <div style={{marginBottom:6}}><strong style={{color:S.T.text}}>Ingredients: </strong>{r.ingredients.map(ing=>`${ing.qty} ${ing.name}`).join(", ")}</div>
@@ -465,7 +465,7 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
         <button style={S.btn()} onClick={()=>{if(!newStore.trim())return;saveShopSettings({...shopSettings,stores:[...(shopSettings.stores||[]),newStore.trim()]});setNewStore("");}}>Add</button>
       </div>
       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-        {(shopSettings.stores||[]).map(s=><div key={s} style={{display:"flex",gap:4,alignItems:"center",...S.tag(S.T.accent)}}><span>{s}</span><button onClick={()=>saveShopSettings({...shopSettings,stores:(shopSettings.stores||[]).filter(x=>x!==s)})} style={{background:"none",border:"none",color:"#f44336",cursor:"pointer",fontSize:12,padding:"0 2px"}}>×</button></div>)}
+        {(shopSettings.stores||[]).map(s=><div key={s} style={{display:"flex",gap:4,alignItems:"center",...S.tag(S.T.accent)}}><span>{s}</span><button onClick={()=>saveShopSettings({...shopSettings,stores:(shopSettings.stores||[]).filter(x=>x!==s)})} style={{background:"none",border:"none",color:"#f44336",cursor:"pointer",fontSize:14,padding:"4px 7px"}}>×</button></div>)}
       </div>
     </div>}
     {isParent&&<div style={S.card}>
@@ -475,7 +475,7 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
         <button style={S.btn()} onClick={()=>{if(!newCat.trim())return;saveShopSettings({...shopSettings,categories:[...(shopSettings.categories||[]),newCat.trim()]});setNewCat("");}}>Add</button>
       </div>
       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-        {(shopSettings.categories||[]).map(c=><div key={c} style={{display:"flex",gap:4,alignItems:"center",...S.tag(S.T.accent)}}><span>{c}</span><button onClick={()=>saveShopSettings({...shopSettings,categories:(shopSettings.categories||[]).filter(x=>x!==c)})} style={{background:"none",border:"none",color:"#f44336",cursor:"pointer",fontSize:12,padding:"0 2px"}}>×</button></div>)}
+        {(shopSettings.categories||[]).map(c=><div key={c} style={{display:"flex",gap:4,alignItems:"center",...S.tag(S.T.accent)}}><span>{c}</span><button onClick={()=>saveShopSettings({...shopSettings,categories:(shopSettings.categories||[]).filter(x=>x!==c)})} style={{background:"none",border:"none",color:"#f44336",cursor:"pointer",fontSize:14,padding:"4px 7px"}}>×</button></div>)}
       </div>
     </div>}
     <div style={S.card}>
@@ -492,7 +492,7 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
         }}>Add</button>
       </div>
       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-        {(payAccounts[currentUser==="brad"?"brad":"maryBeth"]||[]).map(a=><div key={a} style={{display:"flex",gap:4,alignItems:"center",...S.tag("#2196F3")}}><span>{a}</span><button onClick={()=>{const key=currentUser==="brad"?"brad":"maryBeth";savePayAccounts({...payAccounts,[key]:(payAccounts[key]||[]).filter(x=>x!==a)});}} style={{background:"none",border:"none",color:"#f44336",cursor:"pointer",fontSize:12,padding:"0 2px"}}>×</button></div>)}
+        {(payAccounts[currentUser==="brad"?"brad":"maryBeth"]||[]).map(a=><div key={a} style={{display:"flex",gap:4,alignItems:"center",...S.tag("#2196F3")}}><span>{a}</span><button onClick={()=>{const key=currentUser==="brad"?"brad":"maryBeth";savePayAccounts({...payAccounts,[key]:(payAccounts[key]||[]).filter(x=>x!==a)});}} style={{background:"none",border:"none",color:"#f44336",cursor:"pointer",fontSize:14,padding:"4px 7px"}}>×</button></div>)}
       </div>
       {currentUser==="brad"&&payAccounts.maryBeth?.length>0&&<div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${S.T.border}`}}>
         <div style={{fontSize:11,color:S.T.sub,marginBottom:6}}>{profile.fianceName} accounts (view only)</div>
@@ -874,7 +874,7 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,wk,shopL
             ?<>
               <input style={{...S.input,fontSize:16,fontWeight:"bold",padding:"6px 9px",marginBottom:6,maxWidth:320}} value={nameVal} onChange={e=>setNameVal(e.target.value)} onBlur={()=>{if(nameVal!==mealName)onMoveMeal(detailSlot.day,detailSlot.mt,nameVal,slotDateISO,detailSlot.mt);}} onKeyDown={e=>{if(e.key==="Enter")e.target.blur();}} placeholder="Meal name"/>
               <div>
-                <span onClick={()=>{if(!showMove){setMoveDate(slotDateISO);setMoveMt(detailSlot.mt);}setShowMove(v=>!v);}} style={{fontSize:12,color:S.T.accent,cursor:"pointer",textDecoration:"underline",textDecorationStyle:"dotted"}}>📅 {showMove?"Cancel":"Change Date"}</span>
+                <span onClick={()=>{if(!showMove){setMoveDate(slotDateISO);setMoveMt(detailSlot.mt);}setShowMove(v=>!v);}} style={{fontSize:13,color:S.T.accent,cursor:"pointer",textDecoration:"underline",textDecorationStyle:"dotted",padding:"6px 4px",display:"inline-block"}}>📅 {showMove?"Cancel":"Change Date"}</span>
                 {showMove&&<div style={{marginTop:8,padding:10,background:S.T.bg,borderRadius:8,display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}} onClick={e=>e.stopPropagation()}>
                   <div>
                     <div style={{...S.label,marginBottom:4}}>New Date</div>
@@ -1172,15 +1172,15 @@ function MealsTab({mealPlans,setMealPlans,shopList,setShopList,mealSuggestions,s
               {val
                 ?<div>
                   <div onClick={()=>setDetailSlot({day,mt,key:slotKey(day,mt)})} style={{fontSize:11,color:S.T.text,cursor:"pointer",marginBottom:2,textDecoration:"underline",textDecorationStyle:"dotted"}}>{val}</div>
-                  <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                  <div style={{display:"flex",gap:2,alignItems:"center"}}>
                     {hasDet&&<span style={{fontSize:9,color:"#4CAF50",fontFamily:"monospace"}}>📋</span>}
-                    <span onClick={()=>{setEditCell({day,mt});setCellVal(val);}} style={{fontSize:9,color:S.T.sub,cursor:"pointer"}}>✏ edit</span>
-                    <span onClick={()=>clearCell(day,mt)} style={{fontSize:9,color:"#f44336",cursor:"pointer"}}>✕ del</span>
+                    <span onClick={()=>{setEditCell({day,mt});setCellVal(val);}} style={{fontSize:12,color:S.T.sub,cursor:"pointer",padding:"5px 6px",lineHeight:1}}>✏ edit</span>
+                    <span onClick={()=>clearCell(day,mt)} style={{fontSize:12,color:"#f44336",cursor:"pointer",padding:"5px 6px",lineHeight:1}}>✕ del</span>
                   </div>
                 </div>
-                :<div style={{display:"flex",gap:6,justifyContent:"center",alignItems:"center",paddingTop:6}}>
-                  <span onClick={()=>{setEditCell({day,mt});setCellVal("");}} style={{cursor:"pointer",color:"#5a5a3a",fontSize:13}} title="Add meal">+</span>
-                  {favs.length>0&&<span onClick={()=>surpriseSlot(day,mt)} style={{cursor:"pointer",fontSize:11,opacity:0.6}} title="Surprise me — random favorite">🎲</span>}
+                :<div style={{display:"flex",gap:2,justifyContent:"center",alignItems:"center",paddingTop:2}}>
+                  <span onClick={()=>{setEditCell({day,mt});setCellVal("");}} style={{cursor:"pointer",color:"#5a5a3a",fontSize:22,padding:"6px 12px",lineHeight:1}} title="Add meal">+</span>
+                  {favs.length>0&&<span onClick={()=>surpriseSlot(day,mt)} style={{cursor:"pointer",fontSize:18,opacity:0.7,padding:"6px 10px",lineHeight:1}} title="Surprise me — random favorite">🎲</span>}
                 </div>
               }
             </div>

@@ -350,7 +350,7 @@ function WeeklyChoreBoard({chores,setChores,choreLog,setChoreLog,appSettings,S})
       <table style={{width:"100%",borderCollapse:"collapse",minWidth:480}}>
         <thead><tr>
           <th style={{textAlign:"left",padding:"4px 8px",fontSize:11,color:S.T.sub,fontFamily:"monospace",borderBottom:`1px solid ${S.T.border}`,minWidth:110}}>Who / Task</th>
-          {DAYS.map((d,i)=><th key={d} style={{textAlign:"center",padding:"4px 3px",fontSize:10,color:i===todayIdx?S.T.accent:S.T.sub,fontFamily:"monospace",borderBottom:`1px solid ${S.T.border}`,background:i===todayIdx?S.T.accent+"11":"transparent",minWidth:38}}>{DSHORT[i]}</th>)}
+          {DAYS.map((d,i)=><th key={d} style={{textAlign:"center",padding:"4px 3px",fontSize:10,color:i===todayIdx?S.T.accent:S.T.sub,fontFamily:"monospace",borderBottom:`1px solid ${S.T.border}`,background:i===todayIdx?S.T.accent+"11":"transparent",minWidth:44}}>{DSHORT[i]}</th>)}
         </tr></thead>
         <tbody>{recurring.map(c=>{
           const u=USERS.find(x=>x.key===c.assignee);
@@ -367,7 +367,7 @@ function WeeklyChoreBoard({chores,setChores,choreLog,setChoreLog,appSettings,S})
               const isToday=i===todayIdx;
               return(<td key={d} style={{textAlign:"center",padding:"4px 2px",borderBottom:`1px solid ${S.T.border}`,background:isToday?S.T.accent+"0a":"transparent"}}>
                 {sched
-                  ? <div onClick={()=>toggleDay(c.id,d)} style={{width:22,height:22,borderRadius:4,margin:"0 auto",cursor:"pointer",background:done?"#4CAF50":u?.color+"22",border:`2px solid ${done?"#4CAF50":u?.color||GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,transition:"all 0.15s"}}>{done?"✓":""}</div>
+                  ? <div onClick={()=>toggleDay(c.id,d)} style={{width:28,height:28,borderRadius:5,margin:"0 auto",cursor:"pointer",background:done?"#4CAF50":u?.color+"22",border:`2px solid ${done?"#4CAF50":u?.color||GOLD}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,transition:"all 0.15s"}}>{done?"✓":""}</div>
                   : <div style={{width:6,height:6,borderRadius:"50%",background:S.T.border,margin:"0 auto"}}/>
                 }
               </td>);
