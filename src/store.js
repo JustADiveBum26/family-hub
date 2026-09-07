@@ -34,7 +34,11 @@ const rawSave = async (k, v) => {
     try {
       await updateDoc(ref, { [k]: JSON.stringify(v) });
     } catch(inner) {
-      // Document doesn't exist yet on first-ever save — create it.
+      // updateDoc fails with "not-found" when the document doesn't exist yet
+      // (first-ever save) — create it. Any other error (permission-denied,
+      // network drop, quota) is a real failure and should surface as one
+      // instead of being masked by a doomed-to-also-fail setDoc retry.
+      if (inner.code !== "not-found") throw inner;
       await setDoc(ref, { [k]: JSON.stringify(v) }, { merge: true });
     }
     return true;

@@ -8,6 +8,43 @@ replacement for it.
 
 Add one entry here per `vNN` commit going forward.
 
+## v64 — full-app streamlining pass: real bugs fixed, duplication removed
+Four parallel review agents (family.jsx; shared/dashboards/App; calendar/tv;
+finance/infra) audited the whole codebase for cleanup opportunities. Fixed
+first:
+- Meal plan "Add All to List" only ever saved the last ingredient — each
+  add in the loop read the same stale shopList and overwrote the previous
+  one. Now builds the whole batch once.
+- A weekly recurring calendar event silently failed to save with no error
+  if "repeat until" was picked before the start date.
+- The "Upload Statement" AI-import feature (Finance > Statements) was
+  completely non-functional — it called api.anthropic.com directly from
+  the browser with no auth header, so it could never work without a
+  backend to hold a secret key. Removed the dead upload UI/plumbing;
+  transaction history/spending charts stay wired in case a real import
+  path gets added later.
+- Bradyn/Parker/Ryder's dashboards were passed ~20 props by hand instead
+  of spreading `sharedProps` like Brad/Mary Beth's already did — a future
+  shared field could silently never reach them. Now consistent everywhere.
+- A Firestore save-retry could mask real errors (permission-denied,
+  network drop) behind a doomed-to-also-fail fallback write; now only
+  retries on the specific "document doesn't exist yet" case.
+
+Then de-duplicated logic that had drifted into multiple copies: day-until-
+due math (new `daysUntil()` in constants.js, replacing ~10 hand-rolled
+`864e5` call sites across family/shared/calendar/tv), the "show adult
+chores" visibility check (new `canShowChoreRow()`, was reimplemented
+identically 4x), the full-screen modal overlay (new shared `ModalOverlay`
+component, was duplicated 3x across family.jsx and calendar.jsx), a
+triple-duplicated yearly-event-normalization snippet in calendar.jsx, and
+`billPaid()`/`addMonthToDate()` reimplemented locally in family.jsx
+despite already being imported. `tv.jsx`'s color palette now imports
+`THEMES.dark` instead of a hand-typed copy that could drift (same failure
+mode v60 already fixed once for styles). `scripts/backup-firestore.js`
+now calls `store.dump()` instead of a second copy of the same export
+logic. Plus small dead-code trims (unused imports/vars, a confusing
+`slotKey` name reused for two different key schemes).
+
 ## v63 — bigger tap targets for meal plan and chore checkboxes on TV
 Icon-only controls with no padding (meal plan `+`/🎲/edit/del, chore
 checkboxes, recipe select toggles, chip `×` remove buttons) were hard to

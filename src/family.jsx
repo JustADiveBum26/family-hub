@@ -1,8 +1,9 @@
 // ── Family features: chores, message board, settings, bills, meals, ledger ────
 import { useState, useEffect, useRef } from "react";
 import { store } from "./store";
-import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, SHOP_CATS, SHOP_STORES, POINT_VALUE, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, localISO, todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate } from "./constants";
+import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, SHOP_CATS, SHOP_STORES, POINT_VALUE, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, localISO, todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate, daysUntil, canShowChoreRow } from "./constants";
 import { DayPills, QuickAddChip, SavedListCard, ApprovalRow, EditFormCard } from "./shared";
+import { ModalOverlay } from "./modalOverlay";
 import { RECIPE_LIBRARY } from "./recipeLibrary";
 
 // ── CHORE LEADERBOARD — this week's points + a daily-completion streak ───────
@@ -47,13 +48,7 @@ function ChoresTab({chores,setChores,choreLog,setChoreLog,appSettings,S,currentU
   const [editForm,setEditForm]=useState({});
   const [form,setForm]=useState({assignee:"",task:"",customTask:"",points:5,due:"",days:[]});
   const save=u=>{setChores(u);store.save("fp2:chores",u);};
-  const showFor=id=>{
-    if(id==="brad"&&!appSettings.showAdultChores?.brad)return false;
-    if(id==="maryBeth"&&!appSettings.showAdultChores?.maryBeth)return false;
-    if(id==="bradyn"&&!appSettings.showAdultChores?.bradyn)return false;
-    return true;
-  };
-  const visibleUsers=USERS.filter(u=>showFor(u.key));
+  const visibleUsers=USERS.filter(u=>canShowChoreRow(appSettings,u.key));
   const firstUser=visibleUsers.length>0?visibleUsers[0].key:"bradyn";
   const showPoints=appSettings.showPoints;
   const toggleDay=d=>setForm(f=>({...f,days:f.days.includes(d)?f.days.filter(x=>x!==d):[...f.days,d]}));
@@ -334,8 +329,7 @@ function RecipeLibraryPanel({mealFavs,setMealFavs,S,onClose}){
     setAddedCount(toAdd.length);
     setSelected(new Set());
   };
-  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
-    <div style={{background:S.T.card,border:`1px solid ${S.T.border}`,borderRadius:14,padding:24,maxWidth:720,width:"100%",maxHeight:"88vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+  return(<ModalOverlay onClose={onClose} maxWidth={720} maxHeight="88vh" innerStyle={{background:S.T.card,border:`1px solid ${S.T.border}`,borderRadius:14,padding:24,display:"flex",flexDirection:"column"}}>
       <div style={{...S.row,marginBottom:14,flexWrap:"wrap",gap:8}}>
         <div>
           <div style={{fontSize:18,color:S.T.text,fontWeight:"bold"}}>📖 Recipe Library</div>
@@ -378,8 +372,7 @@ function RecipeLibraryPanel({mealFavs,setMealFavs,S,onClose}){
         <button style={S.btnGhost} onClick={onClose}>Done</button>
         <button style={{...S.btn("#4CAF50"),padding:"9px 20px"}} onClick={addSelected} disabled={selected.size===0}>Add {selected.size>0?selected.size+" ":""}Selected to Favorites</button>
       </div>
-    </div>
-  </div>);
+  </ModalOverlay>);
 }
 
 // ── SETTINGS TAB ─────────────────────────────────────────────────────────────
@@ -578,7 +571,7 @@ function AdminPanel({auth,setAuth,S}){
   const [kidPins,setKidPins]=useState({parker:"",ryder:""});
   const [resetConfirm,setResetConfirm]=useState(null);
   const [ownPwd,setOwnPwd]=useState({curr:"",next:"",confirm:""});
-  const [ownErr,setOwnErr]=useState(""),[ pinOk,setPinOk]=useState({}),[ ownOk,setOwnOk]=useState(false);
+  const [ownErr,setOwnErr]=useState(""),[pinOk,setPinOk]=useState({}),[ownOk,setOwnOk]=useState(false);
   const saveAuth=u=>{setAuth(u);store.save("fp2:auth",u);};
   const setPin=kid=>{const pin=kidPins[kid];if(!/^\d{4}$/.test(pin)){alert("PIN must be exactly 4 digits.");return;}saveAuth({...auth,[kid]:pin});setPinOk({...pinOk,[kid]:true});setTimeout(()=>setPinOk(p=>({...p,[kid]:false})),2000);setKidPins({...kidPins,[kid]:""});};
   const resetPwd=user=>{saveAuth({...auth,[user]:null});setResetConfirm(null);};
@@ -607,7 +600,7 @@ function AdminPanel({auth,setAuth,S}){
 
 // ── BILL CARD (top-level — must not be inside BillsTab) ──────────────────────
 function BillCard({bill,today,togglePaid,setPaidFrom,del,profile,payAccounts,S,editingId,editForm,setEditForm,startEdit,saveEdit,cancelEdit}){
-  const due=new Date(bill.dueDate+"T12:00:00"),dl=Math.ceil((due-today)/(864e5));
+  const due=new Date(bill.dueDate+"T12:00:00"),dl=daysUntil(bill.dueDate,today);
   const isOver=dl<0,isSoon=dl>=0&&dl<=3;
   const isShared=!bill.owner||bill.owner==="shared";
   const isBradOnly=bill.owner==="brad",isMBOnly=bill.owner==="maryBeth";
@@ -625,7 +618,7 @@ function BillCard({bill,today,togglePaid,setPaidFrom,del,profile,payAccounts,S,e
         {key:"recurring",label:"Repeats monthly — auto-create next month's bill once this one's paid",type:"checkbox",full:true},
       ]}/>
   </div>);
-  const full=isShared?(bill.bradPaid&&bill.maryBethPaid):isBradOnly?bill.bradPaid:bill.maryBethPaid;
+  const full=billPaid(bill);
   const edge=full?"#4CAF50":isOver?"#f44336":isSoon?"#FF9800":S.T.border;
   return(<div style={{...S.card,borderLeft:`4px solid ${edge}`,marginBottom:8}}>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
@@ -837,7 +830,11 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,wk,shopL
   const updateNewIng=(i,field,val)=>setNewIngs(rows=>rows.map((r,ri)=>ri===i?{...r,[field]:val}:r));
   const addNewIngRow=()=>setNewIngs(rows=>[...rows,blankIng()]);
   const removeNewIngRow=i=>setNewIngs(rows=>rows.filter((_,ri)=>ri!==i));
-  const slotKey=(day,mt)=>day+"__"+mt;
+  // Named distinctly from MealsTab's own slotKey() below — that one is
+  // week-prefixed (detailKeyFor) with a legacy-key fallback; this one is a
+  // plain day+mealtype pair. Same name, different scheme, was a trap for a
+  // future edit moving code between the two components.
+  const rawSlotKey=(day,mt)=>day+"__"+mt;
   const getDetail=(key)=>mealDetails[key]||{ingredients:[],recipe:""};
   const updateDetail=(key,patch)=>{saveDetails({...mealDetails,[key]:{...getDetail(key),...patch}});};
   const addIngredient=(key,ing)=>{const d=getDetail(key);updateDetail(key,{ingredients:[...d.ingredients,{id:Date.now(),...ing}]});};
@@ -847,7 +844,22 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,wk,shopL
       saveShop([...shopList,{id:Date.now(),name:ing.name,qty:ing.qty||"1",category:"Grocery",store:ingStore,addedBy:"Meal Plan",checked:false,notes:""}]);
     }
   };
-  const addAllIngsToShop=(key)=>{const d=getDetail(key);d.ingredients.forEach(ing=>addIngToShop(ing));};
+  // Builds the whole batch against one snapshot of shopList and saves once —
+  // calling addIngToShop() per ingredient in a loop used to have each call
+  // read the same stale shopList prop and overwrite the previous call's save,
+  // so only the last ingredient ever actually got added.
+  const addAllIngsToShop=(key)=>{
+    const d=getDetail(key);
+    const seen=new Set(shopList.filter(i=>!i.checked).map(i=>i.name.toLowerCase()));
+    const toAdd=[];
+    d.ingredients.forEach(ing=>{
+      const nl=ing.name.toLowerCase();
+      if(seen.has(nl))return;
+      seen.add(nl);toAdd.push(ing);
+    });
+    if(!toAdd.length)return;
+    saveShop([...shopList,...toAdd.map(ing=>({id:Date.now()+Math.random(),name:ing.name,qty:ing.qty||"1",category:"Grocery",store:ingStore,addedBy:"Meal Plan",checked:false,notes:""}))]);
+  };
   const saveNewIngs=(key)=>{
     const valid=newIngs.filter(r=>r.name.trim());
     if(!valid.length)return;
@@ -856,7 +868,7 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,wk,shopL
     setNewIngs([blankIng(),blankIng(),blankIng(),blankIng(),blankIng()]);
   };
   if(!detailSlot)return null;
-  const key=detailSlot.key||slotKey(detailSlot.day,detailSlot.mt);
+  const key=detailSlot.key||rawSlotKey(detailSlot.day,detailSlot.mt);
   const headerTop=detailSlot.day?detailSlot.day.toUpperCase()+" — "+detailSlot.mt.toUpperCase():(detailSlot.sublabel||"MEAL SUGGESTION");
   const mealName=detailSlot.label||(detailSlot.day?mealPlan[detailSlot.day]?.[detailSlot.mt]:"")||"";
   const slotDateISO=detailSlot.day?localISO(dateOfWeekDay(wk,DAYS.indexOf(detailSlot.day))):"";
@@ -865,8 +877,7 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,wk,shopL
   const close=()=>{setDetailSlot(null);setNewIngs([blankIng(),blankIng(),blankIng(),blankIng(),blankIng()]);};
   const currentRecipe=detail.recipe||"";
   const readyCount=newIngs.filter(r=>r.name.trim()).length;
-  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={close}>
-    <div style={{background:S.T.card,border:`1px solid ${S.T.border}`,borderRadius:14,padding:24,maxWidth:580,width:"100%",maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+  return(<ModalOverlay onClose={close} maxWidth={580} maxHeight="90vh" innerStyle={{background:S.T.card,border:`1px solid ${S.T.border}`,borderRadius:14,padding:24}}>
       <div style={{...S.row,marginBottom:16,flexWrap:"wrap",gap:8}}>
         <div style={{flex:1,minWidth:220}}>
           <div style={{fontSize:10,color:S.T.sub,fontFamily:"monospace",letterSpacing:"0.15em",marginBottom:4}}>{headerTop}</div>
@@ -941,8 +952,7 @@ function MealDetailModal({detailSlot,setDetailSlot,mealPlan,mealDetails,wk,shopL
         <textarea style={{...S.input,height:160,resize:"vertical",lineHeight:1.5}} placeholder="Type or paste your recipe steps here..." defaultValue={currentRecipe} onBlur={e=>updateDetail(key,{recipe:e.target.value})}/>
         <div style={{fontSize:11,color:S.T.sub,marginTop:4}}>Changes save automatically when you click away.</div>
       </div>
-    </div>
-  </div>);
+  </ModalOverlay>);
 }
 
 // ── MEALS TAB ─────────────────────────────────────────────────────────────────
@@ -1333,15 +1343,6 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
   const paymentLog=ledger.flatMap(i=>(i.history||[]).map(h=>({...h,itemName:i.name})))
     .sort((a,b)=>new Date(b.date)-new Date(a.date));
   const monthKey=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");};
-  const addMonth=(dateStr)=>{
-    if(!dateStr)return dateStr;
-    const d=new Date(dateStr+"T12:00:00");
-    const day=d.getDate();
-    d.setMonth(d.getMonth()+1);
-    // Handle month-end overflow (e.g. Jan 31 -> Feb 28) by clamping to last day of target month
-    if(d.getDate()!==day)d.setDate(0);
-    return d.toISOString().slice(0,10);
-  };
   const addItem=()=>{
     if(!form.name||!form.defaultAmount)return;
     const item={
@@ -1373,14 +1374,14 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
     }));
   };
   const resetForNewMonth=id=>{
-    save(ledger.map(i=>i.id===id?{...i,paid:false,currentMonthAmount:i.defaultAmount,currentMonthKey:monthKey(),dueDate:i.type==="recurring"?addMonth(i.dueDate):i.dueDate}:i));
+    save(ledger.map(i=>i.id===id?{...i,paid:false,currentMonthAmount:i.defaultAmount,currentMonthKey:monthKey(),dueDate:i.type==="recurring"?addMonthToDate(i.dueDate):i.dueDate}:i));
   };
   // Auto-detect month rollover: if currentMonthKey differs from this month and item was paid, reset it
   useEffect(()=>{
     const mk=monthKey();
     const needsReset=ledger.filter(i=>i.type==="recurring"&&i.currentMonthKey!==mk&&i.paid);
     if(needsReset.length>0){
-      save(ledger.map(i=>(i.type==="recurring"&&i.currentMonthKey!==mk&&i.paid)?{...i,paid:false,currentMonthAmount:i.defaultAmount,currentMonthKey:mk,dueDate:addMonth(i.dueDate)}:i));
+      save(ledger.map(i=>(i.type==="recurring"&&i.currentMonthKey!==mk&&i.paid)?{...i,paid:false,currentMonthAmount:i.defaultAmount,currentMonthKey:mk,dueDate:addMonthToDate(i.dueDate)}:i));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
@@ -1420,8 +1421,7 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
     {recurring.length>0&&<div style={{marginBottom:14}}>
       <div style={{fontSize:13,color:S.T.sub,fontFamily:"monospace",letterSpacing:"0.1em",marginBottom:8,borderLeft:`3px solid ${S.T.accent}`,paddingLeft:10}}>RECURRING MONTHLY</div>
       {recurring.map(item=>{
-        const today=new Date();
-        const dl=item.dueDate?Math.ceil((new Date(item.dueDate+"T12:00:00")-today)/(864e5)):null;
+        const dl=item.dueDate?daysUntil(item.dueDate):null;
         const isOver=dl!=null&&dl<0&&!item.paid;
         const isSoon=dl!=null&&dl>=0&&dl<=3&&!item.paid;
         if(editingId===item.id)return(<div key={item.id} style={{...S.card,borderLeft:`4px solid ${S.T.accent}`,marginBottom:8}}>
@@ -1472,8 +1472,7 @@ function BradynLedger({ledger,setLedger,currentUser,S}){
     {oneTime.length>0&&<div>
       <div style={{fontSize:13,color:S.T.sub,fontFamily:"monospace",letterSpacing:"0.1em",marginBottom:8,borderLeft:`3px solid ${S.T.accent}`,paddingLeft:10}}>ONE-TIME ITEMS</div>
       {oneTime.map(item=>{
-        const today=new Date();
-        const dl=item.dueDate?Math.ceil((new Date(item.dueDate+"T12:00:00")-today)/(864e5)):null;
+        const dl=item.dueDate?daysUntil(item.dueDate):null;
         const isOver=dl!=null&&dl<0&&!item.paid;
         const isSoon=dl!=null&&dl>=0&&dl<=3&&!item.paid;
         if(editingId===item.id)return(<div key={item.id} style={{...S.card,borderLeft:`4px solid ${S.T.accent}`,marginBottom:8}}>

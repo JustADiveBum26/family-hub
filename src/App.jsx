@@ -1,7 +1,7 @@
 // ── Main App: state, Firestore load, auth/session, routing ───────────────────
 import { useState, useEffect, useRef, useCallback } from "react";
 import { store } from "./store";
-import { D, DAYS, CATS, S, GOLD, TIMEOUT_MS, scoreToRate, calcMortgage, weekKeyOf, weekKeyOffset, normalizeWeek } from "./constants";
+import { D, DAYS, S, GOLD, TIMEOUT_MS, scoreToRate, calcMortgage, weekKeyOf, weekKeyOffset, normalizeWeek } from "./constants";
 import { LoginModal, PublicHomeScreen, SaveStatusBadge, VersionBadge } from "./shared";
 import { BradDashboard, MaryBethDashboard, BradynDashboard, ParkerTab, RyderTab } from "./dashboards";
 import { TVDisplay } from "./tv";
@@ -40,9 +40,6 @@ export default function App(){
   const [loginTarget,setLoginTarget]=useState(null);
   const [loaded,setLoaded]=useState(false);
   const [scenario,setScenario]=useState({extraPayment:500,incomeBoost:0,downPct:20,extraSavings:0});
-  const [reviewTxns,setReviewTxns]=useState(null);
-  const [uploadLoading,setUploadLoading]=useState(false);
-  const fileRef=useRef();
   const lastActivity=useRef(Date.now());
   const timerRef=useRef(null);
 
@@ -116,20 +113,6 @@ export default function App(){
   const monthlyMortgage=calcMortgage(loanAmt,mortgageRate);
   const dti=((monthlyMortgage+slPayment+300)/grossMonthly)*100;
 
-  const handleUpload=async e=>{
-    const file=e.target.files?.[0];if(!file)return;setUploadLoading(true);
-    try{
-      let content="";
-      if(file.name.endsWith(".csv")||file.name.endsWith(".txt")){content=await file.text();}
-      else{const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.onerror=rej;r.readAsDataURL(file);});const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,messages:[{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:"Extract all transactions. Return ONLY JSON array: [{date,description,amount,type}]. No markdown."}]}]})});const data=await resp.json();content=data.content?.[0]?.text||"[]";}
-      const pr=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,system:`Categorize transactions. Return ONLY JSON array: [{id,date,description,amount,category}]. Categories: ${CATS.join(",")}. No markdown.`,messages:[{role:"user",content:`Categorize: ${content}`}]})});
-      const pd=await pr.json();let text=pd.content?.[0]?.text||"[]";text=text.replace(/```json|```/g,"").trim();
-      setReviewTxns(JSON.parse(text).map((t,i)=>({...t,id:Date.now()+i,account:file.name})));
-    }catch(err){alert("Could not parse statement. Try CSV format.");}
-    setUploadLoading(false);if(fileRef.current)fileRef.current.value="";
-  };
-  const confirmTxns=sel=>{const upd=[...transactions,...sel.map(t=>({...t,confirmed:true}))].slice(-500);setTransactions(upd);store.save("fp2:transactions",upd);setReviewTxns(null);};
-
   const handleLogin=userKey=>setLoginTarget(userKey);
   const handleLoginSuccess=(userKey,newPwd)=>{if(newPwd){const upd={...auth,[userKey]:newPwd};setAuth(upd);store.save("fp2:auth",upd);}setCurrentUser(userKey);setLoginTarget(null);lastActivity.current=Date.now();};
   const handleLogout=()=>setCurrentUser(null);
@@ -152,10 +135,10 @@ export default function App(){
     {loginTarget&&<LoginModal user={loginTarget} auth={auth} onSuccess={pwd=>handleLoginSuccess(loginTarget,pwd)} onClose={()=>setLoginTarget(null)}/>}
     {!currentUser&&tvMode&&<TVDisplay mealPlan={mealPlan} nextWeekPlan={nextWeekPlan} events={events} shopList={shopList} bills={bills} messages={messages} chores={chores} appSettings={appSettings} onExit={exitTv} onLogin={k=>{exitTv();setLoginTarget(k);}} onRefresh={loadAll}/>}
     {!currentUser&&!tvMode&&<PublicHomeScreen mealPlan={mealPlan} shopList={shopList} setShopList={setShopList} bills={bills} expenses={expenses} onLogin={handleLogin} appSettings={appSettings} messages={messages} shopSettings={shopSettings} events={events} onTv={enterTv}/>}
-    {currentUser==="brad"&&<BradDashboard {...sharedProps} accounts={accounts} setAccounts={setAccounts} debts={debts} setDebts={setDebts} expenses={expenses} setExpenses={setExpenses} goals={goals} setGoals={setGoals} transactions={transactions} setTransactions={setTransactions} pslf={pslf} setPslf={setPslf} scenario={scenario} setScenario={setScenario} reviewTxns={reviewTxns} setReviewTxns={setReviewTxns} uploadLoading={uploadLoading} handleUpload={handleUpload} confirmTxns={confirmTxns} fileRef={fileRef} auth={auth} setAuth={setAuth} totalAssets={totalAssets} totalDebtAmt={totalDebtAmt} netWorth={netWorth} totalCC={totalCC} combinedLiquid={combinedLiquid} cushion={cushion} dti={dti} mortgageRate={mortgageRate} monthlyMortgage={monthlyMortgage} loanAmt={loanAmt} surplus={surplus} takeHome={takeHome} totalExpenses={totalExpenses} slPayment={slPayment} downNeeded={downNeeded} closing={closing} homePrice={homePrice} onLogout={handleLogout}/>}
-    {currentUser==="maryBeth"&&<MaryBethDashboard {...sharedProps} expenses={expenses} debts={debts} onLogout={handleLogout} setChores={setChores}/>}
-    {currentUser==="bradyn"&&<BradynDashboard mealPlan={mealPlan} shopList={shopList} setShopList={setShopList} shopRequests={shopRequests} setShopRequests={setShopRequests} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} mealDetails={mealDetails} setMealDetails={setMealDetails} chores={chores} setChores={setChores} messages={messages} setMessages={setMessages} appSettings={appSettings} shopSettings={shopSettings} bradynLedger={bradynLedger} setBradynLedger={setBradynLedger} events={events} setEvents={setEvents} choreLog={choreLog} setChoreLog={setChoreLog} allowance={allowance} setAllowance={setAllowance} onLogout={handleLogout}/>}
-    {currentUser==="parker"&&<ParkerTab mealPlan={mealPlan} shopRequests={shopRequests} setShopRequests={setShopRequests} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} chores={chores} setChores={setChores} messages={messages} setMessages={setMessages} appSettings={appSettings} events={events} setEvents={setEvents} choreLog={choreLog} setChoreLog={setChoreLog} allowance={allowance} setAllowance={setAllowance} onLogout={handleLogout}/>}
-    {currentUser==="ryder"&&<RyderTab mealPlan={mealPlan} shopRequests={shopRequests} setShopRequests={setShopRequests} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} chores={chores} setChores={setChores} messages={messages} setMessages={setMessages} appSettings={appSettings} events={events} setEvents={setEvents} choreLog={choreLog} setChoreLog={setChoreLog} allowance={allowance} setAllowance={setAllowance} onLogout={handleLogout}/>}
+    {currentUser==="brad"&&<BradDashboard {...sharedProps} accounts={accounts} setAccounts={setAccounts} debts={debts} setDebts={setDebts} expenses={expenses} setExpenses={setExpenses} goals={goals} setGoals={setGoals} transactions={transactions} setTransactions={setTransactions} pslf={pslf} setPslf={setPslf} scenario={scenario} setScenario={setScenario} auth={auth} setAuth={setAuth} totalAssets={totalAssets} totalDebtAmt={totalDebtAmt} netWorth={netWorth} totalCC={totalCC} combinedLiquid={combinedLiquid} cushion={cushion} dti={dti} mortgageRate={mortgageRate} monthlyMortgage={monthlyMortgage} loanAmt={loanAmt} surplus={surplus} takeHome={takeHome} totalExpenses={totalExpenses} slPayment={slPayment} downNeeded={downNeeded} closing={closing} homePrice={homePrice} onLogout={handleLogout}/>}
+    {currentUser==="maryBeth"&&<MaryBethDashboard {...sharedProps} expenses={expenses} debts={debts} onLogout={handleLogout}/>}
+    {currentUser==="bradyn"&&<BradynDashboard {...sharedProps} onLogout={handleLogout}/>}
+    {currentUser==="parker"&&<ParkerTab {...sharedProps} onLogout={handleLogout}/>}
+    {currentUser==="ryder"&&<RyderTab {...sharedProps} onLogout={handleLogout}/>}
   </div>);
 }

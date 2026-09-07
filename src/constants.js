@@ -17,7 +17,7 @@ const TIMEOUT_MS=5*60*1000;
 const POINT_VALUE=0.10;
 // Bumped by hand alongside each commit's "vNN: ..." message, so the number
 // shown in the app (VersionBadge in shared.jsx) always matches git history.
-const APP_VERSION="63";
+const APP_VERSION="64";
 
 const THEMES={
   dark:{bg:"#0d0d08",card:"#141410",border:"#2a2a18",text:"#e8e0c8",sub:"#888",accent:GOLD,name:"Dark Gold"},
@@ -83,12 +83,25 @@ const normalizeWeek=p=>Object.fromEntries(DAYS.map(dy=>[dy,{Breakfast:p?.[dy]?.B
 // chore marked done this Monday doesn't still show as done next Monday —
 // otherwise the box (and the leaderboard streak built from choreLog) would
 // never actually reset week to week.
-const todayISO=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;};
+const todayISO=()=>localISO(new Date());
 const isoDateForDayName=(dayName)=>{
   const idx=DAYS.indexOf(dayName);
   const d=new Date();
   d.setDate(d.getDate()-((d.getDay()+6)%7)+idx);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  return localISO(d);
+};
+// Days from `from` until a "YYYY-MM-DD" date (negative = overdue). Centralizes
+// the `(due-now)/864e5` millisecond math that used to be hand-rolled at every
+// bill/chore/event due-date call site across the app.
+const daysUntil=(dateStr,from=new Date())=>Math.ceil((new Date(dateStr+"T12:00:00")-from)/864e5);
+// Whether a chore row for `id` (brad/maryBeth/bradyn) should show, per the
+// Settings > "show adult chores" toggles. Was reimplemented identically in
+// 4 different components before being centralized here.
+const canShowChoreRow=(appSettings,id)=>{
+  if(id==="brad"&&!appSettings?.showAdultChores?.brad)return false;
+  if(id==="maryBeth"&&!appSettings?.showAdultChores?.maryBeth)return false;
+  if(id==="bradyn"&&!appSettings?.showAdultChores?.bradyn)return false;
+  return true;
 };
 // Dated history behind streaks/leaderboard — the source of truth for "what got
 // done when," independent of (and unaffected by) the donedays checkbox state.
@@ -131,7 +144,6 @@ function makeS(theme,scale=1.15){
     btnDanger:{background:"transparent",border:"1px solid #f4433644",borderRadius:6,padding:`${sp(6)}px ${sp(11)}px`,color:"#f44336",fontFamily:"Georgia,serif",fontSize:fs(13),cursor:"pointer"},
     row:{display:"flex",justifyContent:"space-between",alignItems:"center"},
     grid2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:sp(16)},
-    grid2mob:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:sp(16)},
     grid3:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:sp(16)},
     grid4:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:sp(16)},
     h2:{fontSize:fs(16),color:T.accent,fontWeight:"normal",borderBottom:`1px solid ${T.border}`,paddingBottom:sp(9),marginBottom:sp(18),letterSpacing:"0.05em"},
@@ -175,5 +187,6 @@ export {
   D, fmt, calcMortgage, scoreToRate, calcPayoff, todayName, billPaid,
   weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, localISO,
   todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate,
+  daysUntil, canShowChoreRow,
   makeS, makeKidS, S,
 };

@@ -2,11 +2,13 @@
 // Reached from the "📺 TV Display Mode" button on the landing page or by
 // bookmarking the app URL with #tv. Read-only, big type, refreshes itself.
 import { useState, useEffect, useRef } from "react";
-import { DAYS, MEAL_TYPES, GOLD, BORDER, USERS, todayName, billPaid, weekKeyOf, dateOfWeekDay, todayISO, makeS } from "./constants";
+import { DAYS, GOLD, USERS, todayName, billPaid, weekKeyOf, dateOfWeekDay, todayISO, localISO, daysUntil, canShowChoreRow, THEMES, makeS } from "./constants";
 import { WeatherScroll } from "./shared";
-import { MonthCalendar, EventRow, CountdownStrip, WeeklyCelebrations, EventDetailPopup, eventsOnDay, todayKey } from "./calendar";
+import { MonthCalendar, EventRow, CountdownStrip, WeeklyCelebrations, EventDetailPopup, eventsOnDay } from "./calendar";
 
-const T={bg:"#0d0d08",card:"#141410",border:"#2a2a18",text:"#e8e0c8",sub:"#888",accent:GOLD};
+// Same palette as makeS("dark") — imported rather than hand-typed so it can't
+// silently drift from the shared theme the way tvS's style keys once did.
+const T=THEMES.dark;
 // Built on makeS() (base scale) so the TV always has every key shared
 // components expect — a hand-forked copy previously fell behind makeS() as it
 // grew (missing grid2/grid2mob/grid3/grid4/page) and could silently break a
@@ -68,20 +70,17 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
   useEffect(()=>()=>clearTimeout(wakeTimerRef.current),[]);
   const asleep=inNight&&!awake;
   const tn=todayName();
-  const tKey=todayKey();
-  const tomorrowKey=(()=>{const d=new Date(now);d.setDate(d.getDate()+1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;})();
+  // Both derived from the same `now` (rather than tKey calling todayISO()
+  // fresh) so the pair can't disagree for the few seconds around midnight
+  // before `now`'s next 15s tick.
+  const tKey=localISO(now);
+  const tomorrowKey=(()=>{const d=new Date(now);d.setDate(d.getDate()+1);return localISO(d);})();
   const todayEvents=eventsOnDay(events,tKey);
   const tomorrowEvents=eventsOnDay(events,tomorrowKey);
   const unchecked=(shopList||[]).filter(i=>!i.checked);
   const pinned=(messages||[]).filter(m=>m.approved&&m.pinned);
-  const dueSoon=(bills||[]).filter(b=>{if(billPaid(b))return false;const dl=Math.ceil((new Date(b.dueDate+"T12:00:00")-now)/(864e5));return dl>=0&&dl<=7;});
-  const showFor=id=>{
-    if(id==="brad"&&!appSettings?.showAdultChores?.brad)return false;
-    if(id==="maryBeth"&&!appSettings?.showAdultChores?.maryBeth)return false;
-    if(id==="bradyn"&&!appSettings?.showAdultChores?.bradyn)return false;
-    return true;
-  };
-  const todayChores=(chores||[]).filter(c=>showFor(c.assignee)&&c.days&&c.days.includes(tn)&&!(c.donedays||{})[todayISO()]);
+  const dueSoon=(bills||[]).filter(b=>{if(billPaid(b))return false;const dl=daysUntil(b.dueDate,now);return dl>=0&&dl<=7;});
+  const todayChores=(chores||[]).filter(c=>canShowChoreRow(appSettings,c.assignee)&&c.days&&c.days.includes(tn)&&!(c.donedays||{})[todayISO()]);
   const tomorrowIsNextWeek=DAYS.indexOf(tn)===6;
   const tomorrowDayName=DAYS[(DAYS.indexOf(tn)+1)%7];
   const tonightDinner=mealPlan[tn]?.Dinner||"";

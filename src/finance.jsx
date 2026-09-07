@@ -1,5 +1,5 @@
 // ── Finance suite: accounts, debts, budget, goals, statements, PSLF ───────────
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { store } from "./store";
 import { CATS, ACCT_TYPES, DEBT_TYPES, GOLD, fmt, calcMortgage, calcPayoff } from "./constants";
 import { Ring, Bar } from "./shared";
@@ -61,16 +61,16 @@ function GoalsTab({goals,setGoals,S}){
     <div style={S.card}><div style={S.h2}>Add Goal</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,alignItems:"flex-end"}}><div><div style={S.label}>Goal Name</div><input style={S.input} placeholder="e.g. Honeymoon Fund" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></div><div><div style={S.label}>Target</div><input style={S.input} type="number" placeholder="10000" value={form.target} onChange={e=>setForm({...form,target:e.target.value})}/></div><div><div style={S.label}>Saved</div><input style={S.input} type="number" placeholder="0" value={form.saved} onChange={e=>setForm({...form,saved:e.target.value})}/></div><div><div style={S.label}>Target Date</div><input style={S.input} type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/></div><button style={S.btn()} onClick={add}>Add</button></div></div></>);
 }
 
-function StatementsTab({transactions,setTransactions,handleUpload,uploadLoading,reviewTxns,setReviewTxns,confirmTxns,fileRef,S}){
-  const [sel,setSel]=useState([]),[catE,setCatE]=useState({});
-  useEffect(()=>{if(reviewTxns)setSel(reviewTxns.map(t=>t.id));},[reviewTxns]);
-  const toggle=id=>setSel(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);
-  const confirm=()=>{confirmTxns(reviewTxns.map(t=>({...t,category:catE[t.id]||t.category})).filter(t=>sel.includes(t.id)));setSel([]);setCatE({});};
+function StatementsTab({transactions,S}){
   const spend=transactions.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(t.amount),0);
   const income=transactions.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0);
   const byCat={};transactions.filter(t=>t.amount<0).forEach(t=>{byCat[t.category]=(byCat[t.category]||0)+Math.abs(t.amount);});
-  return(<><div style={S.card}><div style={S.h2}>Upload Statement</div><div style={{display:"flex",gap:14,alignItems:"center",flexWrap:"wrap"}}><p style={{color:S.T.sub,fontSize:13,margin:0,flex:1}}>Upload a bank or credit card statement (PDF or CSV). AI reads it, categorizes transactions, and shows a review screen before saving.</p><div><input ref={fileRef} type="file" accept=".pdf,.csv,.txt" onChange={handleUpload} style={{display:"none"}}/><button style={{...S.btn(),padding:"12px 24px"}} onClick={()=>fileRef.current?.click()} disabled={uploadLoading}>{uploadLoading?"Processing...":"Choose File"}</button></div></div></div>
-    {reviewTxns&&<div style={S.card}><div style={{...S.h2,...S.row,flexWrap:"wrap",gap:8}}><span>Review ({reviewTxns.length} found)</span><div style={{display:"flex",gap:8}}><button style={S.btnGhost} onClick={()=>{setReviewTxns(null);setSel([]);setCatE({});}}>Cancel</button><button style={S.btn()} onClick={confirm}>Confirm {sel.length}</button></div></div><div style={{maxHeight:360,overflowY:"auto"}}>{reviewTxns.map(t=><div key={t.id} style={{...S.row,padding:"7px 0",borderBottom:`1px solid #1a1a0f`,gap:8,opacity:sel.includes(t.id)?1:0.4,flexWrap:"wrap"}}><input type="checkbox" checked={sel.includes(t.id)} onChange={()=>toggle(t.id)} style={{accentColor:GOLD}}/><div style={{flex:1}}><div style={{fontSize:13,color:S.T.text}}>{t.description}</div><div style={{fontSize:11,color:S.T.sub}}>{t.date}</div></div><select style={{...S.select,maxWidth:130,fontSize:11,padding:"4px 8px"}} value={catE[t.id]||t.category} onChange={e=>setCatE({...catE,[t.id]:e.target.value})}>{CATS.map(c=><option key={c}>{c}</option>)}</select><span style={{color:t.amount<0?"#f44336":"#4CAF50",fontFamily:"monospace",fontWeight:"bold",minWidth:70,textAlign:"right"}}>{t.amount<0?"−":"+"}{fmt(Math.abs(t.amount))}</span></div>)}</div></div>}
+  // Automatic statement import (AI-read PDF/CSV -> categorize -> review) was
+  // removed: it called api.anthropic.com directly from the browser with no
+  // auth header, so it could never actually work without a backend to hold
+  // a secret key. transactions/setTransactions are left wired through in
+  // case a real import path is added later.
+  return(<>{transactions.length===0&&<div style={{...S.card,textAlign:"center",padding:28,color:S.T.sub}}>No transactions yet — automatic statement import isn't available.</div>}
     {transactions.length>0&&<><div style={S.grid3}>{[{l:"Imported",v:`${transactions.length} txns`,c:GOLD},{l:"Spending",v:fmt(spend),c:"#f44336"},{l:"Income",v:fmt(income),c:"#4CAF50"}].map((k,i)=><div key={i} style={{...S.card,marginBottom:0,borderTop:`3px solid ${k.c}`}}><div style={S.label}>{k.l}</div><div style={{fontSize:18,fontFamily:"monospace",color:k.c,fontWeight:"bold"}}>{k.v}</div></div>)}</div><div style={{...S.card,marginTop:14}}><div style={S.h2}>Spending by Category</div>{Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([cat,amt])=><div key={cat} style={{marginBottom:10}}><div style={{...S.row,marginBottom:4}}><span style={{fontSize:13,color:S.T.sub}}>{cat}</span><span style={{fontFamily:"monospace",color:GOLD}}>{fmt(amt)}</span></div><Bar value={amt} max={Math.max(...Object.values(byCat))} color={GOLD}/></div>)}</div><div style={S.card}><div style={S.h2}>Transaction History</div><div style={{maxHeight:320,overflowY:"auto"}}>{[...transactions].reverse().map(t=><div key={t.id} style={{...S.row,padding:"6px 0",borderBottom:`1px solid #1a1a0f`,flexWrap:"wrap",gap:8}}><div><div style={{fontSize:13,color:S.T.text}}>{t.description}</div><div style={{fontSize:11,color:S.T.sub}}>{t.date} · <span style={S.tag("#888")}>{t.category}</span></div></div><span style={{color:t.amount<0?"#f44336":"#4CAF50",fontFamily:"monospace"}}>{t.amount<0?"−":"+"}{fmt(Math.abs(t.amount))}</span></div>)}</div></div></>}
   </>);
 }
@@ -150,7 +150,7 @@ const FINANCE_SECTIONS=[
   {id:"statements",label:"Statements",icon:"📄"},
   {id:"pslf",label:"PSLF",icon:"🎓"},
 ];
-function FinanceHub({profile,pslf,setPslf,accounts,setAccounts,debts,setDebts,expenses,setExpenses,transactions,setTransactions,goals,setGoals,reviewTxns,setReviewTxns,uploadLoading,handleUpload,confirmTxns,fileRef,netWorth,combinedLiquid,totalCC,cushion,dti,mortgageRate,monthlyMortgage,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,scenario,setScenario,S}){
+function FinanceHub({profile,pslf,setPslf,accounts,setAccounts,debts,setDebts,expenses,setExpenses,transactions,setTransactions,goals,setGoals,netWorth,combinedLiquid,totalCC,cushion,dti,mortgageRate,monthlyMortgage,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,scenario,setScenario,S}){
   const [screen,setScreen]=useState("overview");
   return(<div>
     <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
@@ -161,7 +161,7 @@ function FinanceHub({profile,pslf,setPslf,accounts,setAccounts,debts,setDebts,ex
     {screen==="debts"&&<DebtsTab debts={debts} setDebts={setDebts} profile={profile} S={S}/>}
     {screen==="budget"&&<BudgetTab expenses={expenses} setExpenses={setExpenses} transactions={transactions} takeHome={takeHome} slPayment={slPayment} S={S}/>}
     {screen==="goals"&&<GoalsTab goals={goals} setGoals={setGoals} S={S}/>}
-    {screen==="statements"&&<StatementsTab transactions={transactions} setTransactions={setTransactions} handleUpload={handleUpload} uploadLoading={uploadLoading} reviewTxns={reviewTxns} setReviewTxns={setReviewTxns} confirmTxns={confirmTxns} fileRef={fileRef} S={S}/>}
+    {screen==="statements"&&<StatementsTab transactions={transactions} S={S}/>}
     {screen==="pslf"&&<PslfTab pslf={pslf} setPslf={setPslf} debts={debts} S={S}/>}
   </div>);
 }

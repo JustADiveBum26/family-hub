@@ -1,7 +1,7 @@
 // ── Shared UI components (login, home screens, widgets) ───────────────────────
 import { useState, useEffect } from "react";
 import { store } from "./store";
-import { DAYS, DSHORT, MEAL_TYPES, GOLD, BORDER, THEMES, USERS, APP_VERSION, SHOP_CATS, SHOP_STORES, fmt, todayName, billPaid, weekKeyOf, dateOfWeekDay, S, isoDateForDayName, logChoreDone, unlogChoreDone } from "./constants";
+import { DAYS, DSHORT, MEAL_TYPES, GOLD, BORDER, THEMES, USERS, APP_VERSION, SHOP_CATS, SHOP_STORES, fmt, todayName, billPaid, weekKeyOf, dateOfWeekDay, S, isoDateForDayName, logChoreDone, unlogChoreDone, daysUntil, canShowChoreRow } from "./constants";
 import { MonthCalendar, UpcomingEvents, CountdownStrip, WeeklyCelebrations, EventDetailPopup } from "./calendar";
 
 // ── QUICK-ADD CHIP — a saved item that can be one-tap added elsewhere, with
@@ -296,11 +296,11 @@ function WeatherScroll({cities=FAMILY_CITIES,big,intervalMs=8000}){
 
 function BillsBanner({bills,S}){
   const today=new Date();
-  const due=bills.filter(b=>{if(billPaid(b))return false;const d=new Date(b.dueDate+"T12:00:00");const dl=Math.ceil((d-today)/(864e5));return dl>=0&&dl<=7;});
+  const due=bills.filter(b=>{if(billPaid(b))return false;const dl=daysUntil(b.dueDate,today);return dl>=0&&dl<=7;});
   if(due.length===0)return null;
   return(<div style={{...S.alert("#FF9800"),display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:14}}>
     <span style={{color:"#FF9800",fontWeight:"bold",fontSize:13}}>Expenses this week:</span>
-    {due.map(b=>{const dl=Math.ceil((new Date(b.dueDate+"T12:00:00")-today)/(864e5));return <span key={b.id} style={{...S.tag("#FF9800")}}>{b.name} — {dl===0?"Today":dl===1?"Tomorrow":dl+"d"}</span>;})}
+    {due.map(b=>{const dl=daysUntil(b.dueDate,today);return <span key={b.id} style={{...S.tag("#FF9800")}}>{b.name} — {dl===0?"Today":dl===1?"Tomorrow":dl+"d"}</span>;})}
   </div>);
 }
 
@@ -336,13 +336,7 @@ function WeeklyChoreBoard({chores,setChores,choreLog,setChoreLog,appSettings,S})
       else unlogChoreDone(choreLog,setChoreLog,c.id,dateKey);
     }
   };
-  const showFor=id=>{
-    if(id==="brad"&&!appSettings.showAdultChores?.brad)return false;
-    if(id==="maryBeth"&&!appSettings.showAdultChores?.maryBeth)return false;
-    if(id==="bradyn"&&!appSettings.showAdultChores?.bradyn)return false;
-    return true;
-  };
-  const recurring=chores.filter(c=>c.days&&c.days.length>0&&showFor(c.assignee));
+  const recurring=chores.filter(c=>c.days&&c.days.length>0&&canShowChoreRow(appSettings,c.assignee));
   if(recurring.length===0)return null;
   return(<div style={S.card}>
     <div style={S.h2}>Weekly Task Board</div>
@@ -384,14 +378,8 @@ function PersonalHomeScreen({currentUser,mealPlan,nextWeekPlan,bills,chores,setC
   const today=new Date(),tn=todayName();
   const tomorrowName=DAYS[(DAYS.indexOf(tn)+1)%7];
   const u=USERS.find(x=>x.key===currentUser);
-  const dueSoon=(bills||[]).filter(b=>{if(billPaid(b))return false;const d=new Date(b.dueDate+"T12:00:00");const dl=Math.ceil((d-today)/(864e5));return dl>=0&&dl<=7;});
-  const showFor=id=>{
-    if(id==="brad"&&!appSettings.showAdultChores?.brad)return false;
-    if(id==="maryBeth"&&!appSettings.showAdultChores?.maryBeth)return false;
-    if(id==="bradyn"&&!appSettings.showAdultChores?.bradyn)return false;
-    return true;
-  };
-  const myOneOff=showFor(currentUser)?(chores||[]).filter(c=>c.assignee===currentUser&&!c.done&&(!c.days||c.days.length===0)):[];
+  const dueSoon=(bills||[]).filter(b=>{if(billPaid(b))return false;const dl=daysUntil(b.dueDate,today);return dl>=0&&dl<=7;});
+  const myOneOff=canShowChoreRow(appSettings,currentUser)?(chores||[]).filter(c=>c.assignee===currentUser&&!c.done&&(!c.days||c.days.length===0)):[];
   // On Sunday, "tomorrow" is next week's Monday.
   const todayMeals=mealPlan[tn]||{},tomorrowMeals=(DAYS.indexOf(tn)===6?(nextWeekPlan||{})[tomorrowName]:mealPlan[tomorrowName])||{};
   return(<div style={{padding:"0 0 16px"}}>
@@ -417,7 +405,7 @@ function PersonalHomeScreen({currentUser,mealPlan,nextWeekPlan,bills,chores,setC
       {dueSoon.length>0&&<div style={S.card}>
         <div style={S.h2}>Bills Due This Week</div>
         {dueSoon.map(b=>{
-          const dl=Math.ceil((new Date(b.dueDate+"T12:00:00")-today)/(864e5));
+          const dl=daysUntil(b.dueDate,today);
           const isShared=!b.owner||b.owner==="shared";
           const amt=isShared?b.amount/2:b.amount;
           const paid=isShared?(b.bradPaid&&b.maryBethPaid):b.owner==="brad"?b.bradPaid:b.maryBethPaid;
@@ -469,7 +457,7 @@ function PublicHomeScreen({mealPlan,shopList,setShopList,bills,expenses,onLogin,
   const [popupDay,setPopupDay]=useState(null);
   const tonightDinner=mealPlan[tn]?.Dinner||"";
   const unchecked=shopList.filter(i=>!i.checked);
-  const dueSoon=bills.filter(b=>{if(billPaid(b))return false;const d=new Date(b.dueDate+"T12:00:00");return Math.ceil((d-today)/(864e5))>=0&&Math.ceil((d-today)/(864e5))<=7;});
+  const dueSoon=bills.filter(b=>{if(billPaid(b))return false;const dl=daysUntil(b.dueDate,today);return dl>=0&&dl<=7;});
   return(<div style={{...S.page,minHeight:"100vh"}}>
     <div style={{background:"linear-gradient(180deg,#1a1a0f,#0d0d08)",borderBottom:`1px solid ${BORDER}`,padding:"16px 20px"}}>
       <div style={{maxWidth:1300,margin:"0 auto"}}>
@@ -498,7 +486,7 @@ function PublicHomeScreen({mealPlan,shopList,setShopList,bills,expenses,onLogin,
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:12,marginBottom:14}}>
         <div style={S.card}><div style={{...S.h2,...S.row}}><span>Shopping List</span><button onClick={()=>setShowShopView(true)} style={{...S.btnGhost,fontSize:12,padding:"4px 12px"}}>🛒 Full View</button></div>{unchecked.length===0?<div style={{color:"#444",fontSize:13,textAlign:"center",padding:"10px 0"}}>Nothing on the list!</div>:unchecked.slice(0,8).map(item=><div key={item.id} style={{display:"flex",gap:10,padding:"5px 0",borderBottom:`1px solid #1a1a0f`,alignItems:"center"}}><div style={{width:7,height:7,borderRadius:"50%",background:GOLD,flexShrink:0}}/><span style={{fontSize:13,color:"#e8e0c8",flex:1}}>{item.qty&&item.qty!=="1"?`${item.qty}x `:""}{item.name}</span>{item.addedBy&&item.addedBy!=="Parents"&&<span style={{fontSize:10,color:"#555"}}>{item.addedBy}</span>}</div>)}{unchecked.length>8&&<div style={{fontSize:11,color:"#555",marginTop:4}}>+{unchecked.length-8} more</div>}</div>
-        {dueSoon.length>0&&<div style={S.card}><div style={S.h2}>Due This Week</div>{dueSoon.map(b=>{const dl=Math.ceil((new Date(b.dueDate+"T12:00:00")-today)/(864e5)),paid=b.bradPaid&&b.maryBethPaid;return(<div key={b.id} style={{...S.row,padding:"6px 0",borderBottom:`1px solid #1a1a0f`}}><div><div style={{fontSize:13,color:"#e8e0c8"}}>{b.name}</div><div style={{fontSize:11,color:"#555"}}>{dl===0?"Today":dl===1?"Tomorrow":`${dl} days`}</div></div><div style={{textAlign:"right"}}><div style={{fontFamily:"monospace",color:GOLD,fontSize:12,fontWeight:"bold"}}>{fmt(b.amount/2)} ea</div><div style={{fontSize:10,color:paid?"#4CAF50":"#FF9800"}}>{paid?"Paid":"Pending"}</div></div></div>);})}
+        {dueSoon.length>0&&<div style={S.card}><div style={S.h2}>Due This Week</div>{dueSoon.map(b=>{const dl=daysUntil(b.dueDate,today),paid=b.bradPaid&&b.maryBethPaid;return(<div key={b.id} style={{...S.row,padding:"6px 0",borderBottom:`1px solid #1a1a0f`}}><div><div style={{fontSize:13,color:"#e8e0c8"}}>{b.name}</div><div style={{fontSize:11,color:"#555"}}>{dl===0?"Today":dl===1?"Tomorrow":`${dl} days`}</div></div><div style={{textAlign:"right"}}><div style={{fontFamily:"monospace",color:GOLD,fontSize:12,fontWeight:"bold"}}>{fmt(b.amount/2)} ea</div><div style={{fontSize:10,color:paid?"#4CAF50":"#FF9800"}}>{paid?"Paid":"Pending"}</div></div></div>);})}
         </div>}
       </div>
       <div style={S.card}><div style={{textAlign:"center",marginBottom:14}}><div style={{fontSize:11,color:"#555",fontFamily:"monospace",letterSpacing:"0.2em"}}>SIGN IN AS</div></div><div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>{USERS.map(u=><button key={u.key} onClick={()=>onLogin(u.key)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"14px 20px",background:`${u.color}12`,border:`2px solid ${u.color}44`,borderRadius:14,cursor:"pointer",color:"#e8e0c8",fontFamily:"Georgia,serif",minWidth:90}}><span style={{fontSize:32}}>{u.emoji}</span><span style={{fontSize:13,color:u.color,fontWeight:"bold"}}>{u.label}</span></button>)}</div>

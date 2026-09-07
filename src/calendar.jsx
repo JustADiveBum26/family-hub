@@ -2,7 +2,8 @@
 // Parents + Bradyn can add/edit; everyone can view. Data syncs via fp2:events.
 import { useState, useEffect } from "react";
 import { store } from "./store";
-import { USERS, GOLD } from "./constants";
+import { USERS, GOLD, localISO, todayISO } from "./constants";
+import { ModalOverlay } from "./modalOverlay";
 
 const OWNERS=[{key:"family",label:"Family",emoji:"👨‍👩‍👦‍👦",color:GOLD},...USERS];
 // Fallback when an event isn't tagged to anyone — a grandparent's birthday isn't
@@ -27,9 +28,11 @@ const EVENT_CATS=[
 const WEEK_HEAD=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
 const pad2=n=>String(n).padStart(2,"0");
-const dateKey=d=>`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+// Aliased onto the shared constants.js date helpers (same "YYYY-MM-DD" local
+// format) rather than hand-rolled here, so this file can't drift from them.
+const dateKey=localISO;
 const parseKey=k=>new Date(k+"T12:00:00");
-const todayKey=()=>dateKey(new Date());
+const todayKey=todayISO;
 // Events can be tagged with several people (owners: ["brad","parker"]). Older
 // events only have a single `owner` string — both shapes are supported.
 const evOwners=ev=>{
@@ -82,6 +85,11 @@ const nextOccurrence=(ev,fromKey)=>{
   if(dateKey(next)<fromKey)next=new Date(from.getFullYear()+1,orig.getMonth(),orig.getDate(),12);
   return dateKey(next);
 };
+// Yearly-recurring events keep their original `date` in storage (so age/
+// anniversary-number math has a fixed origin) — normalize them to their next
+// occurrence on/after `fromKey` so date-range filters and sorts just work.
+// Was duplicated identically at 3 call sites before being centralized here.
+const normalizeYearly=(events,fromKey)=>(events||[]).map(ev=>ev.repeatYearly?{...ev,date:nextOccurrence(ev,fromKey),endDate:""}:ev);
 
 // Events starting (or still running) within the next `days` days, soonest first.
 // Yearly events are normalized to their next occurrence first so the usual
@@ -89,8 +97,7 @@ const nextOccurrence=(ev,fromKey)=>{
 const upcomingEvents=(events,days=7)=>{
   const start=todayKey();
   const end=dateKey(new Date(Date.now()+days*864e5));
-  return(events||[])
-    .map(ev=>ev.repeatYearly?{...ev,date:nextOccurrence(ev,start),endDate:""}:ev)
+  return normalizeYearly(events,start)
     .filter(ev=>(ev.endDate||ev.date)>=start&&ev.date<=end)
     .sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.time||"")<(b.time||"")?-1:1);
 };
@@ -274,6 +281,7 @@ function EventForm({S,initial,defaultDate,currentUser,onSave,onCancel}){
     if(!f.date){setErr("Pick a date.");return;}
     if(f.endDate&&f.endDate<f.date){setErr("End date is before start date.");return;}
     if(f.repeatWeekly&&!f.repeatUntil){setErr("Pick the last date for the weekly repeat.");return;}
+    if(f.repeatWeekly&&f.repeatUntil<f.date){setErr("Repeat-until date must be on or after the start date.");return;}
     onSave(f);
   };
   return(<div style={{...S.cardSm,border:`1px solid ${S.T.accent}55`}}>
@@ -370,8 +378,7 @@ function EventDetailPopup({dayKey,events,setEvents,currentUser,canEdit,S,onClose
   };
   const del=id=>{save((events||[]).filter(ev=>ev.id!==id));setEditingEv(null);};
   const delSeries=seriesId=>{save((events||[]).filter(ev=>ev.seriesId!==seriesId));setEditingEv(null);};
-  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}>
-    <div style={{...S.card,maxWidth:520,width:"100%",maxHeight:"85vh",overflowY:"auto",marginBottom:0}} onClick={e=>e.stopPropagation()}>
+  return(<ModalOverlay onClose={onClose} bg="rgba(0,0,0,0.75)" padding={20} maxWidth={520} maxHeight="85vh" innerStyle={{...S.card,marginBottom:0}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
         <div style={{...S.h2,marginBottom:0,paddingBottom:0,border:"none",fontSize:18}}>{dayKey===todayKey()?"Today — ":""}{fmtDayLong(dayKey)}</div>
         <button onClick={onClose} style={{...S.btnGhost,padding:"7px 14px",fontSize:13}}>✕ Close</button>
@@ -383,8 +390,7 @@ function EventDetailPopup({dayKey,events,setEvents,currentUser,canEdit,S,onClose
           {dayEvents.map(ev=><EventRow key={ev.id} ev={ev} S={S} occKey={dayKey} canEdit={canActuallyEdit} onEdit={setEditingEv} onDelete={del} onDeleteSeries={delSeries}/>)}
         </>
       }
-    </div>
-  </div>);
+  </ModalOverlay>);
 }
 
 // ── COUNTDOWN TILES — events flagged "countdown" show big days-to-go numbers ──
@@ -396,7 +402,7 @@ function EventDetailPopup({dayKey,events,setEvents,currentUser,canEdit,S,onClose
 function CountdownStrip({events,S,big,setEvents,canEdit,currentUser}){
   const today=todayKey();
   const horizon=dateKey(new Date(Date.now()+30*864e5));
-  const normalized=(events||[]).map(ev=>ev.repeatYearly?{...ev,date:nextOccurrence(ev,today),endDate:""}:ev);
+  const normalized=normalizeYearly(events,today);
   const manual=normalized.filter(ev=>ev.countdown&&(ev.endDate||ev.date)>=today);
   const birthdays=normalized.filter(ev=>(ev.category==="birthday"||ev.category==="anniversary")&&ev.date>=today&&ev.date<=horizon);
   const seen=new Set();
@@ -558,9 +564,7 @@ function CalendarTab({events,setEvents,currentUser,canEdit,S}){
   // (same trick upcomingEvents() uses for yearly-recurring events) so the list
   // reads as "who's coming up," not stuck on the year it was first added.
   const today=todayKey();
-  const celebrations=(events||[])
-    .filter(ev=>ev.category==="birthday"||ev.category==="anniversary")
-    .map(ev=>ev.repeatYearly?{...ev,date:nextOccurrence(ev,today),endDate:""}:ev)
+  const celebrations=normalizeYearly((events||[]).filter(ev=>ev.category==="birthday"||ev.category==="anniversary"),today)
     .sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
   const openDay=k=>{setSelected(k);setPopupDay(k);};
   return(<div>
