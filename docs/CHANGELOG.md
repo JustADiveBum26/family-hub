@@ -19,6 +19,12 @@ three for both parents. Stored at `fp2:sharedTodos`; every edit re-reads the
 stored list first so simultaneous edits by both parents don't clobber each
 other. Kids and the public home screen never see it.
 
+## v66 — shared to-do list simplified to task name + notes
+The v65 shared list was too busy. Dropped assignee, priority, and due date;
+each item is now just a task name and optional notes, in the order added.
+Same tab / home card / TV panel / Settings toggle. Existing items keep
+working (their old extra fields are simply ignored).
+
 ## v64 — full-app streamlining pass: real bugs fixed, duplication removed
 Four parallel review agents (family.jsx; shared/dashboards/App; calendar/tv;
 finance/infra) audited the whole codebase for cleanup opportunities. Fixed

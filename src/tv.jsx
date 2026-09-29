@@ -2,7 +2,7 @@
 // Reached from the "📺 TV Display Mode" button on the landing page or by
 // bookmarking the app URL with #tv. Read-only, big type, refreshes itself.
 import { useState, useEffect, useRef } from "react";
-import { DAYS, GOLD, USERS, todayName, billPaid, weekKeyOf, dateOfWeekDay, todayISO, localISO, daysUntil, canShowChoreRow, sortOpenTodos, TODO_PRIORITY, THEMES, makeS } from "./constants";
+import { DAYS, GOLD, USERS, todayName, billPaid, weekKeyOf, dateOfWeekDay, todayISO, localISO, daysUntil, canShowChoreRow, sortOpenTodos, THEMES, makeS } from "./constants";
 import { WeatherScroll } from "./shared";
 import { MonthCalendar, EventRow, CountdownStrip, WeeklyCelebrations, EventDetailPopup, eventsOnDay } from "./calendar";
 
@@ -121,12 +121,10 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
       );})}
     </div>)}]:[]),
     ...(openTodos.length>0?[{key:"stodo",label:`🤝 To-Do (${openTodos.length})`,body:(<>
-      {openTodos.slice(0,6).map(i=>{const dl=i.due?daysUntil(i.due,now):null;const u=USERS.find(x=>x.key===i.assignee);return(<div key={i.id} style={{display:"flex",gap:10,padding:"6px 0",borderBottom:"1px solid #1a1a0f",alignItems:"center"}}>
-        <div style={{width:9,height:9,borderRadius:"50%",background:i.priority==="high"?TODO_PRIORITY.high.color:GOLD,flexShrink:0}}/>
-        <span style={{flex:1,fontSize:15,color:T.text}}>{i.text}</span>
-        {i.due&&<span style={{fontSize:12,color:dl<0?"#f44336":T.sub,fontFamily:"monospace"}}>{dl<0?"Overdue":dl===0?"Today":dl===1?"Tmrw":i.due.slice(5)}</span>}
-        <span style={{...tvS.tag(u?.color||T.sub),fontSize:11,padding:"2px 8px"}}>{u?u.label:"Either"}</span>
-      </div>);})}
+      {openTodos.slice(0,6).map(i=><div key={i.id} style={{display:"flex",gap:10,padding:"6px 0",borderBottom:"1px solid #1a1a0f",alignItems:"flex-start"}}>
+        <div style={{width:9,height:9,borderRadius:"50%",background:GOLD,flexShrink:0,marginTop:7}}/>
+        <div style={{flex:1}}><div style={{fontSize:15,color:T.text}}>{i.text}</div>{i.notes&&<div style={{fontSize:12,color:T.sub}}>{i.notes}</div>}</div>
+      </div>)}
       {openTodos.length>6&&<div style={{fontSize:12,color:T.sub,marginTop:6}}>+{openTodos.length-6} more</div>}
     </>)}]:[]),
   ];
