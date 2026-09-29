@@ -8,6 +8,17 @@ replacement for it.
 
 Add one entry here per `vNN` commit going forward.
 
+## v65 — shared to-do list for Brad & Mary Beth
+New "Shared To-Do" list, separate from the personal "My To-Do" tabs (those are
+unchanged). Items have text, assignee (Brad / Mary Beth / either), priority,
+due date and notes; completed items collapse into a "Done" section with
+"Clear completed". Shows as a tab, a card on both parents' home screens, and
+a rotating panel on the TV (open items only, top 6, overdue in red). One
+on/off toggle in Brad's Settings > Feature Toggles (default OFF) hides all
+three for both parents. Stored at `fp2:sharedTodos`; every edit re-reads the
+stored list first so simultaneous edits by both parents don't clobber each
+other. Kids and the public home screen never see it.
+
 ## v64 — full-app streamlining pass: real bugs fixed, duplication removed
 Four parallel review agents (family.jsx; shared/dashboards/App; calendar/tv;
 finance/infra) audited the whole codebase for cleanup opportunities. Fixed

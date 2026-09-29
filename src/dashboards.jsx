@@ -3,7 +3,7 @@ import { useState } from "react";
 import { store } from "./store";
 import { DAYS, MEAL_TYPES, SHOP_CATS, SHOP_STORES, fmt, makeS, makeKidS } from "./constants";
 import { ShoppingListView, UserHeader, ThemePicker, PersonalHomeScreen, BillsBanner, WeatherScroll } from "./shared";
-import { ChoresTab, KidChoreView, MessageBoard, SettingsTab, BillsTab, MealDetailModal, MealsTab, BradynLedger, TodoTab, AllowanceCard, AllowanceOverview } from "./family";
+import { ChoresTab, KidChoreView, MessageBoard, SettingsTab, BillsTab, MealDetailModal, MealsTab, BradynLedger, TodoTab, SharedTodoTab, AllowanceCard, AllowanceOverview } from "./family";
 import { FinanceHub } from "./finance";
 import { CalendarTab, WeeklyCelebrations } from "./calendar";
 
@@ -254,10 +254,11 @@ function DashboardShell({userKey,groups,badges,extraHeader,maxWidth=1300,appSett
 
 // ── BRAD DASHBOARD ────────────────────────────────────────────────────────────
 function BradDashboard(props){
-  const {onLogout,auth,setAuth,netWorth,accounts,setAccounts,debts,setDebts,expenses,setExpenses,goals,setGoals,transactions,setTransactions,pslf,setPslf,scenario,setScenario,profile,setProfile,mealPlan,nextWeekPlan,mealPlans,setMealPlans,mealFavs,setMealFavs,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,totalAssets,totalDebtAmt,totalCC,combinedLiquid,cushion,dti,mortgageRate,monthlyMortgage,loanAmt,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger,events,setEvents,todos,setTodos,shopStaples,setShopStaples,choreLog,setChoreLog,allowance,setAllowance}=props;
+  const {onLogout,auth,setAuth,netWorth,accounts,setAccounts,debts,setDebts,expenses,setExpenses,goals,setGoals,transactions,setTransactions,pslf,setPslf,scenario,setScenario,profile,setProfile,mealPlan,nextWeekPlan,mealPlans,setMealPlans,mealFavs,setMealFavs,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,totalAssets,totalDebtAmt,totalCC,combinedLiquid,cushion,dti,mortgageRate,monthlyMortgage,loanAmt,surplus,takeHome,totalExpenses,slPayment,downNeeded,closing,homePrice,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger,events,setEvents,todos,setTodos,sharedTodos,setSharedTodos,shopStaples,setShopStaples,choreLog,setChoreLog,allowance,setAllowance}=props;
   const [tab,setTab]=useState("home");
   const saveTodos=u=>{const updated={...todos,brad:u};setTodos(updated);store.save("fp2:todos",updated);};
   const todoOn=appSettings?.todoEnabled?.brad!==false;
+  const sharedTodoOn=!!appSettings?.sharedTodoEnabled;
   // Finance is its own siloed area, opt-in via Settings — defaults to visible
   // so it doesn't vanish out from under someone already using it.
   const financeOn=appSettings?.financeEnabled!==false;
@@ -265,7 +266,7 @@ function BradDashboard(props){
   const msgPending=(messages||[]).filter(m=>!m.approved).length;
   const GROUPS=[
     {g:"Home",tabs:[{id:"home",label:"Home",icon:"🏠"}]},
-    {g:"Family",tabs:[{id:"cal",label:"Calendar",icon:"📅"},{id:"meals",label:"Meals & Food",icon:"🍽"},{id:"chores",label:"Tasks",icon:"✅"},...(todoOn?[{id:"todo",label:"My To-Do",icon:"📝"}]:[]),{id:"board",label:"Board",icon:"📢"},{id:"bills",label:"Bills",icon:"🧾"},{id:"bradynledger",label:"Bradyn & Me",icon:"💵"},{id:"allowance",label:"Allowance",icon:"💰"}]},
+    {g:"Family",tabs:[{id:"cal",label:"Calendar",icon:"📅"},{id:"meals",label:"Meals & Food",icon:"🍽"},{id:"chores",label:"Tasks",icon:"✅"},...(todoOn?[{id:"todo",label:"My To-Do",icon:"📝"}]:[]),...(sharedTodoOn?[{id:"stodo",label:"Shared To-Do",icon:"🤝"}]:[]),{id:"board",label:"Board",icon:"📢"},{id:"bills",label:"Bills",icon:"🧾"},{id:"bradynledger",label:"Bradyn & Me",icon:"💵"},{id:"allowance",label:"Allowance",icon:"💰"}]},
     ...(financeOn?[{g:"Finance",tabs:[{id:"finance",label:"Finance",icon:"◈"}]}]:[]),
     {g:"Settings",tabs:[{id:"settings",label:"Settings",icon:"⚙️"}]},
   ];
@@ -273,11 +274,12 @@ function BradDashboard(props){
     <DashboardShell userKey="brad" groups={GROUPS} badges={{meals:pendingCount,board:msgPending}} maxWidth={1400} appSettings={appSettings} setAppSettings={setAppSettings} shopList={shopList} setShopList={setShopList} shopSettings={shopSettings} bills={bills} onLogout={onLogout} tab={tab} setTab={setTab}
       extraHeader={S=><div style={{fontSize:13,color:S.T.accent,fontFamily:"monospace"}}>{fmt(netWorth)} net worth</div>}>
       {S=>(<>
-        {tab==="home"&&<PersonalHomeScreen currentUser="brad" mealPlan={mealPlan} nextWeekPlan={nextWeekPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} choreLog={choreLog} setChoreLog={setChoreLog} messages={messages||[]} appSettings={appSettings} events={events} setEvents={setEvents} S={S}/>}
+        {tab==="home"&&<PersonalHomeScreen currentUser="brad" sharedTodos={sharedTodoOn?sharedTodos:null} onOpenTodos={()=>setTab("stodo")} mealPlan={mealPlan} nextWeekPlan={nextWeekPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} choreLog={choreLog} setChoreLog={setChoreLog} messages={messages||[]} appSettings={appSettings} events={events} setEvents={setEvents} S={S}/>}
         {tab==="cal"&&<CalendarTab events={events} setEvents={setEvents} currentUser="brad" canEdit={true} S={S}/>}
         {tab==="meals"&&<MealsTab mealPlans={mealPlans} setMealPlans={setMealPlans} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} mealFavs={mealFavs} setMealFavs={setMealFavs} shopStaples={shopStaples} setShopStaples={setShopStaples} shopSettings={shopSettings} profile={profile} expenses={expenses} S={S}/>}
         {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} choreLog={choreLog} setChoreLog={setChoreLog} appSettings={appSettings} S={S} currentUser="brad"/>}
         {tab==="todo"&&todoOn&&<TodoTab items={todos?.brad} onSave={saveTodos} S={S}/>}
+        {tab==="stodo"&&sharedTodoOn&&<SharedTodoTab items={sharedTodos} setItems={setSharedTodos} currentUser="brad" S={S}/>}
         {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="brad" S={S}/>}
         {tab==="bills"&&<BillsTab bills={bills} setBills={setBills} billHistory={billHistory} setBillHistory={setBillHistory} profile={profile} payAccounts={payAccounts} S={S}/>}
         {tab==="bradynledger"&&<BradynLedger ledger={bradynLedger||[]} setLedger={setBradynLedger} currentUser="brad" S={S}/>}
@@ -290,25 +292,27 @@ function BradDashboard(props){
 }
 
 // ── MARY BETH DASHBOARD ───────────────────────────────────────────────────────
-function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,nextWeekPlan,mealPlans,setMealPlans,mealFavs,setMealFavs,shopStaples,setShopStaples,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,profile,setProfile,expenses,debts,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,events,setEvents,todos,setTodos,choreLog,setChoreLog,allowance,setAllowance,onLogout}){
+function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,nextWeekPlan,mealPlans,setMealPlans,mealFavs,setMealFavs,shopStaples,setShopStaples,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,profile,setProfile,expenses,debts,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,events,setEvents,todos,setTodos,sharedTodos,setSharedTodos,choreLog,setChoreLog,allowance,setAllowance,onLogout}){
   const [tab,setTab]=useState("home");
   const saveTodos=u=>{const updated={...todos,maryBeth:u};setTodos(updated);store.save("fp2:todos",updated);};
   const todoOn=appSettings?.todoEnabled?.maryBeth!==false;
+  const sharedTodoOn=!!appSettings?.sharedTodoEnabled;
   const pending=(mealSuggestions||[]).filter(s=>s.status==="pending").length+(shopRequests||[]).filter(r=>r.status==="pending").length;
   const msgPending=(messages||[]).filter(m=>!m.approved).length;
   const GROUPS=[
     {g:"Home",tabs:[{id:"home",label:"Home",icon:"🏠"}]},
-    {g:"Family",tabs:[{id:"cal",label:"Calendar",icon:"📅"},{id:"meals",label:"Meals & Food",icon:"🍽"},{id:"chores",label:"Tasks",icon:"✅"},...(todoOn?[{id:"todo",label:"My To-Do",icon:"📝"}]:[]),{id:"board",label:"Board",icon:"📢"},{id:"bills",label:"Bills",icon:"🧾"},{id:"allowance",label:"Allowance",icon:"💰"}]},
+    {g:"Family",tabs:[{id:"cal",label:"Calendar",icon:"📅"},{id:"meals",label:"Meals & Food",icon:"🍽"},{id:"chores",label:"Tasks",icon:"✅"},...(todoOn?[{id:"todo",label:"My To-Do",icon:"📝"}]:[]),...(sharedTodoOn?[{id:"stodo",label:"Shared To-Do",icon:"🤝"}]:[]),{id:"board",label:"Board",icon:"📢"},{id:"bills",label:"Bills",icon:"🧾"},{id:"allowance",label:"Allowance",icon:"💰"}]},
     {g:"Settings",tabs:[{id:"settings",label:"Settings",icon:"⚙️"}]},
   ];
   return(
     <DashboardShell userKey="maryBeth" groups={GROUPS} badges={{meals:pending,board:msgPending}} maxWidth={1300} appSettings={appSettings} setAppSettings={setAppSettings} shopList={shopList} setShopList={setShopList} shopSettings={shopSettings} bills={bills} onLogout={onLogout} tab={tab} setTab={setTab}>
       {S=>(<>
-        {tab==="home"&&<PersonalHomeScreen currentUser="maryBeth" mealPlan={mealPlan} nextWeekPlan={nextWeekPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} choreLog={choreLog} setChoreLog={setChoreLog} messages={messages||[]} appSettings={appSettings} events={events} setEvents={setEvents} S={S}/>}
+        {tab==="home"&&<PersonalHomeScreen currentUser="maryBeth" sharedTodos={sharedTodoOn?sharedTodos:null} onOpenTodos={()=>setTab("stodo")} mealPlan={mealPlan} nextWeekPlan={nextWeekPlan} bills={bills||[]} chores={chores||[]} setChores={setChores} choreLog={choreLog} setChoreLog={setChoreLog} messages={messages||[]} appSettings={appSettings} events={events} setEvents={setEvents} S={S}/>}
         {tab==="cal"&&<CalendarTab events={events} setEvents={setEvents} currentUser="maryBeth" canEdit={true} S={S}/>}
         {tab==="meals"&&<MealsTab mealPlans={mealPlans} setMealPlans={setMealPlans} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} mealFavs={mealFavs} setMealFavs={setMealFavs} shopStaples={shopStaples} setShopStaples={setShopStaples} shopSettings={shopSettings} profile={profile} expenses={expenses} S={S}/>}
         {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} choreLog={choreLog} setChoreLog={setChoreLog} appSettings={appSettings} S={S} currentUser="maryBeth"/>}
         {tab==="todo"&&todoOn&&<TodoTab items={todos?.maryBeth} onSave={saveTodos} S={S}/>}
+        {tab==="stodo"&&sharedTodoOn&&<SharedTodoTab items={sharedTodos} setItems={setSharedTodos} currentUser="maryBeth" S={S}/>}
         {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="maryBeth" S={S}/>}
         {tab==="bills"&&<BillsTab bills={bills} setBills={setBills} billHistory={billHistory} setBillHistory={setBillHistory} profile={profile} payAccounts={payAccounts} S={S}/>}
         {tab==="allowance"&&<AllowanceOverview log={allowance} setLog={setAllowance} chores={chores} setChores={setChores} S={S}/>}

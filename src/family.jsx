@@ -1,7 +1,7 @@
 // ── Family features: chores, message board, settings, bills, meals, ledger ────
 import { useState, useEffect, useRef } from "react";
 import { store } from "./store";
-import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, SHOP_CATS, SHOP_STORES, POINT_VALUE, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, localISO, todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate, daysUntil, canShowChoreRow } from "./constants";
+import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, SHOP_CATS, SHOP_STORES, POINT_VALUE, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, localISO, todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate, daysUntil, TODO_PRIORITY, sortOpenTodos, canShowChoreRow } from "./constants";
 import { DayPills, QuickAddChip, SavedListCard, ApprovalRow, EditFormCard } from "./shared";
 import { ModalOverlay } from "./modalOverlay";
 import { RECIPE_LIBRARY } from "./recipeLibrary";
@@ -297,6 +297,77 @@ function TodoTab({items,onSave,S}){
   </div>);
 }
 
+// ── SHARED TO-DO (Brad + Mary Beth) — one list both parents edit ─────────────
+// Every change re-reads the stored list first and applies to that, so two
+// people editing at once (or a stale tab) don't overwrite each other's items.
+function SharedTodoTab({items,setItems,currentUser,S}){
+  const blank={text:"",assignee:"either",due:"",priority:"normal",notes:""};
+  const [f,setF]=useState(blank);
+  const [editId,setEditId]=useState(null);
+  const [showDone,setShowDone]=useState(false);
+  const [open,setOpen]=useState(null);
+  const list=items||[];
+  const mutate=async fn=>{const fresh=await store.load("fp2:sharedTodos",[]);const next=fn(fresh||[]);setItems(next);store.save("fp2:sharedTodos",next);};
+  useEffect(()=>{store.load("fp2:sharedTodos",[]).then(l=>setItems(l||[]));},[]);
+  const submit=()=>{
+    if(!f.text.trim())return;
+    const clean={...f,text:f.text.trim(),notes:f.notes.trim()};
+    if(editId)mutate(l=>l.map(i=>i.id===editId?{...i,...clean}:i));
+    else mutate(l=>[...l,{id:Date.now(),...clean,done:false,addedBy:currentUser}]);
+    setF(blank);setEditId(null);
+  };
+  const startEdit=i=>{setF({text:i.text,assignee:i.assignee||"either",due:i.due||"",priority:i.priority||"normal",notes:i.notes||""});setEditId(i.id);};
+  const toggle=id=>mutate(l=>l.map(i=>i.id===id?{...i,done:!i.done,doneAt:i.done?null:todayISO(),doneBy:i.done?null:currentUser}:i));
+  const del=id=>mutate(l=>l.filter(i=>i.id!==id));
+  const clearDone=()=>mutate(l=>l.filter(i=>!i.done));
+  const pending=sortOpenTodos(list),done=list.filter(i=>i.done);
+  const who=a=>a==="brad"?"Brad":a==="maryBeth"?"Mary Beth":"Either";
+  const whoColor=a=>a==="brad"||a==="maryBeth"?USERS.find(u=>u.key===a)?.color||GOLD:S.T.sub;
+  const row=(i,isDone)=>{
+    const dl=i.due?daysUntil(i.due):null,over=!isDone&&dl!==null&&dl<0;
+    const pr=TODO_PRIORITY[i.priority||"normal"];
+    return(<div key={i.id} style={{padding:"9px 0",borderBottom:`1px solid ${S.T.border}`,opacity:isDone?0.55:1}}>
+      <div style={{display:"flex",gap:10,alignItems:"center"}}>
+        <input type="checkbox" checked={isDone} onChange={()=>toggle(i.id)} style={{width:22,height:22,cursor:"pointer",flexShrink:0}}/>
+        <div style={{flex:1,minWidth:0,cursor:i.notes?"pointer":"default"}} onClick={()=>i.notes&&setOpen(open===i.id?null:i.id)}>
+          <div style={{fontSize:14,color:S.T.text,textDecoration:isDone?"line-through":"none"}}>{i.priority==="high"&&!isDone&&<span style={{color:pr.color}}>❗ </span>}{i.text}{i.notes&&<span style={{fontSize:11,color:S.T.sub}}> 📝</span>}</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:3}}>
+            <span style={{...S.tag(whoColor(i.assignee)),fontSize:10}}>{who(i.assignee)}</span>
+            {i.priority&&i.priority!=="normal"&&<span style={{...S.tag(pr.color),fontSize:10}}>{pr.label}</span>}
+            {i.due&&<span style={{...S.tag(over?"#f44336":S.T.sub),fontSize:10}}>{isDone?"Due ":over?"Overdue · ":"Due "}{i.due}</span>}
+            {isDone&&i.doneAt&&<span style={{fontSize:10,color:S.T.sub}}>done {i.doneAt}{i.doneBy?` by ${who(i.doneBy)}`:""}</span>}
+          </div>
+        </div>
+        {!isDone&&<button onClick={()=>startEdit(i)} style={S.btnGhost}>Edit</button>}
+        <button onClick={()=>del(i.id)} style={S.btnDanger}>X</button>
+      </div>
+      {open===i.id&&i.notes&&<div style={{fontSize:12,color:S.T.sub,margin:"6px 0 0 32px",whiteSpace:"pre-wrap"}}>{i.notes}</div>}
+    </div>);
+  };
+  return(<div style={S.card}>
+    <div style={S.h2}>🤝 Shared To-Do (Brad & Mary Beth)</div>
+    <div style={{background:S.T.bg,borderRadius:10,padding:12,marginBottom:14}}>
+      <input style={{...S.input,width:"100%",boxSizing:"border-box",marginBottom:8}} placeholder="Add a task..." value={f.text} onChange={e=>setF({...f,text:e.target.value})} onKeyDown={e=>e.key==="Enter"&&submit()}/>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+        <select style={S.input} value={f.assignee} onChange={e=>setF({...f,assignee:e.target.value})}><option value="either">Either of us</option><option value="brad">Brad</option><option value="maryBeth">Mary Beth</option></select>
+        <select style={S.input} value={f.priority} onChange={e=>setF({...f,priority:e.target.value})}><option value="high">High priority</option><option value="normal">Normal priority</option><option value="low">Low priority</option></select>
+        <input type="date" style={S.input} value={f.due} onChange={e=>setF({...f,due:e.target.value})}/>
+      </div>
+      <textarea style={{...S.input,width:"100%",boxSizing:"border-box",minHeight:44,marginBottom:8}} placeholder="Notes (optional)" value={f.notes} onChange={e=>setF({...f,notes:e.target.value})}/>
+      <div style={{display:"flex",gap:8}}>
+        <button style={S.btn()} onClick={submit}>{editId?"Save Changes":"+ Add"}</button>
+        {editId&&<button style={S.btnGhost} onClick={()=>{setF(blank);setEditId(null);}}>Cancel</button>}
+      </div>
+    </div>
+    {pending.length===0&&<div style={{fontSize:13,color:S.T.sub,textAlign:"center",padding:"12px 0"}}>{done.length>0?"All caught up!":"Nothing on the shared list yet."}</div>}
+    {pending.map(i=>row(i,false))}
+    {done.length>0&&<>
+      <div onClick={()=>setShowDone(!showDone)} style={{...S.label,marginTop:16,cursor:"pointer"}}>{showDone?"▾":"▸"} Done ({done.length})</div>
+      {showDone&&<>{done.map(i=>row(i,true))}<button style={{...S.btnGhost,marginTop:10,fontSize:12}} onClick={clearDone}>Clear completed</button></>}
+    </>}
+  </div>);
+}
+
 // ── RECIPE LIBRARY — browse the 100 curated weeknight recipes, pick which to import ─
 function RecipeLibraryPanel({mealFavs,setMealFavs,S,onClose}){
   const [search,setSearch]=useState("");
@@ -533,6 +604,10 @@ function SettingsTab({profile,setProfile,appSettings,setAppSettings,shopSettings
           <div><div style={{fontSize:14,color:S.T.text}}>{label}</div><div style={{fontSize:12,color:S.T.sub}}>Show task list for {label.split("'")[0]}</div></div>
           <button onClick={()=>toggleAdultChore(key)} style={{...S.btn(appSettings.showAdultChores?.[key]?"#4CAF50":S.T.border),padding:"7px 16px",fontSize:12}}>{appSettings.showAdultChores?.[key]?"ON":"OFF"}</button>
         </div>)}
+        {currentUser==="brad"&&<div style={{...S.row,padding:"10px 0",borderBottom:`1px solid ${S.T.border}`}}>
+          <div><div style={{fontSize:14,color:S.T.text}}>Shared To-Do List</div><div style={{fontSize:12,color:S.T.sub}}>One to-do list for Brad & Mary Beth — a tab, a home-screen card, and a TV panel. Turns on or off for both of you</div></div>
+          <button onClick={()=>saveSettings({...appSettings,sharedTodoEnabled:!appSettings.sharedTodoEnabled})} style={{...S.btn(appSettings.sharedTodoEnabled?"#4CAF50":S.T.border),padding:"7px 16px",fontSize:12}}>{appSettings.sharedTodoEnabled?"ON":"OFF"}</button>
+        </div>}
         {(currentUser==="brad"||currentUser==="maryBeth")&&<div style={{...S.row,padding:"10px 0",borderBottom:`1px solid ${S.T.border}`}}>
           <div><div style={{fontSize:14,color:S.T.text}}>My To-Do List</div><div style={{fontSize:12,color:S.T.sub}}>Show a personal to-do list tab on your own dashboard</div></div>
           <button onClick={()=>saveSettings({...appSettings,todoEnabled:{...appSettings.todoEnabled,[currentUser]:!(appSettings.todoEnabled?.[currentUser]!==false)}})} style={{...S.btn(appSettings.todoEnabled?.[currentUser]!==false?"#4CAF50":S.T.border),padding:"7px 16px",fontSize:12}}>{appSettings.todoEnabled?.[currentUser]!==false?"ON":"OFF"}</button>
@@ -1572,5 +1647,5 @@ function AllowanceOverview({log,setLog,chores,setChores,S}){
 
 export {
   ChoresTab, KidChoreView, ChoreLeaderboard, MessageBoard, SettingsTab, BillCard,
-  SecHead, BillsTab, MealDetailModal, MealsTab, BradynLedger, TodoTab, AllowanceCard, AllowanceOverview,
+  SecHead, BillsTab, MealDetailModal, MealsTab, BradynLedger, TodoTab, SharedTodoTab, AllowanceCard, AllowanceOverview,
 };

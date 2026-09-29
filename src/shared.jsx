@@ -1,7 +1,7 @@
 // ── Shared UI components (login, home screens, widgets) ───────────────────────
 import { useState, useEffect } from "react";
 import { store } from "./store";
-import { DAYS, DSHORT, MEAL_TYPES, GOLD, BORDER, THEMES, USERS, APP_VERSION, SHOP_CATS, SHOP_STORES, fmt, todayName, billPaid, weekKeyOf, dateOfWeekDay, S, isoDateForDayName, logChoreDone, unlogChoreDone, daysUntil, canShowChoreRow } from "./constants";
+import { DAYS, DSHORT, MEAL_TYPES, GOLD, BORDER, THEMES, USERS, APP_VERSION, SHOP_CATS, SHOP_STORES, fmt, todayName, billPaid, weekKeyOf, dateOfWeekDay, S, isoDateForDayName, logChoreDone, unlogChoreDone, daysUntil, canShowChoreRow, TODO_PRIORITY, sortOpenTodos } from "./constants";
 import { MonthCalendar, UpcomingEvents, CountdownStrip, WeeklyCelebrations, EventDetailPopup } from "./calendar";
 
 // ── QUICK-ADD CHIP — a saved item that can be one-tap added elsewhere, with
@@ -374,7 +374,7 @@ function WeeklyChoreBoard({chores,setChores,choreLog,setChoreLog,appSettings,S})
 }
 
 // ── PERSONAL HOME SCREEN (Brad / Mary Beth / Bradyn) ─────────────────────────
-function PersonalHomeScreen({currentUser,mealPlan,nextWeekPlan,bills,chores,setChores,choreLog,setChoreLog,messages,appSettings,events,setEvents,S}){
+function PersonalHomeScreen({sharedTodos,onOpenTodos,currentUser,mealPlan,nextWeekPlan,bills,chores,setChores,choreLog,setChoreLog,messages,appSettings,events,setEvents,S}){
   const today=new Date(),tn=todayName();
   const tomorrowName=DAYS[(DAYS.indexOf(tn)+1)%7];
   const u=USERS.find(x=>x.key===currentUser);
@@ -414,6 +414,16 @@ function PersonalHomeScreen({currentUser,mealPlan,nextWeekPlan,bills,chores,setC
             <div style={{textAlign:"right"}}><div style={{fontFamily:"monospace",color:GOLD,fontWeight:"bold"}}>{fmt(amt)}</div><div style={{fontSize:10,color:paid?"#4CAF50":"#FF9800"}}>{paid?"Paid":"Pending"}</div></div>
           </div>);
         })}
+      </div>}
+      {sharedTodos&&<div style={S.card}>
+        <div style={{...S.row,marginBottom:8}}><div style={{...S.h2,marginBottom:0,borderBottom:"none",paddingBottom:0}}>🤝 Shared To-Do</div><button style={{...S.btnGhost,fontSize:11}} onClick={onOpenTodos}>Open</button></div>
+        {sortOpenTodos(sharedTodos).length===0&&<div style={{fontSize:12,color:S.T.sub}}>All caught up!</div>}
+        {sortOpenTodos(sharedTodos).slice(0,6).map(i=>{const dl=i.due?daysUntil(i.due):null;const u=USERS.find(x=>x.key===i.assignee);return(<div key={i.id} style={{display:"flex",gap:8,padding:"5px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"center"}}>
+          <div style={{width:14,height:14,borderRadius:3,border:`2px solid ${i.priority==="high"?TODO_PRIORITY.high.color:S.T.border}`,flexShrink:0}}/>
+          <div style={{flex:1}}><div style={{fontSize:13,color:S.T.text}}>{i.text}</div>{i.due&&<div style={{fontSize:11,color:dl<0?"#f44336":S.T.sub}}>{dl<0?"Overdue: ":"Due: "}{i.due}</div>}</div>
+          <span style={{...S.tag(u?.color||S.T.sub),fontSize:10}}>{u?u.label:"Either"}</span>
+        </div>);})}
+        {sortOpenTodos(sharedTodos).length>6&&<div style={{fontSize:11,color:S.T.sub,marginTop:6}}>+{sortOpenTodos(sharedTodos).length-6} more</div>}
       </div>}
       {myOneOff.length>0&&<div style={S.card}>
         <div style={S.h2}>My Tasks</div>

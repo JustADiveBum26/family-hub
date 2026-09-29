@@ -17,7 +17,7 @@ const TIMEOUT_MS=5*60*1000;
 const POINT_VALUE=0.10;
 // Bumped by hand alongside each commit's "vNN: ..." message, so the number
 // shown in the app (VersionBadge in shared.jsx) always matches git history.
-const APP_VERSION="64";
+const APP_VERSION="65";
 
 const THEMES={
   dark:{bg:"#0d0d08",card:"#141410",border:"#2a2a18",text:"#e8e0c8",sub:"#888",accent:GOLD,name:"Dark Gold"},
@@ -46,7 +46,7 @@ const D={
   bills:[],shopList:[],mealSuggestions:[],shopRequests:[],
   auth:{brad:null,maryBeth:null,bradyn:null,parker:null,ryder:null},
   chores:[],messages:[],billHistory:[],choreLog:[],allowance:{},
-  appSettings:{showPoints:false,showAdultChores:{brad:false,maryBeth:false,bradyn:false},userThemes:{},todoEnabled:{brad:true,maryBeth:true}},
+  appSettings:{showPoints:false,showAdultChores:{brad:false,maryBeth:false,bradyn:false},userThemes:{},todoEnabled:{brad:true,maryBeth:true},sharedTodoEnabled:false},
   todos:{brad:[],maryBeth:[]},
   shopSettings:{
     categories:SHOP_CATS,
@@ -103,6 +103,9 @@ const canShowChoreRow=(appSettings,id)=>{
   if(id==="bradyn"&&!appSettings?.showAdultChores?.bradyn)return false;
   return true;
 };
+const TODO_PRIORITY={high:{label:"High",color:"#f44336",rank:0},normal:{label:"Normal",color:"#888",rank:1},low:{label:"Low",color:"#4CAF50",rank:2}};
+// Open items first by priority, then soonest due date (undated last).
+const sortOpenTodos=list=>(list||[]).filter(i=>!i.done).sort((a,b)=>(TODO_PRIORITY[a.priority||"normal"].rank-TODO_PRIORITY[b.priority||"normal"].rank)||((a.due||"9999")<(b.due||"9999")?-1:(a.due||"9999")>(b.due||"9999")?1:0)||a.id-b.id);
 // Dated history behind streaks/leaderboard — the source of truth for "what got
 // done when," independent of (and unaffected by) the donedays checkbox state.
 const logChoreDone=(choreLog,setChoreLog,{choreId,assignee,points,task,date})=>{
@@ -187,6 +190,6 @@ export {
   D, fmt, calcMortgage, scoreToRate, calcPayoff, todayName, billPaid,
   weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, localISO,
   todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate,
-  daysUntil, canShowChoreRow,
+  daysUntil, canShowChoreRow, TODO_PRIORITY, sortOpenTodos,
   makeS, makeKidS, S,
 };

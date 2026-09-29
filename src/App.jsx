@@ -37,6 +37,7 @@ export default function App(){
   const [mealFavs,setMealFavs]=useState([]);
   const [shopStaples,setShopStaples]=useState([]);
   const [todos,setTodos]=useState(D.todos);
+  const [sharedTodos,setSharedTodos]=useState([]);
   const [loginTarget,setLoginTarget]=useState(null);
   const [loaded,setLoaded]=useState(false);
   const [scenario,setScenario]=useState({extraPayment:500,incomeBoost:0,downPct:20,extraSavings:0});
@@ -44,7 +45,7 @@ export default function App(){
   const timerRef=useRef(null);
 
   const loadAll=useCallback(async()=>{
-    const [p,a,d,e,g,t,ps,bl,sl,ms,sr,au,ch,mg,bh,as,md,ss,pa,bn,evts,mps,mf,td,stp,cl,al]=await Promise.all([
+    const [p,a,d,e,g,t,ps,bl,sl,ms,sr,au,ch,mg,bh,as,md,ss,pa,bn,evts,mps,mf,td,stp,cl,al,sTd]=await Promise.all([
       store.load("fp2:profile",D.profile),store.load("fp2:accounts",D.accounts),
       store.load("fp2:debts",D.debts),store.load("fp2:expenses",D.expenses),
       store.load("fp2:goals",D.goals),store.load("fp2:transactions",D.transactions),
@@ -63,6 +64,7 @@ export default function App(){
       store.load("fp2:shopStaples",[]),
       store.load("fp2:choreLog",D.choreLog||[]),
       store.load("fp2:allowance",D.allowance||{}),
+      store.load("fp2:sharedTodos",[]),
     ]);
     setProfile(p);setAccounts(a);setDebts(d);setExpenses(e);setGoals(g);setTransactions(t);setPslf(ps);
     setBills(bl);setBillHistory(bh||[]);
@@ -81,6 +83,7 @@ export default function App(){
     setTodos({...D.todos,...(td||{})});
     setChoreLog(cl||[]);
     setAllowance(al||{});
+    setSharedTodos(sTd||[]);
     setLoaded(true);
   },[]);
   useEffect(()=>{loadAll();},[loadAll]);
@@ -125,7 +128,7 @@ export default function App(){
   const mealPlan=normalizeWeek(mealPlans[curWk]);
   const nextWeekPlan=normalizeWeek(mealPlans[weekKeyOffset(curWk,1)]);
 
-  const sharedProps={mealPlan,nextWeekPlan,mealPlans,setMealPlans,mealFavs,setMealFavs,shopStaples,setShopStaples,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,profile,setProfile,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger,events,setEvents,todos,setTodos,choreLog,setChoreLog,allowance,setAllowance};
+  const sharedProps={mealPlan,nextWeekPlan,mealPlans,setMealPlans,mealFavs,setMealFavs,shopStaples,setShopStaples,shopList,setShopList,mealSuggestions,setMealSuggestions,shopRequests,setShopRequests,bills,setBills,billHistory,setBillHistory,profile,setProfile,chores,setChores,messages,setMessages,appSettings,setAppSettings,mealDetails,setMealDetails,shopSettings,setShopSettings,payAccounts,setPayAccounts,bradynLedger,setBradynLedger,events,setEvents,todos,setTodos,sharedTodos,setSharedTodos,choreLog,setChoreLog,allowance,setAllowance};
   const enterTv=()=>{setTvMode(true);try{window.history.replaceState(null,"","#tv");}catch(e){}};
   const exitTv=()=>{setTvMode(false);try{window.history.replaceState(null,"",window.location.pathname);}catch(e){}};
 
@@ -133,7 +136,7 @@ export default function App(){
     <SaveStatusBadge/>
     <VersionBadge/>
     {loginTarget&&<LoginModal user={loginTarget} auth={auth} onSuccess={pwd=>handleLoginSuccess(loginTarget,pwd)} onClose={()=>setLoginTarget(null)}/>}
-    {!currentUser&&tvMode&&<TVDisplay mealPlan={mealPlan} nextWeekPlan={nextWeekPlan} events={events} shopList={shopList} bills={bills} messages={messages} chores={chores} appSettings={appSettings} onExit={exitTv} onLogin={k=>{exitTv();setLoginTarget(k);}} onRefresh={loadAll}/>}
+    {!currentUser&&tvMode&&<TVDisplay mealPlan={mealPlan} nextWeekPlan={nextWeekPlan} events={events} shopList={shopList} bills={bills} messages={messages} chores={chores} sharedTodos={appSettings.sharedTodoEnabled?sharedTodos:null} appSettings={appSettings} onExit={exitTv} onLogin={k=>{exitTv();setLoginTarget(k);}} onRefresh={loadAll}/>}
     {!currentUser&&!tvMode&&<PublicHomeScreen mealPlan={mealPlan} shopList={shopList} setShopList={setShopList} bills={bills} expenses={expenses} onLogin={handleLogin} appSettings={appSettings} messages={messages} shopSettings={shopSettings} events={events} onTv={enterTv}/>}
     {currentUser==="brad"&&<BradDashboard {...sharedProps} accounts={accounts} setAccounts={setAccounts} debts={debts} setDebts={setDebts} expenses={expenses} setExpenses={setExpenses} goals={goals} setGoals={setGoals} transactions={transactions} setTransactions={setTransactions} pslf={pslf} setPslf={setPslf} scenario={scenario} setScenario={setScenario} auth={auth} setAuth={setAuth} totalAssets={totalAssets} totalDebtAmt={totalDebtAmt} netWorth={netWorth} totalCC={totalCC} combinedLiquid={combinedLiquid} cushion={cushion} dti={dti} mortgageRate={mortgageRate} monthlyMortgage={monthlyMortgage} loanAmt={loanAmt} surplus={surplus} takeHome={takeHome} totalExpenses={totalExpenses} slPayment={slPayment} downNeeded={downNeeded} closing={closing} homePrice={homePrice} onLogout={handleLogout}/>}
     {currentUser==="maryBeth"&&<MaryBethDashboard {...sharedProps} expenses={expenses} debts={debts} onLogout={handleLogout}/>}

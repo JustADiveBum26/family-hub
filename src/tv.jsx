@@ -2,7 +2,7 @@
 // Reached from the "📺 TV Display Mode" button on the landing page or by
 // bookmarking the app URL with #tv. Read-only, big type, refreshes itself.
 import { useState, useEffect, useRef } from "react";
-import { DAYS, GOLD, USERS, todayName, billPaid, weekKeyOf, dateOfWeekDay, todayISO, localISO, daysUntil, canShowChoreRow, THEMES, makeS } from "./constants";
+import { DAYS, GOLD, USERS, todayName, billPaid, weekKeyOf, dateOfWeekDay, todayISO, localISO, daysUntil, canShowChoreRow, sortOpenTodos, TODO_PRIORITY, THEMES, makeS } from "./constants";
 import { WeatherScroll } from "./shared";
 import { MonthCalendar, EventRow, CountdownStrip, WeeklyCelebrations, EventDetailPopup, eventsOnDay } from "./calendar";
 
@@ -25,7 +25,7 @@ const tvS={
   alert:c=>({background:c+"18",border:`1px solid ${c}44`,borderRadius:10,padding:"14px 18px",marginBottom:12}),
 };
 
-function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,appSettings,onExit,onLogin,onRefresh}){
+function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,sharedTodos,appSettings,onExit,onLogin,onRefresh}){
   const [now,setNow]=useState(new Date());
   // Tap/click any day on the calendar to see its full event details — hover
   // doesn't work here since most TVs have no pointer, and touchscreens have
@@ -81,6 +81,7 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
   const pinned=(messages||[]).filter(m=>m.approved&&m.pinned);
   const dueSoon=(bills||[]).filter(b=>{if(billPaid(b))return false;const dl=daysUntil(b.dueDate,now);return dl>=0&&dl<=7;});
   const todayChores=(chores||[]).filter(c=>canShowChoreRow(appSettings,c.assignee)&&c.days&&c.days.includes(tn)&&!(c.donedays||{})[todayISO()]);
+  const openTodos=sortOpenTodos(sharedTodos);
   const tomorrowIsNextWeek=DAYS.indexOf(tn)===6;
   const tomorrowDayName=DAYS[(DAYS.indexOf(tn)+1)%7];
   const tonightDinner=mealPlan[tn]?.Dinner||"";
@@ -119,6 +120,15 @@ function TVDisplay({mealPlan,nextWeekPlan,events,shopList,bills,messages,chores,
         <span key={c.id} style={{...tvS.tag(u?.color||GOLD),fontSize:13,padding:"6px 12px"}}>{u?.emoji} {u?.label}: {c.task}</span>
       );})}
     </div>)}]:[]),
+    ...(openTodos.length>0?[{key:"stodo",label:`🤝 To-Do (${openTodos.length})`,body:(<>
+      {openTodos.slice(0,6).map(i=>{const dl=i.due?daysUntil(i.due,now):null;const u=USERS.find(x=>x.key===i.assignee);return(<div key={i.id} style={{display:"flex",gap:10,padding:"6px 0",borderBottom:"1px solid #1a1a0f",alignItems:"center"}}>
+        <div style={{width:9,height:9,borderRadius:"50%",background:i.priority==="high"?TODO_PRIORITY.high.color:GOLD,flexShrink:0}}/>
+        <span style={{flex:1,fontSize:15,color:T.text}}>{i.text}</span>
+        {i.due&&<span style={{fontSize:12,color:dl<0?"#f44336":T.sub,fontFamily:"monospace"}}>{dl<0?"Overdue":dl===0?"Today":dl===1?"Tmrw":i.due.slice(5)}</span>}
+        <span style={{...tvS.tag(u?.color||T.sub),fontSize:11,padding:"2px 8px"}}>{u?u.label:"Either"}</span>
+      </div>);})}
+      {openTodos.length>6&&<div style={{fontSize:12,color:T.sub,marginTop:6}}>+{openTodos.length-6} more</div>}
+    </>)}]:[]),
   ];
   const [panelIdx,setPanelIdx]=useState(0);
   useEffect(()=>{
