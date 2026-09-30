@@ -1,7 +1,7 @@
 // ── Family features: chores, message board, settings, bills, meals, ledger ────
 import { useState, useEffect, useRef } from "react";
 import { store } from "./store";
-import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, SHOP_CATS, SHOP_STORES, POINT_VALUE, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, localISO, todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate, daysUntil, sortOpenTodos, canShowChoreRow } from "./constants";
+import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, SHOP_CATS, SHOP_STORES, POINT_VALUE, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, localISO, todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate, daysUntil, sortOpenTodos, shareTodo, completeLinkedTodo, canShowChoreRow } from "./constants";
 import { DayPills, QuickAddChip, SavedListCard, ApprovalRow, EditFormCard } from "./shared";
 import { ModalOverlay } from "./modalOverlay";
 import { RECIPE_LIBRARY } from "./recipeLibrary";
@@ -265,11 +265,11 @@ function MessageBoard({messages,setMessages,currentUser,S}){
 }
 
 // ── TO-DO TAB (personal, per-user list — separate from the shared Tasks/chores board) ─
-function TodoTab({items,onSave,S}){
+function TodoTab({items,onSave,S,user,setTodos,setSharedTodos,sharedOn}){
   const [text,setText]=useState("");
   const list=items||[];
   const add=()=>{if(!text.trim())return;onSave([...list,{id:Date.now(),text:text.trim(),done:false}]);setText("");};
-  const toggle=id=>onSave(list.map(i=>i.id===id?{...i,done:!i.done}:i));
+  const toggle=id=>{const it=list.find(i=>i.id===id);if(it&&!it.done&&it.sharedId)return completeLinkedTodo(user,id,it.sharedId,setTodos,setSharedTodos);onSave(list.map(i=>i.id===id?{...i,done:!i.done}:i));};
   const del=id=>onSave(list.filter(i=>i.id!==id));
   const clearDone=()=>onSave(list.filter(i=>!i.done));
   const pending=list.filter(i=>!i.done),done=list.filter(i=>i.done);
@@ -283,6 +283,7 @@ function TodoTab({items,onSave,S}){
     {pending.map(i=><div key={i.id} style={{display:"flex",gap:10,padding:"8px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"center"}}>
       <input type="checkbox" checked={false} onChange={()=>toggle(i.id)} style={{width:22,height:22,cursor:"pointer",flexShrink:0}}/>
       <div style={{flex:1,fontSize:14,color:S.T.text}}>{i.text}</div>
+      {sharedOn&&(i.sharedId?<span style={{fontSize:11,color:S.T.sub}}>🤝 Shared</span>:<button onClick={()=>shareTodo(user,i,setTodos,setSharedTodos)} style={S.btnGhost}>🤝 Share</button>)}
       <button onClick={()=>del(i.id)} style={S.btnDanger}>X</button>
     </div>)}
     {done.length>0&&<>
@@ -300,7 +301,7 @@ function TodoTab({items,onSave,S}){
 // ── SHARED TO-DO (Brad + Mary Beth) — one list both parents edit ─────────────
 // Every change re-reads the stored list first and applies to that, so two
 // people editing at once (or a stale tab) don't overwrite each other's items.
-function SharedTodoTab({items,setItems,currentUser,S}){
+function SharedTodoTab({items,setItems,setTodos,currentUser,S}){
   const blank={text:"",notes:""};
   const [f,setF]=useState(blank);
   const [editId,setEditId]=useState(null);
@@ -316,7 +317,7 @@ function SharedTodoTab({items,setItems,currentUser,S}){
     setF(blank);setEditId(null);
   };
   const startEdit=i=>{setF({text:i.text,notes:i.notes||""});setEditId(i.id);};
-  const toggle=id=>mutate(l=>l.map(i=>i.id===id?{...i,done:!i.done}:i));
+  const toggle=id=>{const it=list.find(i=>i.id===id);if(it&&!it.done&&it.linkedUser)return completeLinkedTodo(it.linkedUser,it.linkedId,id,setTodos,setItems);mutate(l=>l.map(i=>i.id===id?{...i,done:!i.done}:i));};
   const del=id=>mutate(l=>l.filter(i=>i.id!==id));
   const clearDone=()=>mutate(l=>l.filter(i=>!i.done));
   const pending=sortOpenTodos(list),done=list.filter(i=>i.done);
@@ -331,13 +332,11 @@ function SharedTodoTab({items,setItems,currentUser,S}){
   </div>);
   return(<div style={S.card}>
     <div style={S.h2}>🤝 Shared To-Do</div>
-    <div style={{marginBottom:14}}>
-      <input style={{...S.input,width:"100%",boxSizing:"border-box",marginBottom:8}} placeholder="Task name..." value={f.text} onChange={e=>setF({...f,text:e.target.value})} onKeyDown={e=>e.key==="Enter"&&submit()}/>
-      <textarea style={{...S.input,width:"100%",boxSizing:"border-box",minHeight:44,marginBottom:8}} placeholder="Notes (optional)" value={f.notes} onChange={e=>setF({...f,notes:e.target.value})}/>
-      <div style={{display:"flex",gap:8}}>
-        <button style={S.btn()} onClick={submit}>{editId?"Save Changes":"+ Add"}</button>
-        {editId&&<button style={S.btnGhost} onClick={()=>{setF(blank);setEditId(null);}}>Cancel</button>}
-      </div>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
+      <input style={{...S.input,flex:"1 1 140px",minWidth:0}} placeholder="Task name" value={f.text} onChange={e=>setF({...f,text:e.target.value})} onKeyDown={e=>e.key==="Enter"&&submit()}/>
+      <input style={{...S.input,flex:"2 1 180px",minWidth:0}} placeholder="Notes (optional)" value={f.notes} onChange={e=>setF({...f,notes:e.target.value})} onKeyDown={e=>e.key==="Enter"&&submit()}/>
+      <button style={S.btn()} onClick={submit}>{editId?"Save":"+ Add"}</button>
+      {editId&&<button style={S.btnGhost} onClick={()=>{setF(blank);setEditId(null);}}>Cancel</button>}
     </div>
     {pending.length===0&&<div style={{fontSize:13,color:S.T.sub,textAlign:"center",padding:"12px 0"}}>{done.length>0?"All caught up!":"Nothing on the shared list yet."}</div>}
     {pending.map(i=>row(i,false))}

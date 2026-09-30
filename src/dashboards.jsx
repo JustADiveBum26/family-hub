@@ -278,8 +278,8 @@ function BradDashboard(props){
         {tab==="cal"&&<CalendarTab events={events} setEvents={setEvents} currentUser="brad" canEdit={true} S={S}/>}
         {tab==="meals"&&<MealsTab mealPlans={mealPlans} setMealPlans={setMealPlans} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} mealFavs={mealFavs} setMealFavs={setMealFavs} shopStaples={shopStaples} setShopStaples={setShopStaples} shopSettings={shopSettings} profile={profile} expenses={expenses} S={S}/>}
         {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} choreLog={choreLog} setChoreLog={setChoreLog} appSettings={appSettings} S={S} currentUser="brad"/>}
-        {tab==="todo"&&todoOn&&<TodoTab items={todos?.brad} onSave={saveTodos} S={S}/>}
-        {tab==="stodo"&&sharedTodoOn&&<SharedTodoTab items={sharedTodos} setItems={setSharedTodos} currentUser="brad" S={S}/>}
+        {tab==="todo"&&todoOn&&<TodoTab items={todos?.brad} onSave={saveTodos} S={S} user="brad" setTodos={setTodos} setSharedTodos={setSharedTodos} sharedOn={sharedTodoOn}/>}
+        {tab==="stodo"&&sharedTodoOn&&<SharedTodoTab items={sharedTodos} setItems={setSharedTodos} setTodos={setTodos} currentUser="brad" S={S}/>}
         {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="brad" S={S}/>}
         {tab==="bills"&&<BillsTab bills={bills} setBills={setBills} billHistory={billHistory} setBillHistory={setBillHistory} profile={profile} payAccounts={payAccounts} S={S}/>}
         {tab==="bradynledger"&&<BradynLedger ledger={bradynLedger||[]} setLedger={setBradynLedger} currentUser="brad" S={S}/>}
@@ -311,8 +311,8 @@ function MaryBethDashboard({bills,setBills,billHistory,setBillHistory,mealPlan,n
         {tab==="cal"&&<CalendarTab events={events} setEvents={setEvents} currentUser="maryBeth" canEdit={true} S={S}/>}
         {tab==="meals"&&<MealsTab mealPlans={mealPlans} setMealPlans={setMealPlans} shopList={shopList} setShopList={setShopList} mealSuggestions={mealSuggestions} setMealSuggestions={setMealSuggestions} shopRequests={shopRequests} setShopRequests={setShopRequests} mealDetails={mealDetails} setMealDetails={setMealDetails} mealFavs={mealFavs} setMealFavs={setMealFavs} shopStaples={shopStaples} setShopStaples={setShopStaples} shopSettings={shopSettings} profile={profile} expenses={expenses} S={S}/>}
         {tab==="chores"&&<ChoresTab chores={chores} setChores={setChores} choreLog={choreLog} setChoreLog={setChoreLog} appSettings={appSettings} S={S} currentUser="maryBeth"/>}
-        {tab==="todo"&&todoOn&&<TodoTab items={todos?.maryBeth} onSave={saveTodos} S={S}/>}
-        {tab==="stodo"&&sharedTodoOn&&<SharedTodoTab items={sharedTodos} setItems={setSharedTodos} currentUser="maryBeth" S={S}/>}
+        {tab==="todo"&&todoOn&&<TodoTab items={todos?.maryBeth} onSave={saveTodos} S={S} user="maryBeth" setTodos={setTodos} setSharedTodos={setSharedTodos} sharedOn={sharedTodoOn}/>}
+        {tab==="stodo"&&sharedTodoOn&&<SharedTodoTab items={sharedTodos} setItems={setSharedTodos} setTodos={setTodos} currentUser="maryBeth" S={S}/>}
         {tab==="board"&&<MessageBoard messages={messages} setMessages={setMessages} currentUser="maryBeth" S={S}/>}
         {tab==="bills"&&<BillsTab bills={bills} setBills={setBills} billHistory={billHistory} setBillHistory={setBillHistory} profile={profile} payAccounts={payAccounts} S={S}/>}
         {tab==="allowance"&&<AllowanceOverview log={allowance} setLog={setAllowance} chores={chores} setChores={setChores} S={S}/>}

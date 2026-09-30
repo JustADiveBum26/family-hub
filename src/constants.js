@@ -17,7 +17,7 @@ const TIMEOUT_MS=5*60*1000;
 const POINT_VALUE=0.10;
 // Bumped by hand alongside each commit's "vNN: ..." message, so the number
 // shown in the app (VersionBadge in shared.jsx) always matches git history.
-const APP_VERSION="66";
+const APP_VERSION="67";
 
 const THEMES={
   dark:{bg:"#0d0d08",card:"#141410",border:"#2a2a18",text:"#e8e0c8",sub:"#888",accent:GOLD,name:"Dark Gold"},
@@ -104,6 +104,22 @@ const canShowChoreRow=(appSettings,id)=>{
   return true;
 };
 const sortOpenTodos=list=>(list||[]).filter(i=>!i.done).sort((a,b)=>a.id-b.id);
+// A personal to-do copied to the shared list stays linked both ways (personal
+// item gets sharedId, shared item gets linkedUser/linkedId). Both helpers
+// re-read stored data first so they act on the latest lists, not stale state.
+const shareTodo=async(user,item,setTodos,setSharedTodos)=>{
+  const [shared,personal]=await Promise.all([store.load("fp2:sharedTodos",[]),store.load("fp2:todos",D.todos)]);
+  const sharedId=Date.now();
+  const sh=[...(shared||[]),{id:sharedId,text:item.text,notes:"",done:false,addedBy:user,linkedUser:user,linkedId:item.id}];
+  const pt={...D.todos,...personal,[user]:((personal||{})[user]||[]).map(i=>i.id===item.id?{...i,sharedId}:i)};
+  setSharedTodos(sh);setTodos(pt);store.save("fp2:sharedTodos",sh);store.save("fp2:todos",pt);
+};
+const completeLinkedTodo=async(user,personalId,sharedId,setTodos,setSharedTodos)=>{
+  const [shared,personal]=await Promise.all([store.load("fp2:sharedTodos",[]),store.load("fp2:todos",D.todos)]);
+  const sh=(shared||[]).filter(i=>i.id!==sharedId);
+  const pt={...D.todos,...personal,[user]:((personal||{})[user]||[]).filter(i=>i.id!==personalId)};
+  setSharedTodos(sh);setTodos(pt);store.save("fp2:sharedTodos",sh);store.save("fp2:todos",pt);
+};
 // Dated history behind streaks/leaderboard — the source of truth for "what got
 // done when," independent of (and unaffected by) the donedays checkbox state.
 const logChoreDone=(choreLog,setChoreLog,{choreId,assignee,points,task,date})=>{
@@ -188,6 +204,6 @@ export {
   D, fmt, calcMortgage, scoreToRate, calcPayoff, todayName, billPaid,
   weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, localISO,
   todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate,
-  daysUntil, canShowChoreRow, sortOpenTodos,
+  daysUntil, canShowChoreRow, sortOpenTodos, shareTodo, completeLinkedTodo,
   makeS, makeKidS, S,
 };

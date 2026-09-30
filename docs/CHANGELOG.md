@@ -19,6 +19,14 @@ three for both parents. Stored at `fp2:sharedTodos`; every edit re-reads the
 stored list first so simultaneous edits by both parents don't clobber each
 other. Kids and the public home screen never see it.
 
+## v67 — share personal to-dos to the shared list; one-row entry form
+Personal "My To-Do" items get a 🤝 Share button that copies the item into
+the shared list. The two copies are linked: checking either one off removes
+it from both lists (unlinked shared items still go to the Done section). The
+shared entry form is now one row — task name and notes side by side with the
+Add button — instead of two stacked fields. The Share button only shows while
+the shared list is turned on.
+
 ## v66 — shared to-do list simplified to task name + notes
 The v65 shared list was too busy. Dropped assignee, priority, and due date;
 each item is now just a task name and optional notes, in the order added.
