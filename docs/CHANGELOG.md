@@ -19,6 +19,11 @@ three for both parents. Stored at `fp2:sharedTodos`; every edit re-reads the
 stored list first so simultaneous edits by both parents don't clobber each
 other. Kids and the public home screen never see it.
 
+## v68 — linked to-dos: every action hits both lists
+Deleting a linked item (X) on either list now removes it from both, matching
+completing. Editing the task name on the shared list also updates the
+personal copy. (Notes exist only on the shared list.)
+
 ## v67 — share personal to-dos to the shared list; one-row entry form
 Personal "My To-Do" items get a 🤝 Share button that copies the item into
 the shared list. The two copies are linked: checking either one off removes

@@ -1,7 +1,7 @@
 // ── Family features: chores, message board, settings, bills, meals, ledger ────
 import { useState, useEffect, useRef } from "react";
 import { store } from "./store";
-import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, SHOP_CATS, SHOP_STORES, POINT_VALUE, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, localISO, todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate, daysUntil, sortOpenTodos, shareTodo, completeLinkedTodo, canShowChoreRow } from "./constants";
+import { DAYS, DSHORT, MEAL_TYPES, CHORE_MASTER, USERS, GOLD, BILL_CATS, SHOP_CATS, SHOP_STORES, POINT_VALUE, fmt, todayName, billPaid, weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, localISO, todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate, daysUntil, sortOpenTodos, shareTodo, completeLinkedTodo, syncLinkedTodoText, canShowChoreRow } from "./constants";
 import { DayPills, QuickAddChip, SavedListCard, ApprovalRow, EditFormCard } from "./shared";
 import { ModalOverlay } from "./modalOverlay";
 import { RECIPE_LIBRARY } from "./recipeLibrary";
@@ -270,7 +270,7 @@ function TodoTab({items,onSave,S,user,setTodos,setSharedTodos,sharedOn}){
   const list=items||[];
   const add=()=>{if(!text.trim())return;onSave([...list,{id:Date.now(),text:text.trim(),done:false}]);setText("");};
   const toggle=id=>{const it=list.find(i=>i.id===id);if(it&&!it.done&&it.sharedId)return completeLinkedTodo(user,id,it.sharedId,setTodos,setSharedTodos);onSave(list.map(i=>i.id===id?{...i,done:!i.done}:i));};
-  const del=id=>onSave(list.filter(i=>i.id!==id));
+  const del=id=>{const it=list.find(i=>i.id===id);if(it&&it.sharedId)return completeLinkedTodo(user,id,it.sharedId,setTodos,setSharedTodos);onSave(list.filter(i=>i.id!==id));};
   const clearDone=()=>onSave(list.filter(i=>!i.done));
   const pending=list.filter(i=>!i.done),done=list.filter(i=>i.done);
   return(<div style={S.card}>
@@ -312,13 +312,13 @@ function SharedTodoTab({items,setItems,setTodos,currentUser,S}){
   const submit=()=>{
     if(!f.text.trim())return;
     const clean={text:f.text.trim(),notes:f.notes.trim()};
-    if(editId)mutate(l=>l.map(i=>i.id===editId?{...i,...clean}:i));
+    if(editId){const it=list.find(i=>i.id===editId);mutate(l=>l.map(i=>i.id===editId?{...i,...clean}:i));if(it&&it.linkedUser)syncLinkedTodoText(it.linkedUser,it.linkedId,clean.text,setTodos);}
     else mutate(l=>[...l,{id:Date.now(),...clean,done:false,addedBy:currentUser}]);
     setF(blank);setEditId(null);
   };
   const startEdit=i=>{setF({text:i.text,notes:i.notes||""});setEditId(i.id);};
   const toggle=id=>{const it=list.find(i=>i.id===id);if(it&&!it.done&&it.linkedUser)return completeLinkedTodo(it.linkedUser,it.linkedId,id,setTodos,setItems);mutate(l=>l.map(i=>i.id===id?{...i,done:!i.done}:i));};
-  const del=id=>mutate(l=>l.filter(i=>i.id!==id));
+  const del=id=>{const it=list.find(i=>i.id===id);if(it&&it.linkedUser)return completeLinkedTodo(it.linkedUser,it.linkedId,id,setTodos,setItems);mutate(l=>l.filter(i=>i.id!==id));};
   const clearDone=()=>mutate(l=>l.filter(i=>!i.done));
   const pending=sortOpenTodos(list),done=list.filter(i=>i.done);
   const row=(i,isDone)=>(<div key={i.id} style={{display:"flex",gap:10,padding:"9px 0",borderBottom:`1px solid ${S.T.border}`,alignItems:"flex-start",opacity:isDone?0.55:1}}>

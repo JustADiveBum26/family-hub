@@ -17,7 +17,7 @@ const TIMEOUT_MS=5*60*1000;
 const POINT_VALUE=0.10;
 // Bumped by hand alongside each commit's "vNN: ..." message, so the number
 // shown in the app (VersionBadge in shared.jsx) always matches git history.
-const APP_VERSION="67";
+const APP_VERSION="68";
 
 const THEMES={
   dark:{bg:"#0d0d08",card:"#141410",border:"#2a2a18",text:"#e8e0c8",sub:"#888",accent:GOLD,name:"Dark Gold"},
@@ -120,6 +120,11 @@ const completeLinkedTodo=async(user,personalId,sharedId,setTodos,setSharedTodos)
   const pt={...D.todos,...personal,[user]:((personal||{})[user]||[]).filter(i=>i.id!==personalId)};
   setSharedTodos(sh);setTodos(pt);store.save("fp2:sharedTodos",sh);store.save("fp2:todos",pt);
 };
+const syncLinkedTodoText=async(user,personalId,text,setTodos)=>{
+  const personal=await store.load("fp2:todos",D.todos);
+  const pt={...D.todos,...personal,[user]:((personal||{})[user]||[]).map(i=>i.id===personalId?{...i,text}:i)};
+  setTodos(pt);store.save("fp2:todos",pt);
+};
 // Dated history behind streaks/leaderboard — the source of truth for "what got
 // done when," independent of (and unaffected by) the donedays checkbox state.
 const logChoreDone=(choreLog,setChoreLog,{choreId,assignee,points,task,date})=>{
@@ -204,6 +209,6 @@ export {
   D, fmt, calcMortgage, scoreToRate, calcPayoff, todayName, billPaid,
   weekKeyOf, weekKeyOffset, dateOfWeekDay, weekLabel, normalizeWeek, localISO,
   todayISO, isoDateForDayName, logChoreDone, unlogChoreDone, addMonthToDate,
-  daysUntil, canShowChoreRow, sortOpenTodos, shareTodo, completeLinkedTodo,
+  daysUntil, canShowChoreRow, sortOpenTodos, shareTodo, completeLinkedTodo, syncLinkedTodoText,
   makeS, makeKidS, S,
 };
