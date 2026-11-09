@@ -32,6 +32,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Layout gate: builds the app and drives it in headless Chromium at phone,
+      # tablet, laptop and TV sizes (fully offline — never touches live
+      # Firestore). A page that scrolls sideways, a TV screen that clips its
+      # sign-in row, or a dashboard tab that crashes stops the deploy here,
+      # before any backup or publish happens.
+      - name: Install browser for layout checks
+        run: npx playwright install --with-deps chromium
+
+      - name: Layout checks
+        run: npx playwright test
+        env:
+          CI: "true"
+
+      - name: Upload layout screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: layout-screenshots
+          path: test-results/shots
+          retention-days: 14
+
       # Snapshot the live Firestore data before every deploy, so a future
       # data loss always has a recent restore point. Goes to a *private*
       # backups repo, never this one — this repo is public, and the data

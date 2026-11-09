@@ -59,6 +59,12 @@ body. Read recent ones before assuming something is undocumented.
 
 ## Running & deploying
 
+- `npx playwright test` runs the offline layout checks (phone/tablet/laptop/TV
+  sizes, parent dashboard tabs). It blocks all non-localhost network, so it is
+  safe to run against the live Firebase config. It also runs in CI before every
+  deploy; screenshots land in `test-results/shots/`. If you add a dashboard tab
+  it needs a `data-tab` attribute (DashboardShell already adds it).
+
 - `npm run dev` starts a local Vite dev server against the **live**
   Firebase project — there is no separate staging/dev database. Be
   careful with anything that writes data during local testing.

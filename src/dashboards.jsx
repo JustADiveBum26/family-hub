@@ -237,7 +237,7 @@ function DashboardShell({userKey,groups,badges,extraHeader,maxWidth=1300,appSett
         {groups.map((group,gi)=><div key={group.g} style={{display:"flex",alignItems:"center"}}>
           {gi>0&&<div style={{width:1,height:18,background:S.T.border,margin:"0 6px",flexShrink:0}}/>}
           <span style={{fontSize:9,color:S.T.sub,fontFamily:"monospace",letterSpacing:"0.15em",padding:"0 4px",flexShrink:0}}>{group.g}</span>
-          {group.tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{padding:"10px 12px",cursor:"pointer",fontSize:12,background:"none",border:"none",borderBottom:tab===t.id?`2px solid ${S.T.accent}`:"2px solid transparent",color:tab===t.id?S.T.accent:S.T.sub,fontFamily:"Georgia,serif",whiteSpace:"nowrap",position:"relative",WebkitTapHighlightColor:"transparent"}}>
+          {group.tabs.map(t=><button key={t.id} data-tab={t.id} onClick={()=>setTab(t.id)} style={{padding:"10px 12px",cursor:"pointer",fontSize:12,background:"none",border:"none",borderBottom:tab===t.id?`2px solid ${S.T.accent}`:"2px solid transparent",color:tab===t.id?S.T.accent:S.T.sub,fontFamily:"Georgia,serif",whiteSpace:"nowrap",position:"relative",WebkitTapHighlightColor:"transparent"}}>
             {t.icon} {t.label}
             {badges?.[t.id]>0&&<span style={{position:"absolute",top:2,right:0,background:"#f44336",color:"#fff",borderRadius:"50%",width:13,height:13,fontSize:8,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"monospace"}}>{badges[t.id]}</span>}
           </button>)}

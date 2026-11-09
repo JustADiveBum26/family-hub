@@ -8,6 +8,22 @@ replacement for it.
 
 Add one entry here per `vNN` commit going forward.
 
+## v69 — automatic layout checks before every deploy
+New Playwright suite (`tests/layout.spec.js`, run with `npx playwright test`)
+that builds the app and drives it offline in headless Chromium at phone
+(390x844), tablet, laptop, and three TV sizes. It fails on: a page that scrolls
+sideways, a TV screen whose sign-in row is pushed off-screen or that scrolls at
+all, any uncaught JS error, or a Brad/Mary Beth dashboard tab that crashes.
+It signs in through the "create password" path against built-in default data,
+so it needs no real passwords and — with all outside network blocked at the
+browser level — can never read or write live Firestore. Runs in the deploy
+workflow before the backup/build steps, so a failure blocks the deploy;
+screenshots of every screen are uploaded as a `layout-screenshots` artifact on
+each run. Only production-code change: a `data-tab` attribute on dashboard tab
+buttons so the tests can walk every tab. Not yet pixel-diffed against
+baselines — it checks structure/fit, and the screenshots are for eyeballing.
+Also notes small tap targets (<32px) as non-failing annotations.
+
 ## v65 — shared to-do list for Brad & Mary Beth
 New "Shared To-Do" list, separate from the personal "My To-Do" tabs (those are
 unchanged). Items have text, assignee (Brad / Mary Beth / either), priority,
